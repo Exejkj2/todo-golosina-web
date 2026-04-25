@@ -13,7 +13,13 @@ DB_PATH  = os.path.join(BASE_DIR, 'database', 'tienda.db')
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'todo_golosina_secreto_super_seguro'
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
+
+# Configuración de Base de Datos (PostgreSQL en Render / SQLite local)
+uri = os.environ.get('DATABASE_URL')
+if uri and uri.startswith('postgres://'):
+    uri = uri.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = uri or f'sqlite:///{DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 CORS(app)
