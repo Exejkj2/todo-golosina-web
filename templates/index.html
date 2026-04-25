@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Todo Golosina 🍬 — Tu tienda de dulces</title>
+  <meta name="description" content="Todo Golosina — La mejor tienda de golosinas de Argentina. Gummies, chocolates, chupetines y más. Pedidos online con envío a domicilio."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+</head>
+<body>
+
+<!-- ===================== NAVBAR ===================== -->
+<nav class="navbar navbar-expand-lg tg-navbar fixed-top" id="mainNavbar">
+  <div class="container">
+
+    <!-- Brand -->
+    <a class="navbar-brand tg-brand" href="#inicio">
+      <span class="tg-brand-icon">🍬</span>
+      <span class="tg-brand-name">Todo Golosina</span>
+    </a>
+
+    <!-- Mobile: cart + toggler -->
+    <div class="d-flex align-items-center gap-3 d-lg-none">
+      <button class="tg-cart-btn" aria-label="Carrito" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+        <i class="bi bi-bag-heart-fill"></i>
+        <span class="tg-cart-badge">0</span>
+      </button>
+      <button class="navbar-toggler tg-toggler" type="button"
+              data-bs-toggle="collapse" data-bs-target="#navMenu"
+              aria-controls="navMenu" aria-expanded="false" aria-label="Menú">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </div>
+
+    <!-- Collapsible menu -->
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav mx-auto gap-lg-1">
+        <li class="nav-item">
+          <a class="nav-link tg-nav-link active" href="#inicio">
+            <i class="bi bi-house-heart me-1"></i>Inicio
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link tg-nav-link" href="{{ url_for('productos') }}">
+            <i class="bi bi-grid-3x3-gap me-1"></i>Productos
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link tg-nav-link" href="{{ url_for('nosotros') }}">
+            <i class="bi bi-people-fill me-1"></i>Quiénes Somos
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link tg-nav-link" href="{{ url_for('contacto') }}">
+            <i class="bi bi-chat-heart me-1"></i>Contacto
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link tg-nav-link text-pink" href="{{ url_for('login') }}">
+            <i class="bi bi-person-circle me-1"></i>Admin
+          </a>
+        </li>
+      </ul>
+
+      <!-- Desktop right actions -->
+      <div class="d-none d-lg-flex align-items-center gap-3">
+        <button class="tg-cart-btn" aria-label="Carrito" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+          <i class="bi bi-bag-heart-fill"></i>
+          <span class="tg-cart-badge">0</span>
+        </button>
+        <a href="{{ url_for('contacto') }}" class="btn tg-btn-pill">Hacer Pedido</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== OFFCANVAS CARRITO ===== -->
+<div class="offcanvas offcanvas-end tg-offcanvas" tabindex="-1" id="cartOffcanvas" aria-labelledby="cartLabel">
+  <div class="offcanvas-header tg-offcanvas-header">
+    <h5 class="offcanvas-title" id="cartLabel"><i class="bi bi-bag-heart-fill me-2"></i>Tu Carrito</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+  </div>
+  <div class="offcanvas-body tg-offcanvas-body" id="cartBody"></div>
+  <div class="tg-offcanvas-footer" id="cartFooter"></div>
+</div>
+
+<!-- ===================== HERO ===================== -->
+<section class="tg-hero d-flex align-items-center" id="inicio">
+  <div class="tg-hero-blobs" aria-hidden="true">
+    <div class="tg-blob tg-blob--1"></div>
+    <div class="tg-blob tg-blob--2"></div>
+    <div class="tg-blob tg-blob--3"></div>
+  </div>
+  <div class="tg-floating-emojis" aria-hidden="true">
+    <span class="tg-emoji" style="--x:8%;--y:20%;--dur:6s">🍭</span>
+    <span class="tg-emoji" style="--x:85%;--y:15%;--dur:8s;--d:-2s">🍬</span>
+    <span class="tg-emoji" style="--x:5%;--y:70%;--dur:7s;--d:-4s">🍫</span>
+    <span class="tg-emoji" style="--x:90%;--y:60%;--dur:9s;--d:-1s">🍡</span>
+    <span class="tg-emoji" style="--x:50%;--y:8%;--dur:6.5s;--d:-3s">🧁</span>
+    <span class="tg-emoji" style="--x:75%;--y:82%;--dur:7.5s;--d:-5s">🍩</span>
+  </div>
+
+  <div class="container position-relative z-1">
+    <div class="row align-items-center gy-5">
+      <div class="col-lg-6">
+        <span class="tg-badge mb-3 d-inline-block">✨ Envíos a todo el país</span>
+        <h1 class="tg-hero-title">El mundo más <span class="tg-gradient-text">dulce</span> está aquí</h1>
+        <p class="tg-hero-sub mt-3 mb-4">Gummies, chocolates, chupetines, caramelos importados y mucho más. ¡Pedí online y recibí en tu casa!</p>
+        <div class="d-flex flex-wrap gap-3">
+          <a href="{{ url_for('productos') }}" class="btn tg-btn-primary tg-btn-pill px-4">
+            Ver Productos <i class="bi bi-arrow-right ms-1"></i>
+          </a>
+          <a href="{{ url_for('contacto') }}" class="btn tg-btn-ghost tg-btn-pill px-4">Hacer Pedido</a>
+        </div>
+        <div class="tg-stats d-flex flex-wrap gap-4 mt-5">
+          <div class="tg-stat">
+            <span class="tg-stat-num">500+</span>
+            <span class="tg-stat-label">Productos</span>
+          </div>
+          <div class="tg-stat-divider"></div>
+          <div class="tg-stat">
+            <span class="tg-stat-num">5k+</span>
+            <span class="tg-stat-label">Clientes felices</span>
+          </div>
+          <div class="tg-stat-divider"></div>
+          <div class="tg-stat">
+            <span class="tg-stat-num">24h</span>
+            <span class="tg-stat-label">Envío express</span>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6 text-center position-relative">
+        <div class="tg-hero-glow"></div>
+        <img src="{{ url_for('static', filename='assets/hero_candies.png') }}" alt="Surtido de golosinas premium"
+             class="tg-hero-img img-fluid rounded-4 shadow-lg"/>
+        <div class="tg-float-card tg-float-card--1">
+          <span>⭐</span>
+          <div><strong>4.9 / 5</strong><small>+2000 reseñas</small></div>
+        </div>
+        <div class="tg-float-card tg-float-card--2">
+          <span>🚀</span>
+          <div><strong>Envío gratis</strong><small>en compras +$5000</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== MARQUEE ===================== -->
+<div class="tg-marquee" aria-hidden="true">
+  <div class="tg-marquee-track">
+    <span>🍬 Gummies</span><span>🍫 Chocolates</span><span>🍭 Chupetines</span>
+    <span>🍡 Caramelos</span><span>🍩 Gomitas</span><span>🧁 Cupcakes</span>
+    <span>🍪 Cookies</span><span>🎁 Gift Boxes</span><span>🌟 Importados</span>
+    <span>🍬 Gummies</span><span>🍫 Chocolates</span><span>🍭 Chupetines</span>
+    <span>🍡 Caramelos</span><span>🍩 Gomitas</span><span>🧁 Cupcakes</span>
+    <span>🍪 Cookies</span><span>🎁 Gift Boxes</span><span>🌟 Importados</span>
+  </div>
+</div>
+
+<!-- ===================== PRODUCTOS ===================== -->
+<section class="tg-section" id="productos">
+  <div class="container">
+    <div class="text-center mb-5">
+      <span class="tg-section-tag">Nuestros Productos</span>
+      <h2 class="tg-section-title mt-2">Lo mejor en <span class="tg-gradient-text">golosinas</span></h2>
+      <p class="tg-section-sub">Seleccionamos los mejores dulces para una experiencia única.</p>
+    </div>
+
+    <div class="row g-4">
+      {% for p in destacados %}
+      <div class="col-md-6 col-lg-4">
+        <div class="tg-product-card h-100" id="prod-{{ p.id }}">
+          <div class="tg-product-img-wrap">
+            <img src="{{ p.imagen_url or p.imagen }}" alt="{{ p.nombre }}" style="width: 100%; height: 200px; object-fit: cover; object-position: center; border-radius: 12px;"/>
+            <span class="tg-product-badge">⭐ Destacado</span>
+          </div>
+          <div class="tg-product-body">
+            <span class="tg-product-tag">{{ p.categoria_rel.nombre if p.categoria_rel else 'General' }}</span>
+            <h3 class="tg-product-name">{{ p.nombre }}</h3>
+            <p class="tg-product-desc">{{ p.descripcion }}</p>
+            <div class="tg-product-footer">
+              <span class="tg-price">${{ p.precio }}</span>
+              {% if p.stock > 0 or p.permitir_sin_stock %}
+              <button class="btn tg-btn-small tg-btn-pill" onclick="addToCart({id: '{{ p.id }}', name: '{{ p.nombre }}', price: {{ p.precio }}, img: '{{ p.imagen_url or p.imagen }}', stock: {{ p.stock }}, permitir_sin_stock: {{ 'true' if p.permitir_sin_stock else 'false' }}})">
+                <i class="bi bi-bag-plus me-1"></i>Agregar
+              </button>
+              {% else %}
+              <button class="btn tg-btn-small tg-btn-pill btn-secondary" disabled style="background: #cbd5e1; border-color: #cbd5e1; color: #475569;">
+                Agotado
+              </button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12 text-center text-muted py-5">
+        <p>Aún no hay productos destacados.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+
+
+<!-- ===================== TESTIMONIOS ===================== -->
+<section class="tg-section" id="testimonios">
+  <div class="container">
+    <div class="text-center mb-5">
+      <span class="tg-section-tag">Reseñas</span>
+      <h2 class="tg-section-title mt-2">Lo que dicen nuestros <span class="tg-gradient-text">clientes</span></h2>
+    </div>
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="tg-testimonial-card" id="test-1">
+          <div class="tg-stars">⭐⭐⭐⭐⭐</div>
+          <p class="tg-text-muted mt-2">"¡Las mejores golosinas! La caja sorpresa para el cumple de mi hija fue un éxito total."</p>
+          <div class="d-flex align-items-center gap-2 mt-3">
+            <div class="tg-avatar">S</div>
+            <div><strong class="d-block small">Sofía M.</strong><span class="tg-text-muted" style="font-size:.8rem">Buenos Aires</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="tg-testimonial-card" id="test-2">
+          <div class="tg-stars">⭐⭐⭐⭐⭐</div>
+          <p class="tg-text-muted mt-2">"Pedí los gummies y llegaron súper frescos. Ya hice 3 pedidos y nunca me fallaron."</p>
+          <div class="d-flex align-items-center gap-2 mt-3">
+            <div class="tg-avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">M</div>
+            <div><strong class="d-block small">Mateo R.</strong><span class="tg-text-muted" style="font-size:.8rem">Córdoba</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="tg-testimonial-card" id="test-3">
+          <div class="tg-stars">⭐⭐⭐⭐⭐</div>
+          <p class="tg-text-muted mt-2">"Usé Todo Golosina para los souvenirs de mi casamiento. ¡Todos mis invitados preguntaron dónde las compramos!"</p>
+          <div class="d-flex align-items-center gap-2 mt-3">
+            <div class="tg-avatar" style="background:linear-gradient(135deg,#06b6d4,#6366f1)">L</div>
+            <div><strong class="d-block small">Laura G.</strong><span class="tg-text-muted" style="font-size:.8rem">Rosario</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="tg-footer">
+  <div class="container">
+    <div class="row gy-4 py-5">
+      <div class="col-lg-4 col-md-6">
+        <a href="#inicio" class="tg-brand d-inline-flex align-items-center gap-2 mb-3 text-decoration-none">
+          <span class="tg-brand-icon">🍬</span>
+          <span class="tg-brand-name">Todo Golosina</span>
+        </a>
+        <p class="tg-text-muted small">La tienda de golosinas más dulce de Argentina. Hacemos que cada momento sea especial.</p>
+        <div class="d-flex gap-3 mt-3">
+          <a href="https://instagram.com/todogolosina" class="tg-social-icon" aria-label="Instagram" id="footer-instagram">
+            <i class="bi bi-instagram"></i>
+          </a>
+          <a href="https://wa.me/5491100000000" class="tg-social-icon" aria-label="WhatsApp" id="footer-whatsapp">
+            <i class="bi bi-whatsapp"></i>
+          </a>
+          <a href="mailto:info@todogolosina.com" class="tg-social-icon" aria-label="Email" id="footer-email">
+            <i class="bi bi-envelope-heart"></i>
+          </a>
+        </div>
+      </div>
+      <div class="col-lg-2 col-md-6 offset-lg-1">
+        <h5 class="tg-footer-heading">Navegación</h5>
+        <ul class="list-unstyled mt-3 d-flex flex-column gap-2">
+          <li><a href="{{ url_for('index') }}"     class="tg-footer-link">Inicio</a></li>
+          <li><a href="{{ url_for('productos') }}"  class="tg-footer-link">Productos</a></li>
+          <li><a href="{{ url_for('nosotros') }}"   class="tg-footer-link">Quiénes Somos</a></li>
+          <li><a href="{{ url_for('contacto') }}"   class="tg-footer-link">Contacto</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <h5 class="tg-footer-heading">Productos</h5>
+        <ul class="list-unstyled mt-3 d-flex flex-column gap-2">
+          <li><a href="#prod-gummies"    class="tg-footer-link">Gummies</a></li>
+          <li><a href="#prod-lollipops"  class="tg-footer-link">Chupetines</a></li>
+          <li><a href="#prod-chocolates" class="tg-footer-link">Chocolates</a></li>
+          <li><a href="#prod-giftbox"    class="tg-footer-link">Gift Boxes</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <h5 class="tg-footer-heading">Contacto Rápido</h5>
+        <ul class="list-unstyled mt-3 d-flex flex-column gap-2">
+          <li><a href="https://wa.me/5491100000000" class="tg-footer-link"><i class="bi bi-whatsapp me-1"></i>+54 9 11 0000-0000</a></li>
+          <li><a href="mailto:info@todogolosina.com" class="tg-footer-link"><i class="bi bi-envelope me-1"></i>info@todogolosina.com</a></li>
+          <li><a href="https://instagram.com/todogolosina" class="tg-footer-link"><i class="bi bi-instagram me-1"></i>@todogolosina</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="tg-footer-bottom">
+      <p class="mb-0 small tg-text-muted">© 2025 Todo Golosina. Hecho con 🍬 y mucho amor en Argentina.</p>
+    </div>
+  </div>
+</footer>
+
+<!-- Cart Toast -->
+<div class="tg-toast" id="cartToast" role="alert" aria-live="polite">
+  <i class="bi bi-bag-check-fill me-2"></i>
+  <span id="toastMsg">¡Producto agregado!</span>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='cart.js') }}"></script>
+<script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>

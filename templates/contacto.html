@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Contacto — Todo Golosina 🍬</title>
+  <meta name="description" content="Contactate con Todo Golosina. Dejanos tu mensaje o visitanos en nuestro local en Aguilares, Tucumán."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+  <style>
+    .tg-page-header {
+      padding: 140px 0 60px;
+      position: relative;
+      overflow: hidden;
+    }
+    .tg-map-container {
+      border-radius: 25px;
+      overflow: hidden;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+      height: 450px;
+      position: relative;
+    }
+    .tg-map-container iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+    .tg-contact-info-card {
+      background: white;
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+      margin-bottom: 2rem;
+      border: 1px solid rgba(0,0,0,0.05);
+      transition: transform 0.3s ease;
+    }
+    .tg-contact-info-card:hover {
+      transform: translateY(-5px);
+    }
+    .tg-info-icon {
+      width: 50px;
+      height: 50px;
+      background: var(--tg-primary-light);
+      color: var(--tg-primary);
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar navbar-expand-lg tg-navbar fixed-top scrolled" id="mainNavbar">
+  <div class="container">
+    <a class="navbar-brand tg-brand" href="{{ url_for('index') }}">
+      <span class="tg-brand-icon">🍬</span>
+      <span class="tg-brand-name">Todo Golosina</span>
+    </a>
+    <div class="d-flex align-items-center gap-3 d-lg-none">
+      <button class="tg-cart-btn" aria-label="Carrito" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+        <i class="bi bi-bag-heart-fill"></i>
+        <span class="tg-cart-badge">0</span>
+      </button>
+      <button class="navbar-toggler tg-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </div>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav mx-auto gap-lg-1">
+        <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('index') }}"><i class="bi bi-house-heart me-1"></i>Inicio</a></li>
+        <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('productos') }}"><i class="bi bi-grid-3x3-gap me-1"></i>Productos</a></li>
+        <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('nosotros') }}"><i class="bi bi-people-fill me-1"></i>Quiénes Somos</a></li>
+        <li class="nav-item"><a class="nav-link tg-nav-link active" href="{{ url_for('contacto') }}"><i class="bi bi-chat-heart me-1"></i>Contacto</a></li>
+      </ul>
+      <div class="d-none d-lg-flex align-items-center gap-3">
+        <button class="tg-cart-btn" aria-label="Carrito" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+          <i class="bi bi-bag-heart-fill"></i>
+          <span class="tg-cart-badge">0</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== OFFCANVAS CARRITO ===== -->
+<div class="offcanvas offcanvas-end tg-offcanvas" tabindex="-1" id="cartOffcanvas" aria-labelledby="cartOffcanvasLabel">
+  <div class="offcanvas-header tg-offcanvas-header">
+    <h5 class="offcanvas-title" id="cartOffcanvasLabel">
+      <i class="bi bi-bag-heart-fill me-2"></i>Tu Carrito
+    </h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+  </div>
+  <div class="offcanvas-body tg-offcanvas-body" id="cartBody"></div>
+  <div class="tg-offcanvas-footer" id="cartFooter"></div>
+</div>
+
+<!-- ===== PAGE HEADER ===== -->
+<header class="tg-page-header text-center">
+  <div class="container position-relative z-1">
+    <span class="tg-badge mb-3 d-inline-block">💬 ¡Hablemos!</span>
+    <h1 class="tg-hero-title">Ponete en <span class="tg-gradient-text">Contacto</span></h1>
+    <p class="tg-hero-sub mx-auto mt-3">Ya sea para un pedido especial, souvenirs para eventos o consultas generales. ¡Estamos para ayudarte!</p>
+  </div>
+</header>
+
+<!-- ===== CONTACT INFO & FORM ===== -->
+<section class="tg-section py-0 pb-5">
+  <div class="container">
+    <div class="row gy-5">
+      <!-- Columna Formulario -->
+      <div class="col-lg-6">
+        <div style="background: white; padding: 2.5rem; border-radius: 25px; box-shadow: 0 15px 40px rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.03);">
+          <h3 class="h4 mb-4 fw-bold">Dejanos tu mensaje</h3>
+          <form class="tg-form" id="contactFormPage" novalidate>
+            <div class="mb-4">
+              <label for="inputName" class="tg-label">Tu nombre o empresa</label>
+              <input type="text" class="tg-input form-control" id="inputName" placeholder="Ej: María García" required/>
+            </div>
+            <div class="mb-4">
+              <label for="inputEmail" class="tg-label">Correo electrónico</label>
+              <input type="email" class="tg-input form-control" id="inputEmail" placeholder="tu@email.com" required/>
+            </div>
+            <div class="mb-4">
+              <label for="inputAsunto" class="tg-label">Motivo de contacto</label>
+              <select class="tg-input form-select" id="inputAsunto">
+                <option value="consulta">Consulta general</option>
+                <option value="pedido">Pedido especial / Cumpleaños</option>
+                <option value="mayorista">Compra mayorista</option>
+                <option value="problema">Problema con una compra</option>
+              </select>
+            </div>
+            <div class="mb-4">
+              <label for="inputMsg" class="tg-label">Tu mensaje</label>
+              <textarea class="tg-input form-control" id="inputMsg" rows="5"
+                placeholder="Contanos qué necesitas..." required></textarea>
+            </div>
+            <button type="submit" class="btn tg-btn-primary tg-btn-pill w-100 py-3" id="submitBtn">
+              <span id="btnText">Enviar Mensaje <i class="bi bi-send ms-1"></i></span>
+            </button>
+            <div class="tg-form-success mt-3 d-none" id="formSuccess">
+              ✅ ¡Mensaje enviado con éxito! Te responderemos a la brevedad.
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Columna Info y Mapa -->
+      <div class="col-lg-5 offset-lg-1">
+        
+        <!-- Tarjetas de Info -->
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6">
+            <div class="tg-contact-info-card h-100 mb-0">
+              <div class="tg-info-icon"><i class="bi bi-whatsapp"></i></div>
+              <h4 class="h5 fw-bold mb-1">WhatsApp</h4>
+              <p class="text-muted small mb-0">+54 9 11 0000-0000</p>
+              <a href="https://wa.me/5491100000000" class="stretched-link text-decoration-none small fw-bold" style="color:var(--tg-primary)">Enviar mensaje</a>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="tg-contact-info-card h-100 mb-0">
+              <div class="tg-info-icon"><i class="bi bi-envelope-heart"></i></div>
+              <h4 class="h5 fw-bold mb-1">Email</h4>
+              <p class="text-muted small mb-0">info@todogolosina.com</p>
+              <a href="mailto:info@todogolosina.com" class="stretched-link text-decoration-none small fw-bold" style="color:var(--tg-primary)">Escribir email</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="tg-contact-info-card">
+          <div class="tg-info-icon"><i class="bi bi-geo-alt"></i></div>
+          <h4 class="h5 fw-bold mb-1">Nuestro Local</h4>
+          <p class="text-muted small mb-2">Visitanos en nuestra tienda física para disfrutar de toda la experiencia.</p>
+          <p class="mb-0 fw-bold">📍 Aguilares, Tucumán, Argentina</p>
+          <p class="text-muted small mt-1 mb-0">Horarios: Lun a Sab de 9:00 a 13:00 y de 17:00 a 21:00 hs.</p>
+        </div>
+
+      </div>
+    </div>
+    
+    <!-- Mapa de Google Embebido (Aguilares, Tucumán) -->
+    <div class="row mt-5 pt-4">
+      <div class="col-12 text-center mb-4">
+        <h3 class="h4 fw-bold">¿Cómo llegar?</h3>
+      </div>
+      <div class="col-12">
+        <div class="tg-map-container">
+          <!-- Google Maps iframe apuntando a Aguilares, Tucumán -->
+          <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d28362.475961011118!2d-65.642055!3d-27.4299839!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x9423c52e1f40d5e1%3A0x6b876fc1eb2cb1a!2sAguilares%2C%20Tucum%C3%A1n!5e0!3m2!1ses!2sar!4v1713500000000!5m2!1ses!2sar" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="tg-footer mt-auto">
+  <div class="container">
+    <div class="row gy-4 py-5">
+      <div class="col-lg-4 col-md-6">
+        <a href="{{ url_for('index') }}" class="tg-brand d-inline-flex align-items-center gap-2 mb-3 text-decoration-none">
+          <span class="tg-brand-icon">🍬</span>
+          <span class="tg-brand-name">Todo Golosina</span>
+        </a>
+        <p class="tg-text-muted small">La tienda de golosinas más dulce de Argentina. Desde Aguilares con amor.</p>
+        <div class="d-flex gap-3 mt-3">
+          <a href="https://instagram.com/todogolosina" class="tg-social-icon" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
+          <a href="https://wa.me/5491100000000" class="tg-social-icon" aria-label="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+          <a href="mailto:info@todogolosina.com" class="tg-social-icon" aria-label="Email"><i class="bi bi-envelope-heart"></i></a>
+        </div>
+      </div>
+      <div class="col-lg-2 col-md-6 offset-lg-1">
+        <h5 class="tg-footer-heading">Navegación</h5>
+        <ul class="list-unstyled mt-3 d-flex flex-column gap-2">
+          <li><a href="{{ url_for('index') }}" class="tg-footer-link">Inicio</a></li>
+          <li><a href="{{ url_for('productos') }}" class="tg-footer-link">Productos</a></li>
+          <li><a href="{{ url_for('nosotros') }}" class="tg-footer-link">Quiénes Somos</a></li>
+          <li><a href="{{ url_for('contacto') }}" class="tg-footer-link">Contacto</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <h5 class="tg-footer-heading">Contacto</h5>
+        <ul class="list-unstyled mt-3 d-flex flex-column gap-2">
+          <li><a href="https://wa.me/5491100000000" class="tg-footer-link"><i class="bi bi-whatsapp me-1"></i>+54 9 11 0000-0000</a></li>
+          <li><a href="mailto:info@todogolosina.com" class="tg-footer-link"><i class="bi bi-envelope me-1"></i>info@todogolosina.com</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="tg-footer-bottom">
+      <p class="mb-0 small tg-text-muted">© 2025 Todo Golosina. Hecho con 🍬 y amor en Argentina.</p>
+    </div>
+  </div>
+</footer>
+
+<!-- Toast -->
+<div class="tg-toast" id="cartToast" role="alert" aria-live="polite">
+  <i class="bi bi-bag-check-fill me-2"></i>
+  <span id="toastMsg">¡Producto agregado!</span>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='cart.js') }}"></script>
+<script>
+  // Script específico para el formulario de la página de contacto
+  const formPage = document.getElementById('contactFormPage');
+  
+  // Función para validar email con Regex
+  function isValidEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  }
+
+  // Función auxiliar para mostrar error visual
+  function setInvalid(elementId) {
+    const el = document.getElementById(elementId);
+    el.style.borderColor = '#f43f5e';
+    el.classList.add('is-invalid');
+    el.addEventListener('input', () => { 
+      el.style.borderColor = ''; 
+      el.classList.remove('is-invalid');
+    }, { once: true });
+  }
+
+  if (formPage) {
+    formPage.addEventListener('submit', e => {
+      e.preventDefault();
+      
+      const nameEl  = document.getElementById('inputName');
+      const emailEl = document.getElementById('inputEmail');
+      const msgEl   = document.getElementById('inputMsg');
+
+      const name  = nameEl.value.trim();
+      const email = emailEl.value.trim();
+      const msg   = msgEl.value.trim();
+
+      let hasError = false;
+
+      // Validación de Nombre
+      if (!name) {
+        setInvalid('inputName');
+        hasError = true;
+      }
+
+      // Validación de Mensaje
+      if (!msg) {
+        setInvalid('inputMsg');
+        hasError = true;
+      }
+
+      // Validación de Email rigurosa
+      if (!email || !isValidEmail(email)) {
+        setInvalid('inputEmail');
+        hasError = true;
+      }
+
+      // Si hay error, detenemos el envío
+      if (hasError) return;
+
+      // Estado de carga
+      const btn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('btnText');
+      const originalText = btnText.innerHTML;
+      
+      btnText.innerHTML = '⏳ Enviando...';
+      btn.disabled = true;
+
+      // Simulación de envío a backend
+      setTimeout(() => {
+        formPage.reset();
+        const ok = document.getElementById('formSuccess');
+        ok.classList.remove('d-none');
+        
+        btnText.innerHTML = originalText;
+        btn.disabled = false;
+        
+        setTimeout(() => ok.classList.add('d-none'), 5000);
+      }, 1500);
+    });
+  }
+</script>
+</body>
+</html>
