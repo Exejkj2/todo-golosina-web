@@ -49,7 +49,7 @@ class Producto(db.Model):
     descripcion = db.Column(db.Text)
     precio = db.Column(db.Float, nullable=False)
     imagen = db.Column(db.String(255), default='')
-    imagen_url = db.Column(db.String(500), default='')
+    imagen_url = db.Column(db.Text, default='')
     categoria_id = db.Column(db.Integer, db.ForeignKey('categoria.id'))
     categoria_rel = db.relationship('Categoria', backref='productos')
     stock = db.Column(db.Integer, default=0)
