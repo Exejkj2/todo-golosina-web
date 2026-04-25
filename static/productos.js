@@ -4,7 +4,7 @@
    Depende de cart.js (cargado antes en el HTML)
    ============================================================ */
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = '/api';
 
 // ─── Estado ────────────────────────────────────────────────────
 let todosLosProductos = [];   // copia completa desde la API
@@ -237,8 +237,8 @@ function mostrarAlertaAPI() {
   alert.id = 'apiAlert';
   alert.className = 'tg-api-alert';
   alert.innerHTML = `
-    <i class="bi bi-wifi-off me-2"></i>
-    <span>API offline — mostrando catálogo local. Iniciá el servidor con <code>python app.py</code></span>
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    <span>No se pudo conectar con el servidor. Mostrando catálogo de respaldo.</span>
     <button onclick="this.parentElement.remove()" class="tg-api-alert-close">✕</button>`;
   document.querySelector('.tg-filters-bar')?.insertAdjacentElement('afterend', alert);
 }
