@@ -220,7 +220,8 @@ def admin_add_product():
         
     descripcion = request.form.get('descripcion', '')
     imagen_url = request.form.get('imagen_url', '')
-    categoria_id = request.form.get('categoria_id')
+    categoria_id_str = request.form.get('categoria_id')
+    categoria_id = int(categoria_id_str) if categoria_id_str and categoria_id_str.isdigit() else None
     
     stock_str = request.form.get('stock', '0').strip()
     try:
@@ -245,30 +246,35 @@ def admin_add_product():
 @login_required
 def admin_edit_product(id):
     producto = db.session.get(Producto, id)
-    if producto:
-        producto.nombre = request.form.get('nombre')
-        
-        precio_str = request.form.get('precio', '0').strip().replace(',', '.')
-        try:
-            producto.precio = float(precio_str) if precio_str else 0.0
-        except ValueError:
-            producto.precio = 0.0
-            
-        producto.descripcion = request.form.get('descripcion', '')
-        producto.imagen_url = request.form.get('imagen_url', '')
-        producto.categoria_id = request.form.get('categoria_id')
-        
-        stock_str = request.form.get('stock', '0').strip()
-        try:
-            producto.stock = int(stock_str) if stock_str else 0
-        except ValueError:
-            producto.stock = 0
+    if not producto:
+        flash('Producto no encontrado.', 'danger')
+        return redirect(url_for('admin_dashboard'))
 
-        producto.favorito = True if request.form.get('favorito') else False
-        producto.permitir_sin_stock = True if request.form.get('permitir_sin_stock') else False
-            
-        db.session.commit()
-        flash('Producto editado correctamente.', 'info')
+    producto.nombre = request.form.get('nombre')
+    
+    precio_str = request.form.get('precio', '0').strip().replace(',', '.')
+    try:
+        producto.precio = float(precio_str) if precio_str else 0.0
+    except ValueError:
+        producto.precio = 0.0
+        
+    producto.descripcion = request.form.get('descripcion', '')
+    producto.imagen_url = request.form.get('imagen_url', '')
+    
+    cat_id_str = request.form.get('categoria_id')
+    producto.categoria_id = int(cat_id_str) if cat_id_str and cat_id_str.isdigit() else None
+    
+    stock_str = request.form.get('stock', '0').strip()
+    try:
+        producto.stock = int(stock_str) if stock_str else 0
+    except ValueError:
+        producto.stock = 0
+
+    producto.favorito = True if request.form.get('favorito') else False
+    producto.permitir_sin_stock = True if request.form.get('permitir_sin_stock') else False
+        
+    db.session.commit()
+    flash('Producto editado correctamente.', 'info')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/producto/delete/<int:id>', methods=['POST'])
