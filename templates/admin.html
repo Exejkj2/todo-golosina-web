@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Dashboard - Todo Golosina</title>
     <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&family=Roboto:wght@300;400;500;700;900&display=swap"
       rel="stylesheet"
     />
     <link
@@ -76,6 +76,15 @@
         vertical-align: middle;
         color: #334155;
       }
+    
+      .tg-brand-name {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 800;
+        font-size: 1.5rem;
+        color: white;
+        letter-spacing: -0.02em;
+        text-transform: none;
+      }
     </style>
   </head>
   <body>
@@ -118,7 +127,7 @@
                 />
               </g>
             </svg> </span
-          ><br />Todo Golosina
+          ><br /><span class="tg-brand-name">Todo Golosina</span>
         </h4>
         <a href="{{ url_for('admin_dashboard') }}" class="active"><i class="bi bi-box-seam me-2"></i> Productos</a>
         <a href="{{ url_for('admin_categorias') }}"><i class="bi bi-tags me-2"></i> Categorías</a>

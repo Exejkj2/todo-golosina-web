@@ -68,9 +68,12 @@ body {
 .tg-brand { display: inline-flex; align-items: center; gap: .45rem; text-decoration: none; }
 .tg-brand-icon { font-size: 1.6rem; }
 .tg-brand-name {
-  font-family: 'Pacifico', cursive;
-  font-size: 1.4rem;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 1.5rem;
   color: var(--mp-dark);
+  letter-spacing: -0.02em;
+  text-transform: none;
 }
 
 /* Nav links */
