@@ -74,7 +74,11 @@
             <i class="bi bi-person-circle me-1"></i>Admin
           </a>
         </li>
-      </ul>
+      
+        <li class="nav-item ms-lg-3 d-flex align-items-center">
+          <input type="text" id="buscadorProductos" class="form-control form-control-sm rounded-pill px-3" placeholder="Buscar golosinas (ej: Hamlet)..." style="min-width: 220px; border: 1px solid #009EE3;">
+        </li>
+</ul>
 
       <!-- Desktop right actions -->
       <div class="d-none d-lg-flex align-items-center gap-3">
@@ -195,7 +199,19 @@
               <h3 class="tg-product-name">{{ p.nombre }}</h3>
               <p class="tg-product-desc">{{ p.descripcion }}</p>
               <div class="tg-product-footer">
-                <span class="tg-price">${{ p.precio }}</span>
+                
+                {% if p.precio_anterior and p.precio_anterior > p.precio %}
+                  <div class="d-flex flex-column">
+                    <span class="text-decoration-line-through text-muted" style="font-size:0.85rem">${{ p.precio_anterior }}</span>
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="tg-price text-success">${{ p.precio }}</span>
+                      <span class="badge bg-success" style="font-size:0.7rem;">{{ ((p.precio_anterior - p.precio) / p.precio_anterior * 100)|round|int }}% OFF</span>
+                    </div>
+                  </div>
+                {% else %}
+                  <span class="tg-price">${{ p.precio }}</span>
+                {% endif %}
+
                 <!--
                 {% if p.stock > 0 or p.permitir_sin_stock %}
                 <button class="btn tg-btn-small tg-btn-pill" onclick="event.preventDefault(); addToCart({id: '{{ p.id }}', name: '{{ p.nombre }}', price: {{ p.precio }}, img: '{{ p.imagen_url or p.imagen }}', stock: {{ p.stock }}, permitir_sin_stock: {{ 'true' if p.permitir_sin_stock else 'false' }}})">
@@ -268,59 +284,43 @@
 
 
 <!-- ===================== FOOTER ===================== -->
-<footer class="tg-footer">
+
+<!-- ===================== FOOTER DE CONFIANZA ===================== -->
+<footer class="tg-footer" style="background-color: #F5F5F5; border-top: 1px solid rgba(0,0,0,0.1);">
   <div class="container">
-    <div class="row gy-4 py-5">
-      <div class="col-lg-4 col-md-6">
-        <a href="#inicio" class="tg-brand d-inline-flex align-items-center gap-2 mb-3 text-decoration-none">
-          <span class="tg-brand-icon">🍬</span>
-          <span class="tg-brand-name">Todo Golosina</span>
-        </a>
-        <p class="tg-text-muted small">La tienda de golosinas más dulce de Argentina. Hacemos que cada momento sea especial.</p>
-        <div class="d-flex gap-3 mt-3">
-          <a href="https://instagram.com/todogolosina" class="tg-social-icon" aria-label="Instagram" id="footer-instagram">
-            <i class="bi bi-instagram"></i>
-          </a>
-          <a href="https://wa.me/5491100000000" class="tg-social-icon" aria-label="WhatsApp" id="footer-whatsapp">
-            <i class="bi bi-whatsapp"></i>
-          </a>
-          <a href="mailto:info@todogolosina.com" class="tg-social-icon" aria-label="Email" id="footer-email">
-            <i class="bi bi-envelope-heart"></i>
-          </a>
+    <div class="row py-5 text-center text-md-start">
+      <!-- Columna 1: Medios de Pago -->
+      <div class="col-md-4 mb-4 mb-md-0">
+        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-credit-card me-2"></i>Medios de Pago</h5>
+        <ul class="list-unstyled text-muted small d-flex flex-column gap-2">
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Mercado Pago</li>
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Transferencia Bancaria</li>
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Efectivo</li>
+        </ul>
+      </div>
+      <!-- Columna 2: Logística -->
+      <div class="col-md-4 mb-4 mb-md-0">
+        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-truck me-2"></i>Envíos y Entregas</h5>
+        <p class="text-muted small mb-0">
+          Envíos a domicilio en <strong>Aguilares, Famaillá y Los Ralos</strong>.<br>
+          Retiro por sucursal disponible.
+        </p>
+      </div>
+      <!-- Columna 3: Redes Sociales -->
+      <div class="col-md-4">
+        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-phone me-2"></i>Seguinos</h5>
+        <div class="d-flex justify-content-center justify-content-md-start gap-3">
+          <a href="#" class="btn btn-outline-secondary rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-instagram"></i></a>
+          <a href="#" class="btn btn-outline-secondary rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-facebook"></i></a>
         </div>
       </div>
-      <div class="col-lg-2 col-md-6 offset-lg-1">
-        <h5 class="tg-footer-heading">Navegación</h5>
-        <ul class="list-unstyled mt-3 d-flex flex-column gap-2">
-          <li><a href="{{ url_for('index') }}"     class="tg-footer-link">Inicio</a></li>
-          <li><a href="{{ url_for('productos') }}"  class="tg-footer-link">Productos</a></li>
-          <li><a href="{{ url_for('nosotros') }}"   class="tg-footer-link">Quiénes Somos</a></li>
-          <li><a href="{{ url_for('contacto') }}"   class="tg-footer-link">Contacto</a></li>
-        </ul>
-      </div>
-      <div class="col-lg-2 col-md-6">
-        <h5 class="tg-footer-heading">Productos</h5>
-        <ul class="list-unstyled mt-3 d-flex flex-column gap-2">
-          <li><a href="#prod-gummies"    class="tg-footer-link">Gummies</a></li>
-          <li><a href="#prod-lollipops"  class="tg-footer-link">Chupetines</a></li>
-          <li><a href="#prod-chocolates" class="tg-footer-link">Chocolates</a></li>
-          <li><a href="#prod-giftbox"    class="tg-footer-link">Gift Boxes</a></li>
-        </ul>
-      </div>
-      <div class="col-lg-3 col-md-6">
-        <h5 class="tg-footer-heading">Contacto Rápido</h5>
-        <ul class="list-unstyled mt-3 d-flex flex-column gap-2">
-          <li><a href="https://wa.me/5491100000000" class="tg-footer-link"><i class="bi bi-whatsapp me-1"></i>+54 9 11 0000-0000</a></li>
-          <li><a href="mailto:info@todogolosina.com" class="tg-footer-link"><i class="bi bi-envelope me-1"></i>info@todogolosina.com</a></li>
-          <li><a href="https://instagram.com/todogolosina" class="tg-footer-link"><i class="bi bi-instagram me-1"></i>@todogolosina</a></li>
-        </ul>
-      </div>
     </div>
-    <div class="tg-footer-bottom">
-      <p class="mb-0 small tg-text-muted">© 2025 Todo Golosina. Hecho con 🍬 y mucho amor en Argentina.</p>
+    <div class="text-center py-3 border-top border-secondary-subtle">
+      <p class="mb-0 small text-muted">© 2026 Todo Golosina. Todos los derechos reservados.</p>
     </div>
   </div>
 </footer>
+
 
 <!-- Cart Toast -->
 <div class="tg-toast" id="cartToast" role="alert" aria-live="polite">
@@ -331,5 +331,41 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='cart.js') }}"></script>
 <script src="{{ url_for('static', filename='main.js') }}"></script>
+
+<!-- Botón WhatsApp Flotante -->
+<a href="https://wa.me/5491100000000?text=¡Hola! Vengo de la tienda online de Todo Golosina y tengo una consulta..." 
+   target="_blank" 
+   class="tg-whatsapp-btn" 
+   aria-label="Chat en WhatsApp">
+  <i class="bi bi-whatsapp"></i>
+</a>
+
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const buscador = document.getElementById('buscadorProductos');
+    if(buscador) {
+      buscador.addEventListener('keyup', function(e) {
+        const text = e.target.value.toLowerCase();
+        const cards = document.querySelectorAll('.tg-product-card');
+        cards.forEach(card => {
+          const titleEl = card.querySelector('.tg-product-name');
+          if(titleEl) {
+            const title = titleEl.textContent.toLowerCase();
+            const colParent = card.closest('.col-md-6, .col-lg-4, .col-6, .col-12, .col-md-3, .col-lg-3');
+            if(title.includes(text)) {
+              if(colParent) colParent.style.display = '';
+              else card.style.display = '';
+            } else {
+              if(colParent) colParent.style.display = 'none';
+              else card.style.display = 'none';
+            }
+          }
+        });
+      });
+    }
+  });
+</script>
+
 </body>
 </html>

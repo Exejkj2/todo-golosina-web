@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ producto.nombre }} — Todo Golosina 🍬</title>
+  <meta name="description" content="{{ producto.descripcion }}"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NYF6GLTJET"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-NYF6GLTJET');
+  </script>
+</head>
+<body>
+
+<!-- ===================== NAVBAR ===================== -->
+<nav class="navbar navbar-expand-lg tg-navbar fixed-top" id="mainNavbar">
+  <div class="container">
+    <a class="navbar-brand tg-brand" href="{{ url_for('index') }}">
+      <span class="tg-brand-icon">🍬</span>
+      <span class="tg-brand-name">Todo Golosina</span>
+    </a>
+    <div class="d-flex align-items-center gap-3 d-lg-none">
+      <button class="tg-cart-btn" aria-label="Carrito" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+        <i class="bi bi-bag-heart-fill"></i>
+        <span class="tg-cart-badge">0</span>
+      </button>
+      <button class="navbar-toggler tg-toggler" type="button"
+              data-bs-toggle="collapse" data-bs-target="#navMenu"
+              aria-controls="navMenu" aria-expanded="false" aria-label="Menú">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </div>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav mx-auto gap-lg-1">
+        <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('index') }}"><i class="bi bi-house-heart me-1"></i>Inicio</a></li>
+        <li class="nav-item"><a class="nav-link tg-nav-link active" href="{{ url_for('productos') }}"><i class="bi bi-grid-3x3-gap me-1"></i>Productos</a></li>
+        <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('nosotros') }}"><i class="bi bi-people-fill me-1"></i>Quiénes Somos</a></li>
+        <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('contacto') }}"><i class="bi bi-chat-heart me-1"></i>Contacto</a></li>
+        <li class="nav-item ms-lg-3 d-flex align-items-center">
+          <input type="text" id="buscadorProductos" class="form-control form-control-sm rounded-pill px-3" placeholder="Buscar golosinas..." style="min-width: 220px; border: 1px solid #009EE3;">
+        </li>
+      </ul>
+      <div class="d-none d-lg-flex align-items-center gap-3">
+        <button class="tg-cart-btn" aria-label="Carrito" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+          <i class="bi bi-bag-heart-fill"></i>
+          <span class="tg-cart-badge">0</span>
+        </button>
+        <a href="{{ url_for('contacto') }}" class="btn tg-btn-pill btn-primary" style="background:#009EE3; color:white; border:none;">Hacer Pedido</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== OFFCANVAS CARRITO ===== -->
+<div class="offcanvas offcanvas-end tg-offcanvas" tabindex="-1" id="cartOffcanvas" aria-labelledby="cartLabel">
+  <div class="offcanvas-header tg-offcanvas-header">
+    <h5 class="offcanvas-title" id="cartLabel"><i class="bi bi-bag-heart-fill me-2"></i>Tu Carrito</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+  </div>
+  <div class="offcanvas-body tg-offcanvas-body" id="cartBody"></div>
+  <div class="tg-offcanvas-footer" id="cartFooter"></div>
+</div>
+
+<!-- ===================== PRODUCT DETAIL ===================== -->
+<section class="tg-section" style="padding-top: 10rem;">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-md-6 mb-4 mb-md-0">
+        <div class="bg-white rounded-4 shadow-sm p-3 text-center">
+          <img src="{{ producto.imagen_url or producto.imagen }}" alt="{{ producto.nombre }}" class="img-fluid rounded" style="max-height: 400px; object-fit: cover;">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <span class="badge bg-light text-dark border mb-2">{{ producto.categoria_rel.nombre if producto.categoria_rel else 'General' }}</span>
+        <h1 class="fw-bold" style="color: #2D3277;">{{ producto.nombre }}</h1>
+        <p class="text-muted mt-3 mb-4 fs-5">{{ producto.descripcion }}</p>
+        
+        <div class="mb-4">
+          {% if producto.precio_anterior and producto.precio_anterior > producto.precio %}
+            <span class="text-decoration-line-through text-muted fs-5 d-block">${{ producto.precio_anterior }}</span>
+            <div class="d-flex align-items-center gap-2">
+              <span class="fw-bold fs-2 text-success">${{ producto.precio }}</span>
+              <span class="badge bg-success fs-6">{{ ((producto.precio_anterior - producto.precio) / producto.precio_anterior * 100)|round|int }}% OFF</span>
+            </div>
+          {% else %}
+            <span class="fw-bold fs-2" style="color: #009EE3;">${{ producto.precio }}</span>
+          {% endif %}
+        </div>
+
+        {% if producto.stock > 0 or producto.permitir_sin_stock %}
+        <button class="btn btn-lg w-100 rounded-pill text-white fw-bold shadow-sm" style="background: #009EE3;" onclick="addToCart({id: '{{ producto.id }}', name: '{{ producto.nombre }}', price: {{ producto.precio }}, img: '{{ producto.imagen_url or producto.imagen }}', stock: {{ producto.stock }}, permitir_sin_stock: {{ 'true' if producto.permitir_sin_stock else 'false' }}})">
+          <i class="bi bi-cart-plus me-2"></i>Agregar al Carrito
+        </button>
+        {% else %}
+        <button class="btn btn-lg w-100 rounded-pill btn-secondary fw-bold" disabled>
+          Agotado
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== RELATED PRODUCTS ===================== -->
+{% if relacionados %}
+<section class="tg-section bg-light py-5">
+  <div class="container">
+    <h3 class="fw-bold mb-4" style="color: #2D3277;">Quienes compraron esto también llevaron...</h3>
+    <div class="row g-4">
+      {% for p in relacionados %}
+      <div class="col-6 col-md-3">
+        <div class="tg-product-card h-100 bg-white" id="prod-{{ p.id }}">
+          <a href="{{ url_for('producto_detalle', id=p.id) }}" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; flex: 1;">
+            <div class="tg-product-img-wrap">
+              <img src="{{ p.imagen_url or p.imagen }}" alt="{{ p.nombre }}" style="width: 100%; height: 150px; object-fit: cover; object-position: center; border-radius: 12px;"/>
+            </div>
+            <div class="tg-product-body p-3">
+              <h5 class="tg-product-name fs-6 mb-2 text-truncate">{{ p.nombre }}</h5>
+              <div class="mt-auto">
+                {% if p.precio_anterior and p.precio_anterior > p.precio %}
+                  <div class="d-flex flex-column">
+                    <span class="text-decoration-line-through text-muted" style="font-size:0.75rem">${{ p.precio_anterior }}</span>
+                    <div class="d-flex align-items-center gap-1">
+                      <span class="tg-price text-success fw-bold">${{ p.precio }}</span>
+                      <span class="badge bg-success" style="font-size:0.6rem;">{{ ((p.precio_anterior - p.precio) / p.precio_anterior * 100)|round|int }}% OFF</span>
+                    </div>
+                  </div>
+                {% else %}
+                  <span class="tg-price fw-bold">${{ p.precio }}</span>
+                {% endif %}
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ===================== FOOTER DE CONFIANZA ===================== -->
+<footer class="tg-footer" style="background-color: #F5F5F5; border-top: 1px solid rgba(0,0,0,0.1);">
+  <div class="container">
+    <div class="row py-5 text-center text-md-start">
+      <div class="col-md-4 mb-4 mb-md-0">
+        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-credit-card me-2"></i>Medios de Pago</h5>
+        <ul class="list-unstyled text-muted small d-flex flex-column gap-2">
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Mercado Pago</li>
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Transferencia Bancaria</li>
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Efectivo</li>
+        </ul>
+      </div>
+      <div class="col-md-4 mb-4 mb-md-0">
+        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-truck me-2"></i>Envíos y Entregas</h5>
+        <p class="text-muted small mb-0">
+          Envíos a domicilio en <strong>Aguilares, Famaillá y Los Ralos</strong>.<br>
+          Retiro por sucursal disponible.
+        </p>
+      </div>
+      <div class="col-md-4">
+        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-phone me-2"></i>Seguinos</h5>
+        <div class="d-flex justify-content-center justify-content-md-start gap-3">
+          <a href="#" class="btn btn-outline-secondary rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-instagram"></i></a>
+          <a href="#" class="btn btn-outline-secondary rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-facebook"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="text-center py-3 border-top border-secondary-subtle">
+      <p class="mb-0 small text-muted">© 2026 Todo Golosina. Todos los derechos reservados.</p>
+    </div>
+  </div>
+</footer>
+
+<!-- Botón WhatsApp Flotante -->
+<a href="https://wa.me/5491100000000?text=¡Hola! Vengo de la tienda online de Todo Golosina y tengo una consulta..." 
+   target="_blank" 
+   class="tg-whatsapp-btn" 
+   aria-label="Chat en WhatsApp">
+  <i class="bi bi-whatsapp"></i>
+</a>
+
+<!-- Toast -->
+<div class="tg-toast" id="cartToast" role="alert" aria-live="polite">
+  <i class="bi bi-bag-check-fill me-2"></i>
+  <span id="toastMsg">¡Producto agregado!</span>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='cart.js') }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const buscador = document.getElementById('buscadorProductos');
+    if(buscador) {
+      buscador.addEventListener('keyup', function(e) {
+        const text = e.target.value.toLowerCase();
+        const cards = document.querySelectorAll('.tg-product-card');
+        cards.forEach(card => {
+          const titleEl = card.querySelector('.tg-product-name');
+          if(titleEl) {
+            const title = titleEl.textContent.toLowerCase();
+            const colParent = card.closest('.col-md-6, .col-lg-4, .col-6, .col-12, .col-md-3, .col-lg-3');
+            if(title.includes(text)) {
+              if(colParent) colParent.style.display = '';
+              else card.style.display = '';
+            } else {
+              if(colParent) colParent.style.display = 'none';
+              else card.style.display = 'none';
+            }
+          }
+        });
+      });
+    }
+  });
+</script>
+</body>
+</html>

@@ -111,6 +111,21 @@ function cardHTML(p, i) {
   const imgEsc = (p.imagen || '').replace(/'/g, "\\'");
   const imgSrc = p.imagen ? (p.imagen.startsWith('http') || p.imagen.startsWith('/static/') ? p.imagen : `/static/${p.imagen}`) : '';
 
+  // Lógica de precio tachado / descuento
+  let precioHTML;
+  if (p.precio_anterior && p.precio_anterior > p.precio) {
+    const precioAnt = Number(p.precio_anterior).toLocaleString('es-AR');
+    const descPct   = Math.round((p.precio_anterior - p.precio) / p.precio_anterior * 100);
+    precioHTML = `
+      <span style="text-decoration:line-through; color:#94a3b8; font-size:0.8rem; font-weight:400; display:block;">$${precioAnt}</span>
+      <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+        <span style="color:#16a34a; font-weight:700; font-size:1rem;">$${precio}</span>
+        <span style="background:#16a34a; color:#fff; font-size:0.65rem; font-weight:700; padding:0.15rem 0.45rem; border-radius:99px; white-space:nowrap;">${descPct}% OFF</span>
+      </div>`;
+  } else {
+    precioHTML = `$${precio}<small>por unidad</small>`;
+  }
+
   return `
     <div class="col-sm-6 col-lg-4 col-xl-3">
       <div class="tg-pc" id="card-${p.id}">
@@ -130,8 +145,7 @@ function cardHTML(p, i) {
           <p class="tg-pc-desc">${p.descripcion || ''}</p>
           <div class="tg-pc-footer">
             <div class="tg-pc-price">
-              $${precio}
-              <small>por unidad</small>
+              ${precioHTML}
             </div>
             <button class="tg-pc-btn"
                     id="btn-${p.id}"

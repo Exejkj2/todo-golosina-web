@@ -48,6 +48,7 @@ class Producto(db.Model):
     nombre = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text)
     precio = db.Column(db.Float, nullable=False)
+    precio_anterior = db.Column(db.Float, nullable=True)
     imagen = db.Column(db.String(255), default='')
     imagen_url = db.Column(db.Text, default='')
     categoria_id = db.Column(db.Integer, db.ForeignKey('categoria.id'))
@@ -65,6 +66,7 @@ class Producto(db.Model):
             'nombre': self.nombre,
             'descripcion': self.descripcion,
             'precio': self.precio,
+            'precio_anterior': self.precio_anterior,
             'imagen': self.imagen_url or self.imagen,
             'imagen_url': self.imagen_url,
             'categoria': self.categoria_rel.nombre if self.categoria_rel else 'General',
@@ -163,6 +165,21 @@ def index():
 def productos():
     return render_template('productos.html')
 
+@app.route('/producto/<int:id>')
+def producto_detalle(id):
+    producto = db.session.get(Producto, id)
+    if not producto or producto.activo == 0:
+        from flask import abort
+        abort(404)
+    relacionados = []
+    if producto.categoria_id:
+        relacionados = Producto.query.filter(
+            Producto.categoria_id == producto.categoria_id, 
+            Producto.id != producto.id,
+            Producto.activo == 1
+        ).order_by(db.func.random()).limit(4).all()
+    return render_template('detalle.html', producto=producto, relacionados=relacionados)
+
 @app.route('/nosotros')
 def nosotros():
     return render_template('nosotros.html')
@@ -218,6 +235,12 @@ def admin_add_product():
     except ValueError:
         precio = 0.0
         
+    precio_ant_str = request.form.get('precio_anterior', '').strip().replace(',', '.')
+    try:
+        precio_anterior = float(precio_ant_str) if precio_ant_str else None
+    except ValueError:
+        precio_anterior = None
+        
     descripcion = request.form.get('descripcion', '')
     imagen_url = request.form.get('imagen_url', '')
     categoria_id_str = request.form.get('categoria_id')
@@ -233,7 +256,7 @@ def admin_add_product():
     permitir_sin_stock = True if request.form.get('permitir_sin_stock') else False
 
     nuevo = Producto(
-        nombre=nombre, precio=precio, descripcion=descripcion,
+        nombre=nombre, precio=precio, precio_anterior=precio_anterior, descripcion=descripcion,
         imagen_url=imagen_url, categoria_id=categoria_id, stock=stock,
         favorito=favorito, permitir_sin_stock=permitir_sin_stock
     )
@@ -257,6 +280,12 @@ def admin_edit_product(id):
         producto.precio = float(precio_str) if precio_str else 0.0
     except ValueError:
         producto.precio = 0.0
+        
+    precio_ant_str = request.form.get('precio_anterior', '').strip().replace(',', '.')
+    try:
+        producto.precio_anterior = float(precio_ant_str) if precio_ant_str else None
+    except ValueError:
+        producto.precio_anterior = None
         
     producto.descripcion = request.form.get('descripcion', '')
     producto.imagen_url = request.form.get('imagen_url', '')
