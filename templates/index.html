@@ -176,27 +176,31 @@
       {% for p in destacados %}
       <div class="col-md-6 col-lg-4">
         <div class="tg-product-card h-100" id="prod-{{ p.id }}">
-          <div class="tg-product-img-wrap">
-            <img src="{{ p.imagen_url or p.imagen }}" alt="{{ p.nombre }}" style="width: 100%; height: 200px; object-fit: cover; object-position: center; border-radius: 12px;"/>
-            <span class="tg-product-badge">⭐ Destacado</span>
-          </div>
-          <div class="tg-product-body">
-            <span class="tg-product-tag">{{ p.categoria_rel.nombre if p.categoria_rel else 'General' }}</span>
-            <h3 class="tg-product-name">{{ p.nombre }}</h3>
-            <p class="tg-product-desc">{{ p.descripcion }}</p>
-            <div class="tg-product-footer">
-              <span class="tg-price">${{ p.precio }}</span>
-              {% if p.stock > 0 or p.permitir_sin_stock %}
-              <button class="btn tg-btn-small tg-btn-pill" onclick="addToCart({id: '{{ p.id }}', name: '{{ p.nombre }}', price: {{ p.precio }}, img: '{{ p.imagen_url or p.imagen }}', stock: {{ p.stock }}, permitir_sin_stock: {{ 'true' if p.permitir_sin_stock else 'false' }}})">
-                <i class="bi bi-bag-plus me-1"></i>Agregar
-              </button>
-              {% else %}
-              <button class="btn tg-btn-small tg-btn-pill btn-secondary" disabled style="background: #cbd5e1; border-color: #cbd5e1; color: #475569;">
-                Agotado
-              </button>
-              {% endif %}
+          <a href="{{ url_for('productos') }}#prod-{{ p.id }}" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; flex: 1;">
+            <div class="tg-product-img-wrap">
+              <img src="{{ p.imagen_url or p.imagen }}" alt="{{ p.nombre }}" style="width: 100%; height: 200px; object-fit: cover; object-position: center; border-radius: 12px;"/>
+              <span class="tg-product-badge">⭐ Destacado</span>
             </div>
-          </div>
+            <div class="tg-product-body">
+              <span class="tg-product-tag">{{ p.categoria_rel.nombre if p.categoria_rel else 'General' }}</span>
+              <h3 class="tg-product-name">{{ p.nombre }}</h3>
+              <p class="tg-product-desc">{{ p.descripcion }}</p>
+              <div class="tg-product-footer">
+                <span class="tg-price">${{ p.precio }}</span>
+                <!--
+                {% if p.stock > 0 or p.permitir_sin_stock %}
+                <button class="btn tg-btn-small tg-btn-pill" onclick="event.preventDefault(); addToCart({id: '{{ p.id }}', name: '{{ p.nombre }}', price: {{ p.precio }}, img: '{{ p.imagen_url or p.imagen }}', stock: {{ p.stock }}, permitir_sin_stock: {{ 'true' if p.permitir_sin_stock else 'false' }}})">
+                  <i class="bi bi-bag-plus me-1"></i>Agregar
+                </button>
+                {% else %}
+                <button class="btn tg-btn-small tg-btn-pill btn-secondary" disabled style="background: #cbd5e1; border-color: #cbd5e1; color: #475569;">
+                  Agotado
+                </button>
+                {% endif %}
+                -->
+              </div>
+            </div>
+          </a>
         </div>
       </div>
       {% else %}
