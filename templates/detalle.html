@@ -46,9 +46,6 @@
         <li class="nav-item"><a class="nav-link tg-nav-link active" href="{{ url_for('productos') }}"><i class="bi bi-grid-3x3-gap me-1"></i>Productos</a></li>
         <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('nosotros') }}"><i class="bi bi-people-fill me-1"></i>Quiénes Somos</a></li>
         <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('contacto') }}"><i class="bi bi-chat-heart me-1"></i>Contacto</a></li>
-        <li class="nav-item ms-lg-3 d-flex align-items-center">
-          <input type="text" id="buscadorProductos" class="form-control form-control-sm rounded-pill px-3" placeholder="Buscar golosinas..." style="min-width: 220px; border: 1px solid #009EE3;">
-        </li>
       </ul>
       <div class="d-none d-lg-flex align-items-center gap-3">
         <button class="tg-cart-btn" aria-label="Carrito" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
@@ -198,30 +195,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='cart.js') }}"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const buscador = document.getElementById('buscadorProductos');
-    if(buscador) {
-      buscador.addEventListener('keyup', function(e) {
-        const text = e.target.value.toLowerCase();
-        const cards = document.querySelectorAll('.tg-product-card');
-        cards.forEach(card => {
-          const titleEl = card.querySelector('.tg-product-name');
-          if(titleEl) {
-            const title = titleEl.textContent.toLowerCase();
-            const colParent = card.closest('.col-md-6, .col-lg-4, .col-6, .col-12, .col-md-3, .col-lg-3');
-            if(title.includes(text)) {
-              if(colParent) colParent.style.display = '';
-              else card.style.display = '';
-            } else {
-              if(colParent) colParent.style.display = 'none';
-              else card.style.display = 'none';
-            }
-          }
-        });
-      });
-    }
-  });
-</script>
+
 </body>
 </html>

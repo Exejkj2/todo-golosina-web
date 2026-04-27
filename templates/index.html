@@ -74,11 +74,7 @@
             <i class="bi bi-person-circle me-1"></i>Admin
           </a>
         </li>
-      
-        <li class="nav-item ms-lg-3 d-flex align-items-center">
-          <input type="text" id="buscadorProductos" class="form-control form-control-sm rounded-pill px-3" placeholder="Buscar golosinas (ej: Hamlet)..." style="min-width: 220px; border: 1px solid #009EE3;">
-        </li>
-</ul>
+      </ul>
 
       <!-- Desktop right actions -->
       <div class="d-none d-lg-flex align-items-center gap-3">
@@ -179,13 +175,29 @@
 <!-- ===================== PRODUCTOS ===================== -->
 <section class="tg-section" id="productos">
   <div class="container">
-    <div class="text-center mb-5">
+    <div class="text-center mb-4">
       <span class="tg-section-tag">Nuestros Productos</span>
       <h2 class="tg-section-title mt-2">Lo mejor en <span class="tg-gradient-text">golosinas</span></h2>
       <p class="tg-section-sub">Seleccionamos los mejores dulces para una experiencia única.</p>
     </div>
 
-    <div class="row g-4">
+    <!-- ===== BUSCADOR DE PRODUCTOS ===== -->
+    <div class="d-flex justify-content-center mb-5">
+      <div class="input-group" style="max-width: 480px;">
+        <span class="input-group-text bg-white border-end-0" style="border: 1px solid #009EE3; border-right: none; border-radius: 99px 0 0 99px;">
+          <i class="bi bi-search" style="color: #009EE3;"></i>
+        </span>
+        <input
+          type="text"
+          id="buscadorProductos"
+          class="form-control border-start-0"
+          placeholder="Buscar golosinas (ej: Hamlet, Leiva...)"
+          style="border: 1px solid #009EE3; border-left: none; border-radius: 0 99px 99px 0; box-shadow: none;"
+        >
+      </div>
+    </div>
+
+    <div class="row g-4" id="gridDestacados">
       {% for p in destacados %}
       <div class="col-md-6 col-lg-4">
         <div class="tg-product-card h-100" id="prod-{{ p.id }}">
@@ -234,6 +246,22 @@
       </div>
       {% endfor %}
     </div>
+
+    <script>
+      (function() {
+        const input = document.getElementById('buscadorProductos');
+        const grid  = document.getElementById('gridDestacados');
+        if (!input || !grid) return;
+        input.addEventListener('keyup', function() {
+          const text = this.value.toLowerCase().trim();
+          grid.querySelectorAll('.col-md-6.col-lg-4').forEach(function(col) {
+            const nameEl = col.querySelector('.tg-product-name');
+            if (!nameEl) return;
+            col.style.display = nameEl.textContent.toLowerCase().includes(text) ? '' : 'none';
+          });
+        });
+      })();
+    </script>
   </div>
 </section>
 
@@ -341,31 +369,7 @@
 </a>
 
 
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const buscador = document.getElementById('buscadorProductos');
-    if(buscador) {
-      buscador.addEventListener('keyup', function(e) {
-        const text = e.target.value.toLowerCase();
-        const cards = document.querySelectorAll('.tg-product-card');
-        cards.forEach(card => {
-          const titleEl = card.querySelector('.tg-product-name');
-          if(titleEl) {
-            const title = titleEl.textContent.toLowerCase();
-            const colParent = card.closest('.col-md-6, .col-lg-4, .col-6, .col-12, .col-md-3, .col-lg-3');
-            if(title.includes(text)) {
-              if(colParent) colParent.style.display = '';
-              else card.style.display = '';
-            } else {
-              if(colParent) colParent.style.display = 'none';
-              else card.style.display = 'none';
-            }
-          }
-        });
-      });
-    }
-  });
-</script>
+
 
 </body>
 </html>
