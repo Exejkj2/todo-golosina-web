@@ -10,6 +10,7 @@ const API_URL = '/api';
 let todosLosProductos = [];   // copia completa desde la API
 let activeFilter = 'all';
 let activeSort   = 'default';
+let activeSearch = '';         // texto del buscador
 
 // ══════════════════════════════════════════════════════════════
 //  FETCH DESDE LA API
@@ -60,10 +61,17 @@ function renderProducts() {
   const grid  = document.getElementById('productsGrid');
   const count = document.getElementById('resultsCount');
 
-  // 1. Filtrar
+  // 1. Filtrar por categoría
   let filtered = activeFilter === 'all'
     ? [...todosLosProductos]
     : todosLosProductos.filter(p => p.categoria === activeFilter);
+
+  // 2. Filtrar por texto del buscador
+  if (activeSearch) {
+    filtered = filtered.filter(p =>
+      p.nombre.toLowerCase().includes(activeSearch)
+    );
+  }
 
   // 2. Ordenar
   if (activeSort === 'precio_asc')  filtered.sort((a, b) => a.precio - b.precio);
@@ -302,6 +310,15 @@ window.addEventListener('scroll', () => {
 
 document.addEventListener('DOMContentLoaded', () => {
   fetchProductos();
+
+  // Buscador de texto
+  const buscador = document.getElementById('buscadorProductos');
+  if (buscador) {
+    buscador.addEventListener('input', () => {
+      activeSearch = buscador.value.toLowerCase().trim();
+      renderProducts();
+    });
+  }
 
   // Actualizar select de orden con los mismos keys que la API
   document.getElementById('sortSelect').innerHTML = `

@@ -181,22 +181,6 @@
       <p class="tg-section-sub">Seleccionamos los mejores dulces para una experiencia única.</p>
     </div>
 
-    <!-- ===== BUSCADOR DE PRODUCTOS ===== -->
-    <div class="d-flex justify-content-center mb-5">
-      <div class="input-group" style="max-width: 480px;">
-        <span class="input-group-text bg-white border-end-0" style="border: 1px solid #009EE3; border-right: none; border-radius: 99px 0 0 99px;">
-          <i class="bi bi-search" style="color: #009EE3;"></i>
-        </span>
-        <input
-          type="text"
-          id="buscadorProductos"
-          class="form-control border-start-0"
-          placeholder="Buscar golosinas (ej: Hamlet, Leiva...)"
-          style="border: 1px solid #009EE3; border-left: none; border-radius: 0 99px 99px 0; box-shadow: none;"
-        >
-      </div>
-    </div>
-
     <div class="row g-4" id="gridDestacados">
       {% for p in destacados %}
       <div class="col-md-6 col-lg-4">
@@ -247,21 +231,7 @@
       {% endfor %}
     </div>
 
-    <script>
-      (function() {
-        const input = document.getElementById('buscadorProductos');
-        const grid  = document.getElementById('gridDestacados');
-        if (!input || !grid) return;
-        input.addEventListener('keyup', function() {
-          const text = this.value.toLowerCase().trim();
-          grid.querySelectorAll('.col-md-6.col-lg-4').forEach(function(col) {
-            const nameEl = col.querySelector('.tg-product-name');
-            if (!nameEl) return;
-            col.style.display = nameEl.textContent.toLowerCase().includes(text) ? '' : 'none';
-          });
-        });
-      })();
-    </script>
+
   </div>
 </section>
 
