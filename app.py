@@ -60,6 +60,11 @@ class Producto(db.Model):
     permitir_sin_stock = db.Column(db.Boolean, default=True)
     ventas_totales = db.Column(db.Integer, default=0)
 
+    # ─── Descuento por Volumen / Mayorista ───
+    descuento_volumen_activo = db.Column(db.Boolean, default=False)
+    cantidad_minima_descuento = db.Column(db.Integer, nullable=True)
+    porcentaje_descuento_volumen = db.Column(db.Float, nullable=True)
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -74,7 +79,10 @@ class Producto(db.Model):
             'activo': self.activo,
             'favorito': self.favorito,
             'permitir_sin_stock': self.permitir_sin_stock,
-            'ventas_totales': self.ventas_totales
+            'ventas_totales': self.ventas_totales,
+            'descuento_volumen_activo': self.descuento_volumen_activo,
+            'cantidad_minima_descuento': self.cantidad_minima_descuento,
+            'porcentaje_descuento_volumen': self.porcentaje_descuento_volumen
         }
 
 @login_manager.user_loader
@@ -255,10 +263,26 @@ def admin_add_product():
     favorito = True if request.form.get('favorito') else False
     permitir_sin_stock = True if request.form.get('permitir_sin_stock') else False
 
+    # Descuento por volumen
+    descuento_volumen_activo = True if request.form.get('descuento_volumen_activo') else False
+    cant_min_str = request.form.get('cantidad_minima_descuento', '').strip()
+    porc_desc_str = request.form.get('porcentaje_descuento_volumen', '').strip()
+    try:
+        cantidad_minima_descuento = int(cant_min_str) if cant_min_str else None
+    except ValueError:
+        cantidad_minima_descuento = None
+    try:
+        porcentaje_descuento_volumen = float(porc_desc_str) if porc_desc_str else None
+    except ValueError:
+        porcentaje_descuento_volumen = None
+
     nuevo = Producto(
         nombre=nombre, precio=precio, precio_anterior=precio_anterior, descripcion=descripcion,
         imagen_url=imagen_url, categoria_id=categoria_id, stock=stock,
-        favorito=favorito, permitir_sin_stock=permitir_sin_stock
+        favorito=favorito, permitir_sin_stock=permitir_sin_stock,
+        descuento_volumen_activo=descuento_volumen_activo,
+        cantidad_minima_descuento=cantidad_minima_descuento,
+        porcentaje_descuento_volumen=porcentaje_descuento_volumen
     )
     db.session.add(nuevo)
     db.session.commit()
@@ -301,7 +325,20 @@ def admin_edit_product(id):
 
     producto.favorito = True if request.form.get('favorito') else False
     producto.permitir_sin_stock = True if request.form.get('permitir_sin_stock') else False
-        
+
+    # Descuento por volumen
+    producto.descuento_volumen_activo = True if request.form.get('descuento_volumen_activo') else False
+    cant_min_str = request.form.get('cantidad_minima_descuento', '').strip()
+    porc_desc_str = request.form.get('porcentaje_descuento_volumen', '').strip()
+    try:
+        producto.cantidad_minima_descuento = int(cant_min_str) if cant_min_str else None
+    except ValueError:
+        producto.cantidad_minima_descuento = None
+    try:
+        producto.porcentaje_descuento_volumen = float(porc_desc_str) if porc_desc_str else None
+    except ValueError:
+        producto.porcentaje_descuento_volumen = None
+
     db.session.commit()
     flash('Producto editado correctamente.', 'info')
     return redirect(url_for('admin_dashboard'))

@@ -134,6 +134,15 @@ function cardHTML(p, i) {
     precioHTML = `$${precio}<small>por unidad</small>`;
   }
 
+  // Badge de descuento por volumen / mayorista
+  const mayoristaBadge = (p.descuento_volumen_activo && p.cantidad_minima_descuento && p.porcentaje_descuento_volumen)
+    ? `<div style="margin-top:0.5rem; background:linear-gradient(90deg,#009EE3,#0070b8); color:#fff; border-radius:8px; padding:0.35rem 0.6rem; font-size:0.72rem; font-weight:700; display:flex; align-items:center; gap:0.25rem; flex-wrap:wrap; box-shadow:0 2px 6px rgba(0,158,227,0.35);">
+        🛒 Llevando ${p.cantidad_minima_descuento}+,
+        <span style="background:#FFE600;color:#2D3277;padding:0.1rem 0.4rem;border-radius:99px;font-weight:900;white-space:nowrap;">${Math.round(p.porcentaje_descuento_volumen)}% OFF</span>
+        mayorista
+      </div>`
+    : '';
+
   return `
     <div class="col-sm-6 col-lg-4 col-xl-3">
       <div class="tg-pc" id="card-${p.id}">
@@ -154,10 +163,11 @@ function cardHTML(p, i) {
           <div class="tg-pc-footer">
             <div class="tg-pc-price">
               ${precioHTML}
+              ${mayoristaBadge}
             </div>
             <button class="tg-pc-btn"
                     id="btn-${p.id}"
-                    onclick="handleAddToCart(${p.id}, '${nombre}', ${p.precio}, '${emoji}', '${imgEsc}', ${p.stock}, ${p.permitir_sin_stock ? 'true' : 'false'}, this)"
+                    onclick="handleAddToCart(${p.id}, '${nombre}', ${p.precio}, '${emoji}', '${imgEsc}', ${p.stock}, ${p.permitir_sin_stock ? 'true' : 'false'}, ${p.descuento_volumen_activo ? 'true' : 'false'}, ${p.cantidad_minima_descuento || 'null'}, ${p.porcentaje_descuento_volumen || 'null'}, this)"
                     ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>
               <i class="bi bi-bag-plus"></i> ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'Agotado' : 'Agregar'}
             </button>
@@ -198,8 +208,19 @@ function resetFiltros() {
 //  CARRITO
 // ──────────────────────────────────────────────────────────────
 
-function handleAddToCart(id, nombre, precio, emoji, img, stock, permitir_sin_stock, btn) {
-  addToCart({ id: `${id}`, name: nombre, price: Number(precio), emoji, img, stock, permitir_sin_stock });
+function handleAddToCart(id, nombre, precio, emoji, img, stock, permitir_sin_stock, descuento_volumen_activo, cantidad_minima_descuento, porcentaje_descuento_volumen, btn) {
+  addToCart({
+    id: `${id}`,
+    name: nombre,
+    price: Number(precio),
+    emoji,
+    img,
+    stock,
+    permitir_sin_stock,
+    descuento_volumen_activo: !!descuento_volumen_activo,
+    cantidad_minima_descuento: cantidad_minima_descuento || null,
+    porcentaje_descuento_volumen: porcentaje_descuento_volumen || null
+  });
 
   btn.innerHTML = '<i class="bi bi-check-lg"></i> ¡Listo!';
   btn.classList.add('added');

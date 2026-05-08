@@ -428,6 +428,36 @@
                               <label class="form-check-label small fw-bold text-muted" for="stockEdit{{ p.id }}">Permitir compra sin stock</label>
                             </div>
                           </div>
+
+                          <!-- ─── Descuento por Volumen ─── -->
+                          <div class="p-3 rounded-3 mb-3" style="background:#f8fafc; border: 1px solid #e2e8f0;">
+                            <div class="form-check form-switch mb-2">
+                              <input class="form-check-input" type="checkbox" role="switch"
+                                     name="descuento_volumen_activo" id="descChk{{ p.id }}"
+                                     {% if p.descuento_volumen_activo %}checked{% endif %}
+                                     onchange="toggleDescuentoFields('descFields{{ p.id }}', this)">
+                              <label class="form-check-label fw-bold text-muted small" for="descChk{{ p.id }}">
+                                🛒 Activar Descuento por Volumen / Mayorista
+                              </label>
+                            </div>
+                            <div id="descFields{{ p.id }}" style="display: {% if p.descuento_volumen_activo %}block{% else %}none{% endif %};">
+                              <div class="row g-2">
+                                <div class="col">
+                                  <label class="form-label small fw-bold text-muted">Cantidad mínima</label>
+                                  <input type="number" name="cantidad_minima_descuento"
+                                         class="form-control bg-white form-control-sm" min="1" placeholder="Ej: 10"
+                                         value="{{ p.cantidad_minima_descuento or '' }}">
+                                </div>
+                                <div class="col">
+                                  <label class="form-label small fw-bold text-muted">% de Descuento</label>
+                                  <input type="number" name="porcentaje_descuento_volumen"
+                                         class="form-control bg-white form-control-sm" min="1" max="100" step="0.5" placeholder="Ej: 15"
+                                         value="{{ p.porcentaje_descuento_volumen or '' }}">
+                                </div>
+                              </div>
+                              <small class="text-muted mt-1 d-block">Ej: llevando {{ p.cantidad_minima_descuento or '10' }} o más → {{ p.porcentaje_descuento_volumen or '15' }}% de descuento</small>
+                            </div>
+                          </div>
                           <div class="mb-3">
                             <label class="form-label small fw-bold text-muted"
                               >Descripción</label
@@ -642,6 +672,33 @@
                 <label class="form-check-label small fw-bold text-muted" for="stockAdd">Permitir compra sin stock</label>
               </div>
             </div>
+
+            <!-- ─── Descuento por Volumen ─── -->
+            <div class="p-3 rounded-3 mb-3" style="background:#f8fafc; border: 1px solid #e2e8f0;">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       name="descuento_volumen_activo" id="descAddChk"
+                       onchange="toggleDescuentoFields('descAddFields', this)">
+                <label class="form-check-label fw-bold text-muted small" for="descAddChk">
+                  🛒 Activar Descuento por Volumen / Mayorista
+                </label>
+              </div>
+              <div id="descAddFields" style="display:none;">
+                <div class="row g-2">
+                  <div class="col">
+                    <label class="form-label small fw-bold text-muted">Cantidad mínima</label>
+                    <input type="number" name="cantidad_minima_descuento" id="cantMinAdd"
+                           class="form-control bg-white form-control-sm" min="1" placeholder="Ej: 10">
+                  </div>
+                  <div class="col">
+                    <label class="form-label small fw-bold text-muted">% de Descuento</label>
+                    <input type="number" name="porcentaje_descuento_volumen" id="porcDescAdd"
+                           class="form-control bg-white form-control-sm" min="1" max="100" step="0.5" placeholder="Ej: 15">
+                  </div>
+                </div>
+                <small class="text-muted mt-1 d-block">Ej: llevando 10 o más → 15% de descuento</small>
+              </div>
+            </div>
             <div class="mb-3">
               <label class="form-label small fw-bold text-muted"
                 >Descripción</label
@@ -709,6 +766,13 @@
           }
         });
       });
+
+      // ─── UX: mostrar/ocultar campos de descuento por volumen ───
+      function toggleDescuentoFields(containerId, checkbox) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.style.display = checkbox.checked ? 'block' : 'none';
+      }
     </script>
   </body>
 </html>

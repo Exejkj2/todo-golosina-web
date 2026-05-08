@@ -208,6 +208,12 @@
                   <span class="tg-price">${{ p.precio }}</span>
                 {% endif %}
 
+                {% if p.descuento_volumen_activo and p.cantidad_minima_descuento and p.porcentaje_descuento_volumen %}
+                <div style="margin-top:0.5rem; background:linear-gradient(90deg,#009EE3,#0070b8); color:#fff; border-radius:8px; padding:0.4rem 0.65rem; font-size:0.75rem; font-weight:700; display:flex; align-items:center; gap:0.3rem; box-shadow:0 2px 6px rgba(0,158,227,0.35);">
+                  🛒 Llevando {{ p.cantidad_minima_descuento }}+, <span style="color:#FFE600;margin:0 0.2rem;">{{ p.porcentaje_descuento_volumen|int }}% OFF</span> mayorista
+                </div>
+                {% endif %}
+
                 <!--
                 {% if p.stock > 0 or p.permitir_sin_stock %}
                 <button class="btn tg-btn-small tg-btn-pill" onclick="event.preventDefault(); addToCart({id: '{{ p.id }}', name: '{{ p.nombre }}', price: {{ p.precio }}, img: '{{ p.imagen_url or p.imagen }}', stock: {{ p.stock }}, permitir_sin_stock: {{ 'true' if p.permitir_sin_stock else 'false' }}})">

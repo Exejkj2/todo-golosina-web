@@ -64,13 +64,26 @@ function clearCart() {
   renderOffcanvas();
 }
 
+// ─── Precio efectivo (con descuento por volumen si aplica) ────
+function getEffectivePrice(p) {
+  if (
+    p.descuento_volumen_activo &&
+    p.cantidad_minima_descuento &&
+    p.porcentaje_descuento_volumen &&
+    p.qty >= p.cantidad_minima_descuento
+  ) {
+    return p.price * (1 - p.porcentaje_descuento_volumen / 100);
+  }
+  return p.price;
+}
+
 // ─── Totales ───────────────────────────────────────────────────
 function cartTotalItems() {
   return cart.reduce((acc, p) => acc + p.qty, 0);
 }
 
 function cartTotalPrice() {
-  return cart.reduce((acc, p) => acc + p.price * p.qty, 0);
+  return cart.reduce((acc, p) => acc + getEffectivePrice(p) * p.qty, 0);
 }
 
 // ─── Enviar pedido por WhatsApp (CORREGIDO) ───────────────────
@@ -84,10 +97,18 @@ function enviarPedidoWsp() {
 
   // 1. Armamos el mensaje PRIMERO mientras el carrito aún tiene datos
   const lineas = cart
-    .map(
-      (p) => `• ${p.name} x${p.qty} → $${(p.price * p.qty).toLocaleString("es-AR")}`
-    )
-    .join("\n");
+    .map((p) => {
+      const precioEfectivo = getEffectivePrice(p);
+      const subtotal = (precioEfectivo * p.qty).toLocaleString('es-AR');
+      const descInfo = (
+        p.descuento_volumen_activo &&
+        p.cantidad_minima_descuento &&
+        p.porcentaje_descuento_volumen &&
+        p.qty >= p.cantidad_minima_descuento
+      ) ? ` 🎉 ${Math.round(p.porcentaje_descuento_volumen)}% desc. mayorista` : '';
+      return `• ${p.name} x${p.qty}${descInfo} → $${subtotal}`;
+    })
+    .join('\n');
 
   const total = cartTotalPrice().toLocaleString("es-AR");
 
@@ -147,21 +168,40 @@ function renderOffcanvas() {
 
   body.innerHTML = cart
     .map(
-      (p) => `
+      (p) => {
+        const precioEfectivo = getEffectivePrice(p);
+        const subtotal = (precioEfectivo * p.qty).toLocaleString('es-AR');
+        const tieneDescuento = (
+          p.descuento_volumen_activo &&
+          p.cantidad_minima_descuento &&
+          p.porcentaje_descuento_volumen &&
+          p.qty >= p.cantidad_minima_descuento
+        );
+        const mayoristaBadge = tieneDescuento
+          ? `<span style="background:#009EE3;color:#fff;font-size:0.65rem;font-weight:700;padding:0.1rem 0.4rem;border-radius:99px;white-space:nowrap;">🎉 ${Math.round(p.porcentaje_descuento_volumen)}% OFF mayorista</span>`
+          : '';
+        const precioDisplay = tieneDescuento
+          ? `<span style="text-decoration:line-through;color:#94a3b8;font-size:0.8rem;">$${(p.price * p.qty).toLocaleString('es-AR')}</span> <strong style="color:#16a34a;">$${subtotal}</strong>`
+          : `$${subtotal}`;
+        return `
     <div class="tg-cart-item">
       <div class="tg-cart-item-info">
         <span class="tg-cart-item-name">${p.name}</span>
-        <span class="tg-cart-item-price">$${(p.price * p.qty).toLocaleString("es-AR")}</span>
+        <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+          <span class="tg-cart-item-price">${precioDisplay}</span>
+          ${mayoristaBadge}
+        </div>
       </div>
       <div class="tg-cart-item-controls">
         <button class="tg-qty-btn" onclick="removeFromCart('${p.id}')"><i class="bi bi-dash"></i></button>
         <span class="tg-qty-num">${p.qty}</span>
-        <button class="tg-qty-btn" onclick="addToCart({id:'${p.id}',name:'${p.name}',price:${p.price},img:'${p.img}', stock:${p.stock}, permitir_sin_stock:${p.permitir_sin_stock}})" ${(!p.permitir_sin_stock && p.qty >= (p.stock || 0)) ? 'disabled style="opacity: 0.5"' : ''}><i class="bi bi-plus"></i></button>
+        <button class="tg-qty-btn" onclick="addToCart({id:'${p.id}',name:'${p.name}',price:${p.price},img:'${p.img}', stock:${p.stock}, permitir_sin_stock:${p.permitir_sin_stock}, descuento_volumen_activo:${p.descuento_volumen_activo}, cantidad_minima_descuento:${p.cantidad_minima_descuento}, porcentaje_descuento_volumen:${p.porcentaje_descuento_volumen}})" ${(!p.permitir_sin_stock && p.qty >= (p.stock || 0)) ? 'disabled style="opacity: 0.5"' : ''}><i class="bi bi-plus"></i></button>
         <button class="tg-qty-btn text-danger" onclick="deleteFromCart('${p.id}')"><i class="bi bi-trash"></i></button>
       </div>
-    </div>`
+    </div>`;
+      }
     )
-    .join("");
+    .join('');
 
   const total = cartTotalPrice();
   if (footer) {
