@@ -173,6 +173,8 @@ function cardHTML(p, i) {
                 value="1"
                 min="1"
                 ${(!p.permitir_sin_stock && p.stock > 0) ? `max="${p.stock}"` : ''}
+                inputmode="numeric"
+                pattern="[0-9]*"
                 aria-label="Cantidad"
                 ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'disabled' : ''}
               >

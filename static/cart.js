@@ -226,6 +226,8 @@ function renderOffcanvas() {
           value="${p.qty}"
           min="1"
           max="${maxStock}"
+          inputmode="numeric"
+          pattern="[0-9]*"
           oninput="setQtyInCart('${p.id}', this.value)"
           onblur="_cleanQtyInput('${p.id}', this)"
         >

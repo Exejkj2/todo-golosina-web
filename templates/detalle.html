@@ -113,6 +113,8 @@
               value="1"
               min="1"
               {% if not producto.permitir_sin_stock and producto.stock > 0 %}max="{{ producto.stock }}"{% endif %}
+              inputmode="numeric"
+              pattern="[0-9]*"
               class="form-control border-0 text-center fw-bold fs-5"
               style="width:90px; background:transparent; box-shadow:none; -moz-appearance:textfield;"
             >
