@@ -104,11 +104,32 @@
         </div>
 
         {% if producto.stock > 0 or producto.permitir_sin_stock %}
-        <button class="btn btn-lg w-100 rounded-pill text-white fw-bold shadow-sm" style="background: #009EE3;"
-          onclick="addToCart({id: '{{ producto.id }}', name: '{{ producto.nombre }}', price: {{ producto.precio }}, img: '{{ producto.imagen_url or producto.imagen }}', stock: {{ producto.stock }}, permitir_sin_stock: {{ 'true' if producto.permitir_sin_stock else 'false' }}, descuento_volumen_activo: {{ 'true' if producto.descuento_volumen_activo else 'false' }}, cantidad_minima_descuento: {{ producto.cantidad_minima_descuento or 'null' }}, porcentaje_descuento_volumen: {{ producto.porcentaje_descuento_volumen or 'null' }}})"
-        >
-          <i class="bi bi-cart-plus me-2"></i>Agregar al Carrito
-        </button>
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="d-flex align-items-center border rounded-pill overflow-hidden shadow-sm" style="background:#f1f5f9;">
+            <label class="ps-3 text-muted small fw-bold" for="detalle-qty" style="white-space:nowrap;">Cantidad:</label>
+            <input
+              type="number"
+              id="detalle-qty"
+              value="1"
+              min="1"
+              {% if not producto.permitir_sin_stock and producto.stock > 0 %}max="{{ producto.stock }}"{% endif %}
+              class="form-control border-0 text-center fw-bold fs-5"
+              style="width:90px; background:transparent; box-shadow:none; -moz-appearance:textfield;"
+            >
+          </div>
+          <button class="btn btn-lg flex-grow-1 rounded-pill text-white fw-bold shadow-sm" style="background: #009EE3;"
+            id="btn-detalle-agregar"
+            onclick="
+              const qty = Math.max(1, parseInt(document.getElementById('detalle-qty').value) || 1);
+              addToCart({id: '{{ producto.id }}', name: '{{ producto.nombre }}', price: {{ producto.precio }}, img: '{{ producto.imagen_url or producto.imagen }}', stock: {{ producto.stock }}, permitir_sin_stock: {{ 'true' if producto.permitir_sin_stock else 'false' }}, descuento_volumen_activo: {{ 'true' if producto.descuento_volumen_activo else 'false' }}, cantidad_minima_descuento: {{ producto.cantidad_minima_descuento or 'null' }}, porcentaje_descuento_volumen: {{ producto.porcentaje_descuento_volumen or 'null' }}}, qty);
+              const btn = document.getElementById('btn-detalle-agregar');
+              btn.innerHTML = '<i class=\'bi bi-check-lg me-2\'></i>¡Agregado!';
+              setTimeout(() => { btn.innerHTML = '<i class=\'bi bi-cart-plus me-2\'></i>Agregar al Carrito'; }, 1800);
+            "
+          >
+            <i class="bi bi-cart-plus me-2"></i>Agregar al Carrito
+          </button>
+        </div>
         {% else %}
         <button class="btn btn-lg w-100 rounded-pill btn-secondary fw-bold" disabled>
           Agotado

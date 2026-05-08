@@ -240,6 +240,64 @@
 /* ── Hidden filter ───────────────────────────────────────────── */
 .tg-hidden { display: none !important; }
 
+/* ── Qty input en card del catálogo ─────────────────────────── */
+.tg-pc-footer {
+  flex-direction: column;
+  align-items: stretch;
+  gap: .6rem;
+}
+.tg-pc-add-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  width: 100%;
+}
+.tg-add-qty-input {
+  width: 56px;
+  flex-shrink: 0;
+  padding: .38rem .4rem;
+  border-radius: .55rem;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  font-size: .9rem;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+  transition: border-color .2s;
+}
+.tg-add-qty-input::-webkit-inner-spin-button,
+.tg-add-qty-input::-webkit-outer-spin-button { opacity: 1; }
+.tg-add-qty-input:focus { border-color: var(--mp-blue); box-shadow: 0 0 0 3px rgba(0,158,227,.15); }
+
+.tg-pc-add-row .tg-pc-btn { flex: 1; justify-content: center; }
+
+/* ── Qty input editable en el carrito ───────────────────────── */
+.tg-qty-input {
+  width: 50px;
+  height: 28px;
+  border-radius: .45rem;
+  border: 1.5px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  font-size: .9rem;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  padding: 0 .25rem;
+  -moz-appearance: textfield;
+  transition: border-color .2s, box-shadow .2s;
+}
+.tg-qty-input::-webkit-inner-spin-button,
+.tg-qty-input::-webkit-outer-spin-button { opacity: 1; }
+.tg-qty-input:focus {
+  border-color: var(--mp-blue);
+  box-shadow: 0 0 0 3px rgba(0,158,227,.18);
+}
+
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 576px) {
   .tg-offcanvas { width: 100vw !important; }

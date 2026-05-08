@@ -165,12 +165,24 @@ function cardHTML(p, i) {
               ${precioHTML}
               ${mayoristaBadge}
             </div>
-            <button class="tg-pc-btn"
-                    id="btn-${p.id}"
-                    onclick="handleAddToCart(${p.id}, '${nombre}', ${p.precio}, '${emoji}', '${imgEsc}', ${p.stock}, ${p.permitir_sin_stock ? 'true' : 'false'}, ${p.descuento_volumen_activo ? 'true' : 'false'}, ${p.cantidad_minima_descuento || 'null'}, ${p.porcentaje_descuento_volumen || 'null'}, this)"
-                    ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>
-              <i class="bi bi-bag-plus"></i> ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'Agotado' : 'Agregar'}
-            </button>
+            <div class="tg-pc-add-row">
+              <input
+                type="number"
+                id="add-qty-${p.id}"
+                class="tg-add-qty-input"
+                value="1"
+                min="1"
+                ${(!p.permitir_sin_stock && p.stock > 0) ? `max="${p.stock}"` : ''}
+                aria-label="Cantidad"
+                ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'disabled' : ''}
+              >
+              <button class="tg-pc-btn"
+                      id="btn-${p.id}"
+                      onclick="handleAddToCart(${p.id}, '${nombre}', ${p.precio}, '${emoji}', '${imgEsc}', ${p.stock}, ${p.permitir_sin_stock ? 'true' : 'false'}, ${p.descuento_volumen_activo ? 'true' : 'false'}, ${p.cantidad_minima_descuento || 'null'}, ${p.porcentaje_descuento_volumen || 'null'}, this)"
+                      ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>
+                <i class="bi bi-bag-plus"></i> ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'Agotado' : 'Agregar'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -209,6 +221,10 @@ function resetFiltros() {
 // ──────────────────────────────────────────────────────────────
 
 function handleAddToCart(id, nombre, precio, emoji, img, stock, permitir_sin_stock, descuento_volumen_activo, cantidad_minima_descuento, porcentaje_descuento_volumen, btn) {
+  // Leer la cantidad del input asociado a la card
+  const inputEl = document.getElementById(`add-qty-${id}`);
+  const qty = inputEl ? Math.max(1, parseInt(inputEl.value) || 1) : 1;
+
   addToCart({
     id: `${id}`,
     name: nombre,
@@ -220,10 +236,12 @@ function handleAddToCart(id, nombre, precio, emoji, img, stock, permitir_sin_sto
     descuento_volumen_activo: !!descuento_volumen_activo,
     cantidad_minima_descuento: cantidad_minima_descuento || null,
     porcentaje_descuento_volumen: porcentaje_descuento_volumen || null
-  });
+  }, qty);
 
   btn.innerHTML = '<i class="bi bi-check-lg"></i> ¡Listo!';
   btn.classList.add('added');
+  // Resetear el input a 1
+  if (inputEl) inputEl.value = 1;
   setTimeout(() => {
     btn.innerHTML = '<i class="bi bi-bag-plus"></i> Agregar';
     btn.classList.remove('added');
