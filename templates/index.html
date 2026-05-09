@@ -33,21 +33,33 @@
       <span class="tg-brand-name">Todo Golosina</span>
     </a>
 
-    <!-- Mobile: cart + toggler -->
-    <div class="d-flex align-items-center gap-3 d-lg-none">
+    <!-- Acciones de Navegación (Siempre visibles) -->
+    <div class="d-flex align-items-center gap-2 gap-lg-3 order-lg-3">
+      <!-- Botón Preventista (Visible en todos los tamaños) -->
+      <a href="/preventa" class="btn btn-sm rounded-pill fw-bold" 
+         style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:.35rem .75rem;font-size:.78rem;border:none;box-shadow:0 2px 8px rgba(245,158,11,.35);" title="Ventas Externas">
+        <i class="bi bi-briefcase-fill me-lg-1"></i><span class="d-none d-lg-inline">Preventista</span>
+      </a>
+
+      <!-- Carrito -->
       <button class="tg-cart-btn" aria-label="Carrito" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
         <i class="bi bi-bag-heart-fill"></i>
         <span class="tg-cart-badge">0</span>
       </button>
-      <button class="navbar-toggler tg-toggler" type="button"
+
+      <!-- Botón Hacer Pedido (Solo Desktop) -->
+      <a href="{{ url_for('contacto') }}" class="btn tg-btn-pill d-none d-lg-flex">Hacer Pedido</a>
+
+      <!-- Toggler (Solo Móvil) -->
+      <button class="navbar-toggler tg-toggler d-lg-none" type="button"
               data-bs-toggle="collapse" data-bs-target="#navMenu"
               aria-controls="navMenu" aria-expanded="false" aria-label="Menú">
         <span class="navbar-toggler-icon"></span>
       </button>
     </div>
 
-    <!-- Collapsible menu -->
-    <div class="collapse navbar-collapse" id="navMenu">
+    <!-- Menú Colapsable -->
+    <div class="collapse navbar-collapse order-lg-2" id="navMenu">
       <ul class="navbar-nav mx-auto gap-lg-1">
         <li class="nav-item">
           <a class="nav-link tg-nav-link active" href="#inicio">
@@ -75,18 +87,6 @@
           </a>
         </li>
       </ul>
-
-      <!-- Desktop right actions -->
-      <div class="d-none d-lg-flex align-items-center gap-3">
-        <a href="/preventa" class="btn btn-sm rounded-pill fw-bold" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:.35rem .9rem;font-size:.82rem;border:none;box-shadow:0 2px 8px rgba(245,158,11,.35);" title="Ventas Externas">
-          <i class="bi bi-briefcase-fill me-1"></i>Preventista
-        </a>
-        <button class="tg-cart-btn" aria-label="Carrito" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
-          <i class="bi bi-bag-heart-fill"></i>
-          <span class="tg-cart-badge">0</span>
-        </button>
-        <a href="{{ url_for('contacto') }}" class="btn tg-btn-pill">Hacer Pedido</a>
-      </div>
     </div>
   </div>
 </nav>
