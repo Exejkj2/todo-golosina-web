@@ -14,6 +14,7 @@ html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,'Seg
 .hdr-info h6{margin:0;font-size:.68rem;opacity:.6;letter-spacing:.03em}.hdr-info .cli{font-size:.92rem;font-weight:700}
 .hdr-btn{min-width:48px;min-height:48px;border-radius:12px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)}
 .hdr-btn:active{background:rgba(255,255,255,.3)}
+.hdr-btn.hist{background:rgba(255,255,255,0.25); border: 1.5px solid rgba(255,255,255,0.3)}
 
 /* ── BUSCADOR STICKY ── */
 .srch{position:sticky;top:56px;z-index:150;background:var(--card);border-bottom:1px solid var(--border);padding:8px 12px}
@@ -103,6 +104,7 @@ html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,'Seg
     <div class="cli" id="cliBanner"><i class="bi bi-person-circle"></i> Seleccioná un cliente</div>
   </div>
   <div style="display:flex; gap:8px">
+    <button class="hdr-btn hist" onclick="abrirHist()" title="Historial"><i class="bi bi-clock-history"></i></button>
     <button class="hdr-btn" onclick="abrirClientes()" aria-label="Cambiar cliente"><i class="bi bi-people-fill"></i></button>
     <a href="{{ url_for('logout') }}" class="hdr-btn" style="color:#ff6b6b; font-size:1.2rem" title="Cerrar Sesión"><i class="bi bi-box-arrow-right"></i></a>
   </div>
@@ -162,6 +164,32 @@ html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,'Seg
   </div>
   <div class="cart-body" id="cartB"></div>
   <div class="cart-footer" id="cartF"></div>
+</div>
+
+<!-- PANEL HISTORIAL -->
+<div class="cart-overlay" id="histOvl" onclick="cerrarHist()"></div>
+<div class="cart-panel" id="histPanel">
+  <div class="cart-hdr" style="position: relative;">
+    <h6 style="margin: 0;"><i class="bi bi-clock-history"></i> Historial de Ventas</h6>
+    <button class="hdr-btn" style="position: absolute; right: 10px; top: 8px; min-width:40px;min-height:40px;background:var(--bg);color:var(--text);font-size:.9rem" onclick="cerrarHist()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="px-3 pt-3">
+    <input type="search" class="cli-search" id="buscHist" placeholder="Buscar por cliente..." oninput="cargarHist(this.value)" inputmode="search">
+  </div>
+  <div class="cart-body" id="histB"></div>
+</div>
+
+<!-- PANEL DETALLE VENTA (Ticket) -->
+<div class="cart-overlay" id="detOvl" onclick="cerrarDetalle()"></div>
+<div class="cart-panel" id="detPanel">
+  <div class="cart-hdr" style="position: relative;">
+    <h6 style="margin: 0;"><i class="bi bi-receipt"></i> Detalle de Venta</h6>
+    <button class="hdr-btn" style="position: absolute; right: 10px; top: 8px; min-width:40px;min-height:40px;background:var(--bg);color:var(--text);font-size:.9rem" onclick="cerrarDetalle()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="cart-body" id="detB"></div>
+  <div class="cart-footer">
+    <button class="btn-clear" onclick="cerrarDetalle()" style="background:var(--blue); color:#fff; border:none">Cerrar</button>
+  </div>
 </div>
 
 <script>
@@ -312,6 +340,60 @@ async function finalizar(){
   const url=`https://wa.me/${ph.startsWith('54')?ph:'54'+ph}?text=${encodeURIComponent(msg)}`;
   cart=[];updFab();cerrarCart();window.open(url,'_blank');
 }
+
+// ═══ HISTORIAL ═══
+function abrirHist(){cargarHist();document.getElementById('histOvl').classList.add('show');document.getElementById('histPanel').classList.add('show')}
+function cerrarHist(){document.getElementById('histOvl').classList.remove('show');document.getElementById('histPanel').classList.remove('show')}
+
+async function cargarHist(q=''){
+  const b=document.getElementById('histB');
+  b.innerHTML='<div class="empty">Cargando...</div>';
+  try{
+    const r=await fetch(`/api/ventas?q=${encodeURIComponent(q)}`);const d=await r.json();
+    if(!d.ventas?.length){b.innerHTML='<div class="empty">No hay ventas registradas</div>';return}
+    b.innerHTML=d.ventas.map(v=>`
+      <div class="ci" onclick='verDetalle(${JSON.stringify(v).replace(/'/g,"&#39;")})' style="cursor:pointer">
+        <div style="flex:1; min-width:0; padding-right:10px">
+          <small class="text-muted d-block" style="font-size:0.65rem">${v.fecha}</small>
+          <span class="ci-name" style="display:block; font-size:0.9rem">${v.cliente_nombre}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px">
+          <span style="font-weight:800; color:var(--blue)">$${v.total.toLocaleString('es-AR')}</span>
+          <i class="bi bi-chevron-right text-muted"></i>
+        </div>
+      </div>`).join('');
+  }catch(e){b.innerHTML='<div class="empty text-danger">Error al cargar historial</div>'}
+}
+
+function verDetalle(v){
+  const b=document.getElementById('detB');
+  const itemsHtml=(v.detalle||[]).map(i=>`
+    <div class="ci">
+      <div style="max-width:70%; flex-shrink:0;">
+        <span class="ci-name" style="font-size:0.8rem">${i.nombre}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; flex:1; justify-content:flex-end;">
+        <small class="text-muted">x${i.qty}</small>
+        <span style="font-size:0.8rem; font-weight:700">$${(i.subtotal||0).toLocaleString('es-AR')}</span>
+      </div>
+    </div>`).join('');
+    
+  b.innerHTML=`
+    <div style="padding:10px 0; border-bottom:2px dashed var(--border); margin-bottom:10px">
+      <h6 style="margin:0; font-weight:800">${v.cliente_nombre}</h6>
+      <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>${v.fecha}</small>
+    </div>
+    <div style="margin-bottom:20px">${itemsHtml}</div>
+    <div class="total-box">
+      <span style="font-weight:700">Total Venta</span>
+      <span style="font-weight:900; font-size:1.3rem; color:var(--blue)">$${v.total.toLocaleString('es-AR')}</span>
+    </div>`;
+    
+  document.getElementById('detOvl').classList.add('show');
+  document.getElementById('detPanel').classList.add('show');
+}
+function cerrarDetalle(){document.getElementById('detOvl').classList.remove('show');document.getElementById('detPanel').classList.remove('show')}
+
 </script>
 </body>
 </html>

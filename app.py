@@ -277,6 +277,27 @@ def add_cliente():
     db.session.commit()
     return jsonify({"ok": True, "cliente": cliente.to_dict()})
 
+@app.route('/api/ventas', methods=['GET'])
+def get_ventas_general():
+    import json as _json
+    buscar = request.args.get('q', '').strip()
+    query = Venta.query.join(Cliente, Venta.cliente_id == Cliente.id)
+    if buscar:
+        query = query.filter(Cliente.nombre.ilike(f'%{buscar}%'))
+    
+    ventas = query.order_by(Venta.fecha.desc()).limit(100).all()
+    
+    return jsonify({
+        "ok": True,
+        "ventas": [{
+            "id": v.id,
+            "fecha": v.fecha.strftime('%d/%m/%Y %H:%M') if v.fecha else '',
+            "cliente_nombre": v.cliente.nombre if v.cliente else 'N/A',
+            "total": v.total,
+            "detalle": _json.loads(v.detalle_json or '[]')
+        } for v in ventas]
+    })
+
 @app.route('/api/ventas-cliente/<int:cliente_id>', methods=['GET'])
 def get_ventas_cliente(cliente_id):
     import json as _json
