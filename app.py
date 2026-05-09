@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file
+from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session
 import io
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -89,6 +89,32 @@ class Producto(db.Model):
 def load_user(user_id):
     return db.session.get(Usuario, int(user_id))
 
+# ─── Modelos de Clientes y Ventas ───────────────────────────────────────
+class Cliente(db.Model):
+    __tablename__ = 'clientes'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(150), nullable=False)
+    telefono = db.Column(db.String(30), nullable=True, default='')
+    direccion = db.Column(db.String(255), nullable=True, default='')
+    activo = db.Column(db.Integer, default=1)
+    ventas = db.relationship('Venta', backref='cliente', lazy=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nombre': self.nombre,
+            'telefono': self.telefono or '',
+            'direccion': self.direccion or ''
+        }
+
+class Venta(db.Model):
+    __tablename__ = 'ventas'
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
+    fecha = db.Column(db.DateTime, default=db.func.now())
+    total = db.Column(db.Float, default=0.0)
+    detalle_json = db.Column(db.Text, default='[]')  # JSON con [{nombre, qty, precio_unit, subtotal}]
+
 # ─── API REST (Para el Frontend) ─────────────────────────────
 @app.route('/api/productos', methods=['GET'])
 def get_productos():
@@ -144,21 +170,53 @@ def get_categorias():
 
 @app.route('/api/registrar_venta', methods=['POST'])
 def registrar_venta():
+    import json as _json
     data = request.json
-    if not data or not isinstance(data, list):
+    if not data:
         return jsonify({"ok": False, "mensaje": "Datos inválidos"}), 400
-        
-    for item in data:
+
+    # Acepta dos formatos:
+    # A) Lista directa (uso original del carrito público): [{id, qty}, ...]
+    # B) Objeto con cliente: {cliente_id, items:[{id,qty,name,precio_unit}], total}
+    if isinstance(data, list):
+        items = data
+        cliente_id = None
+        total_venta = 0.0
+        detalle = []
+    else:
+        items = data.get('items', [])
+        cliente_id = data.get('cliente_id')
+        total_venta = float(data.get('total', 0))
+        detalle = data.get('detalle', [])
+
+    for item in items:
         producto_id = item.get('id')
         qty = item.get('qty', 0)
         if producto_id and qty > 0:
-            producto = db.session.get(Producto, producto_id)
+            producto = db.session.get(Producto, int(producto_id))
             if producto:
                 producto.ventas_totales += qty
                 if producto.stock >= qty:
                     producto.stock -= qty
                 else:
                     producto.stock = 0
+
+    # Guardar registro de venta si hay detalle
+    if detalle or items:
+        if not detalle:
+            # Construir detalle desde items simples
+            detalle = []
+            for item in items:
+                p = db.session.get(Producto, int(item.get('id', 0)))
+                if p:
+                    detalle.append({'nombre': p.nombre, 'qty': item.get('qty', 1), 'precio_unit': p.precio})
+        venta = Venta(
+            cliente_id=cliente_id,
+            total=total_venta,
+            detalle_json=_json.dumps(detalle, ensure_ascii=False)
+        )
+        db.session.add(venta)
+
     db.session.commit()
     return jsonify({"ok": True, "mensaje": "Venta registrada con éxito"})
 
@@ -166,8 +224,76 @@ def registrar_venta():
 @app.route('/')
 def index():
     destacados = Producto.query.filter_by(favorito=True, activo=1).all()
-    # To easily allow template to use p.imagen_url or p.imagen without logic inside the template
     return render_template('index.html', destacados=destacados)
+
+# ─── Preventa: protección por contraseña ──────────────────────
+PREVENTA_PASSWORD = 'todo2026'
+
+@app.route('/preventa/login', methods=['GET', 'POST'])
+def preventa_login():
+    if request.method == 'POST':
+        clave = request.form.get('clave', '').strip()
+        if clave == PREVENTA_PASSWORD:
+            session['preventa_auth'] = True
+            return redirect('/preventa')
+        return render_template('preventa_login.html', error='Contraseña incorrecta')
+    return render_template('preventa_login.html', error=None)
+
+@app.route('/preventa')
+def preventa():
+    if not session.get('preventa_auth'):
+        return redirect('/preventa/login')
+    return render_template('preventa.html')
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    session.clear()
+    flash("Sesión cerrada correctamente.", "info")
+    return redirect(url_for('index'))
+
+# ─── API Clientes ────────────────────────────────────────────────────────────────
+@app.route('/api/clientes', methods=['GET'])
+def get_clientes():
+    buscar = request.args.get('q', '').strip()
+    query = Cliente.query.filter_by(activo=1)
+    if buscar:
+        query = query.filter(Cliente.nombre.ilike(f'%{buscar}%'))
+    clientes = query.order_by(Cliente.nombre.asc()).all()
+    return jsonify({"ok": True, "clientes": [c.to_dict() for c in clientes]})
+
+@app.route('/api/clientes', methods=['POST'])
+def add_cliente():
+    data = request.json or {}
+    nombre = data.get('nombre', '').strip()
+    if not nombre:
+        return jsonify({"ok": False, "mensaje": "El nombre es obligatorio"}), 400
+    cliente = Cliente(
+        nombre=nombre,
+        telefono=data.get('telefono', '').strip(),
+        direccion=data.get('direccion', '').strip()
+    )
+    db.session.add(cliente)
+    db.session.commit()
+    return jsonify({"ok": True, "cliente": cliente.to_dict()})
+
+@app.route('/api/ventas-cliente/<int:cliente_id>', methods=['GET'])
+def get_ventas_cliente(cliente_id):
+    import json as _json
+    cliente = db.session.get(Cliente, cliente_id)
+    if not cliente:
+        return jsonify({"ok": False, "mensaje": "Cliente no encontrado"}), 404
+    ventas = Venta.query.filter_by(cliente_id=cliente_id).order_by(Venta.fecha.desc()).limit(20).all()
+    return jsonify({
+        "ok": True,
+        "cliente": cliente.to_dict(),
+        "ventas": [{
+            "id": v.id,
+            "fecha": v.fecha.strftime('%d/%m/%Y %H:%M') if v.fecha else '',
+            "total": v.total,
+            "detalle": _json.loads(v.detalle_json or '[]')
+        } for v in ventas]
+    })
 
 @app.route('/productos')
 def productos():
@@ -214,12 +340,6 @@ def login():
             flash('Usuario o contraseña incorrectos.', 'danger')
 
     return render_template('login.html')
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
 
 @app.route('/admin')
 @login_required
