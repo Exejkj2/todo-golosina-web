@@ -1,4 +1,4 @@
-import os
+import os 
 from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session
 import io
 from flask_cors import CORS
@@ -6,6 +6,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
+from fpdf import FPDF
+from datetime import datetime, time, date
 
 # ─── Configuración ────────────────────────────────────────────
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -13,6 +15,7 @@ DB_PATH  = os.path.join(BASE_DIR, 'database', 'tienda.db')
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'todo_golosina_secreto_super_seguro'
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # Configuración de Base de Datos (PostgreSQL en Render / SQLite local)
 uri = os.environ.get('DATABASE_URL')
@@ -24,6 +27,70 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 CORS(app)
 db = SQLAlchemy(app)
+# Rutina de migración automática
+def migrate_db():
+    with app.app_context():
+        # Columnas para 'ventas'
+        ventas_cols = {
+            'metodo_pago': 'VARCHAR(100)',
+            'pago_efectivo': 'FLOAT DEFAULT 0.0',
+            'pago_transferencia': 'FLOAT DEFAULT 0.0',
+            'pago_debito': 'FLOAT DEFAULT 0.0',
+            'pago_cc': 'FLOAT DEFAULT 0.0',
+            'entregado': 'FLOAT DEFAULT 0.0',
+            'lista_precios': 'INTEGER DEFAULT 1',
+            'tipo': 'VARCHAR(20) DEFAULT "Local"',
+            'subtotal': 'FLOAT DEFAULT 0.0',
+            'descuento': 'FLOAT DEFAULT 0.0'
+        }
+        
+        # Intentar con y sin comillas para máxima compatibilidad
+        for table in ['ventas', '"ventas"']:
+            for col, type_ in ventas_cols.items():
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
+                    db.session.commit()
+                    print(f"Columna {col} agregada a tabla {table}")
+                except Exception:
+                    db.session.rollback()
+
+        # Columnas para 'clientes'
+        clientes_cols = {
+            'cuit': 'VARCHAR(20)',
+            'telefono': 'VARCHAR(50)',
+            'direccion': 'VARCHAR(200)',
+            'condicion_iva': 'VARCHAR(50) DEFAULT "Consumidor Final"',
+            'descuento_fijo': 'FLOAT DEFAULT 0.0',
+            'limite_credito': 'FLOAT DEFAULT 0.0',
+            'saldo': 'FLOAT DEFAULT 0.0'
+        }
+        for table in ['clientes', '"clientes"']:
+            for col, type_ in clientes_cols.items():
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        # Columnas para 'gastos'
+        gastos_cols = {
+            'tipo': 'VARCHAR(20) DEFAULT "Egreso"'
+        }
+        for table in ['gastos', '"gastos"']:
+            for col, type_ in gastos_cols.items():
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+migrate_db()
+
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -37,17 +104,25 @@ class Usuario(UserMixin, db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
 
+    def __init__(self, **kwargs):
+        super(Usuario, self).__init__(**kwargs)
+
 class Categoria(db.Model):
     __tablename__ = 'categoria'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(50), unique=True, nullable=False)
 
+    def __init__(self, **kwargs):
+        super(Categoria, self).__init__(**kwargs)
+
 class Producto(db.Model):
-    __tablename__ = 'Productos'
+    __tablename__ = '"Productos"'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text)
-    precio = db.Column(db.Float, nullable=False)
+    precio_lista_1 = db.Column(db.Float, nullable=False) # Lista 1
+    precio_lista_2 = db.Column(db.Float, nullable=True, default=0.0) # Lista 2
+    precio_lista_3 = db.Column(db.Float, nullable=True, default=0.0) # Lista 3
     precio_anterior = db.Column(db.Float, nullable=True)
     imagen = db.Column(db.String(255), default='')
     imagen_url = db.Column(db.Text, default='')
@@ -59,18 +134,29 @@ class Producto(db.Model):
     favorito = db.Column(db.Boolean, default=False)
     permitir_sin_stock = db.Column(db.Boolean, default=True)
     ventas_totales = db.Column(db.Integer, default=0)
+    codigo_barra = db.Column(db.String(100), nullable=True)
 
     # ─── Descuento por Volumen / Mayorista ───
     descuento_volumen_activo = db.Column(db.Boolean, default=False)
     cantidad_minima_descuento = db.Column(db.Integer, nullable=True)
     porcentaje_descuento_volumen = db.Column(db.Float, nullable=True)
 
+    def __init__(self, **kwargs):
+        super(Producto, self).__init__(**kwargs)
+
+    @property
+    def precio(self):
+        return self.precio_lista_1
+
     def to_dict(self):
         return {
             'id': self.id,
             'nombre': self.nombre,
             'descripcion': self.descripcion,
-            'precio': self.precio,
+            'precio': self.precio_lista_1,
+            'precio_lista_1': self.precio_lista_1,
+            'precio_lista_2': self.precio_lista_2 or self.precio_lista_1,
+            'precio_lista_3': self.precio_lista_3 or self.precio_lista_1,
             'precio_anterior': self.precio_anterior,
             'imagen': self.imagen_url or self.imagen,
             'imagen_url': self.imagen_url,
@@ -80,6 +166,7 @@ class Producto(db.Model):
             'favorito': self.favorito,
             'permitir_sin_stock': self.permitir_sin_stock,
             'ventas_totales': self.ventas_totales,
+            'codigo_barra': self.codigo_barra or '',
             'descuento_volumen_activo': self.descuento_volumen_activo,
             'cantidad_minima_descuento': self.cantidad_minima_descuento,
             'porcentaje_descuento_volumen': self.porcentaje_descuento_volumen
@@ -94,17 +181,32 @@ class Cliente(db.Model):
     __tablename__ = 'clientes'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(150), nullable=False)
+    cuit = db.Column(db.String(20), nullable=True, default='', unique=True)
+    condicion_iva = db.Column(db.String(50), nullable=True, default='Consumidor Final')
     telefono = db.Column(db.String(30), nullable=True, default='')
     direccion = db.Column(db.String(255), nullable=True, default='')
+    descuento = db.Column(db.Float, default=0.0)
+    descuento_fijo = db.Column(db.Float, default=0.0)
+    saldo = db.Column(db.Float, default=0.0)
+    limite_credito = db.Column(db.Float, default=0.0)
     activo = db.Column(db.Integer, default=1)
     ventas = db.relationship('Venta', backref='cliente', lazy=True)
+
+    def __init__(self, **kwargs):
+        super(Cliente, self).__init__(**kwargs)
 
     def to_dict(self):
         return {
             'id': self.id,
             'nombre': self.nombre,
+            'cuit': self.cuit or '',
+            'condicion_iva': self.condicion_iva or 'CF',
             'telefono': self.telefono or '',
-            'direccion': self.direccion or ''
+            'direccion': self.direccion or '',
+            'descuento_fijo': self.descuento_fijo or 0.0,
+            'descuento': self.descuento or 0.0,
+            'saldo': self.saldo or 0.0,
+            'limite_credito': self.limite_credito or 0.0
         }
 
 class Venta(db.Model):
@@ -113,7 +215,67 @@ class Venta(db.Model):
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
     fecha = db.Column(db.DateTime, default=db.func.now())
     total = db.Column(db.Float, default=0.0)
-    detalle_json = db.Column(db.Text, default='[]')  # JSON con [{nombre, qty, precio_unit, subtotal}]
+    detalle_json = db.Column(db.Text, default='[]')
+    lista_precios = db.Column(db.Integer, default=1)
+    tipo = db.Column(db.String(20), default='Preventa')
+    metodo_pago = db.Column(db.String(100), nullable=True)
+    pago_efectivo = db.Column(db.Float, default=0.0)
+    pago_transferencia = db.Column(db.Float, default=0.0)
+    pago_debito = db.Column(db.Float, default=0.0)
+    pago_cc = db.Column(db.Float, default=0.0)
+    entregado = db.Column(db.Float, default=0.0)
+
+    def __init__(self, **kwargs):
+        super(Venta, self).__init__(**kwargs)
+
+class Gasto(db.Model):
+    __tablename__ = 'gastos'
+    id = db.Column(db.Integer, primary_key=True)
+    descripcion = db.Column(db.String(255), nullable=False)
+    monto = db.Column(db.Float, nullable=False)
+    fecha = db.Column(db.DateTime, default=db.func.now())
+    categoria = db.Column(db.String(100), default='General')
+    tipo = db.Column(db.String(20), default='Egreso') # 'Egreso' o 'Ingreso'
+
+    def __init__(self, **kwargs):
+        super(Gasto, self).__init__(**kwargs)
+
+    def to_dict(self):
+        f = self.fecha
+        if isinstance(f, str):
+            try:
+                from datetime import datetime
+                f = datetime.fromisoformat(f.replace('Z', '+00:00'))
+            except:
+                pass
+        
+        return {
+            'id': self.id,
+            'descripcion': self.descripcion,
+            'monto': self.monto,
+            'fecha': f.strftime('%H:%M') if hasattr(f, 'strftime') else '--:--',
+            'categoria': self.categoria,
+            'tipo': self.tipo
+        }
+
+class CajaDiaria(db.Model):
+    __tablename__ = 'cajas_diarias'
+    id = db.Column(db.Integer, primary_key=True)
+    fecha_apertura = db.Column(db.DateTime, default=db.func.now())
+    monto_inicial = db.Column(db.Float, nullable=False)
+    monto_final = db.Column(db.Float, nullable=True)
+    fecha_cierre = db.Column(db.DateTime, nullable=True)
+    estado = db.Column(db.String(20), default='Abierta') # 'Abierta' o 'Cerrada'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'monto_inicial': self.monto_inicial,
+            'monto_final': self.monto_final,
+            'estado': self.estado,
+            'fecha_apertura': self.fecha_apertura.strftime('%Y-%m-%d %H:%M') if self.fecha_apertura else '',
+            'fecha_cierre': self.fecha_cierre.strftime('%Y-%m-%d %H:%M') if self.fecha_cierre else ''
+        }
 
 # ─── API REST (Para el Frontend) ─────────────────────────────
 @app.route('/api/productos', methods=['GET'])
@@ -135,20 +297,50 @@ def get_productos():
         query = query.filter(Producto.nombre.ilike(f'%{buscar}%') | Producto.descripcion.ilike(f'%{buscar}%'))
 
     if orden == 'precio_asc':
-        query = query.order_by(Producto.precio.asc())
-    elif orden == 'precio_desc':
-        query = query.order_by(Producto.precio.desc())
-    elif orden == 'nombre':
-        query = query.order_by(Producto.nombre.asc())
+        query = query.order_by(Producto.precio_lista_1.asc())
+    elif orden == 'ventas':
+        query = query.order_by(Producto.ventas_totales.desc())
     else:
-        query = query.order_by(Producto.id.asc())
+        query = query.order_by(Producto.id.desc())
 
     productos = query.all()
+    return jsonify({"productos": [p.to_dict() for p in productos]})
+
+@app.route('/buscar_productos')
+def buscar_productos():
+    q = request.args.get('q', '').strip()
+    if not q:
+        return jsonify({"productos": []})
+    
+    # Búsqueda insensible a mayúsculas con ILIKE
+    prods = Producto.query.filter(
+        Producto.nombre.ilike(f'%{q}%'),
+        Producto.activo == 1
+    ).limit(30).all()
+    
     return jsonify({
-        "ok": True,
-        "total": len(productos),
-        "productos": [p.to_dict() for p in productos]
+        "productos": [p.to_dict() for p in prods]
     })
+
+@app.route('/buscar_por_codigo/<codigo>')
+def buscar_por_codigo(codigo):
+    codigo = codigo.strip()
+    
+    # Intenta buscar por codigo_barras primero
+    # Como la columna se acaba de agregar, envolvemos en try-except por si la BD aún no actualizó el schema
+    try:
+        p = Producto.query.filter_by(codigo_barra=codigo, activo=1).first()
+    except Exception:
+        p = None
+        
+    # Fallback: buscar por ID si el código es numérico (útil para códigos generados internamente)
+    if not p and codigo.isdigit():
+        p = Producto.query.filter_by(id=int(codigo), activo=1).first()
+        
+    if p:
+        return jsonify({"ok": True, "producto": p.to_dict()})
+    else:
+        return jsonify({"ok": False, "mensaje": "Producto no encontrado"}), 404
 
 @app.route('/api/productos/<int:producto_id>', methods=['GET'])
 def get_producto(producto_id):
@@ -183,11 +375,13 @@ def registrar_venta():
         cliente_id = None
         total_venta = 0.0
         detalle = []
+        lista_sel = 1
     else:
         items = data.get('items', [])
         cliente_id = data.get('cliente_id')
         total_venta = float(data.get('total', 0))
         detalle = data.get('detalle', [])
+        lista_sel = data.get('lista_precios', 1)
 
     for item in items:
         producto_id = item.get('id')
@@ -201,30 +395,104 @@ def registrar_venta():
                 else:
                     producto.stock = 0
 
-    # Guardar registro de venta si hay detalle
+    venta_id = None
     if detalle or items:
         if not detalle:
-            # Construir detalle desde items simples
             detalle = []
             for item in items:
                 p = db.session.get(Producto, int(item.get('id', 0)))
                 if p:
-                    detalle.append({'nombre': p.nombre, 'qty': item.get('qty', 1), 'precio_unit': p.precio})
+                    precio_u = p.precio_lista_3 if lista_sel == 3 else (p.precio_lista_2 if lista_sel == 2 else p.precio)
+                    detalle.append({'nombre': p.nombre, 'qty': item.get('qty', 1), 'precio_unit': precio_u})
+        
+        # Soporte para medios de pago múltiples
+        pagos = data.get('pagos', {})
+        p_ef = float(pagos.get('efectivo', 0))
+        p_tr = float(pagos.get('transferencia', 0))
+        p_db = float(pagos.get('debito', 0))
+        p_cc = float(pagos.get('cc', 0))
+
+        # Fallback para modo simple (un solo método)
+        if not pagos and data.get('metodo_pago'):
+            m = data.get('metodo_pago')
+            if m == 'Efectivo': p_ef = total_venta
+            elif m in ['Mercado Pago', 'Transferencia']: p_tr = total_venta
+            elif m == 'Débito': p_db = total_venta
+            elif m == 'Cuenta Corriente': p_cc = total_venta
+
+        if p_cc > 0 and cliente_id:
+            cliente = db.session.get(Cliente, cliente_id)
+            if cliente:
+                if cliente.limite_credito > 0 and (cliente.saldo + p_cc) > cliente.limite_credito:
+                    return jsonify({"ok": False, "mensaje": f"Límite de crédito excedido. Saldo: ${cliente.saldo:.2f}, Límite: ${cliente.limite_credito:.2f}"}), 403
+                cliente.saldo += p_cc
+
         venta = Venta(
             cliente_id=cliente_id,
             total=total_venta,
-            detalle_json=_json.dumps(detalle, ensure_ascii=False)
+            detalle_json=_json.dumps(detalle, ensure_ascii=False),
+            lista_precios=lista_sel,
+            tipo=data.get('tipo', 'Preventa'),
+            metodo_pago=data.get('metodo_pago', 'Varios'),
+            pago_efectivo=p_ef,
+            pago_transferencia=p_tr,
+            pago_debito=p_db,
+            pago_cc=p_cc
         )
         db.session.add(venta)
+        db.session.commit()
+        venta_id = venta.id
+    else:
+        db.session.commit()
 
-    db.session.commit()
-    return jsonify({"ok": True, "mensaje": "Venta registrada con éxito"})
+    return jsonify({"ok": True, "mensaje": "Venta registrada con éxito", "venta_id": venta_id})
 
 # ─── Rutas del Frontend (La Vidriera) ────────────────────────
+# ─── Utilidades ────────────────────────────────────────────────────────
+def to_title_case(text):
+    if not text:
+        return ""
+    import re
+    return re.sub(r"\b\w", lambda m: m.group(0).upper(), text.lower())
+
+@app.route('/imprimir_ticket/')
+@app.route('/imprimir_ticket/<int:id>')
+def endpoint_imprimir_ticket(id=None):
+    if id is None:
+        return "ID de ticket no proporcionado", 400
+    try:
+        venta = Venta.query.get_or_404(id)
+        import json
+        detalle = json.loads(venta.detalle_json or '[]')
+        
+        # Formatear nombres para el ticket (Title Case)
+        for item in detalle:
+            item['nombre'] = to_title_case(item.get('nombre', ''))
+            
+        # Regla de Privacidad: Título genérico y ocultar cliente si es CF
+        es_venta_rapida = True
+        cliente_nombre = ""
+        if venta.cliente and venta.cliente.nombre != "Consumidor Final":
+            cliente_nombre = to_title_case(venta.cliente.nombre)
+            es_venta_rapida = False
+            
+        return render_template('ticket.html', 
+                             venta=venta, 
+                             detalle=detalle, 
+                             cliente_nombre=cliente_nombre,
+                             es_venta_rapida=es_venta_rapida)
+    except Exception as e:
+        return f"Error al generar el ticket: {str(e)}", 500
+
 @app.route('/')
 def index():
     destacados = Producto.query.filter_by(favorito=True, activo=1).all()
     return render_template('index.html', destacados=destacados)
+
+@app.route('/dashboard')
+@login_required
+def dashboard_admin():
+    return render_template('dashboard_admin.html')
 
 # ─── Preventa: protección por contraseña ──────────────────────
 PREVENTA_PASSWORD = 'todo2026'
@@ -243,7 +511,135 @@ def preventa_login():
 def preventa():
     if not session.get('preventa_auth'):
         return redirect('/preventa/login')
-    return render_template('preventa.html')
+    try:
+        # Prueba de conexión simple
+        Producto.query.first()
+        return render_template('preventa.html')
+    except Exception as e:
+        return f"<h1>Error de Base de Datos</h1><p>{str(e)}</p><hr><p>Verificá si las columnas precio_lista_1/2/3 existen en la tabla 'Productos'.</p>"
+
+# ─── Facturador: protección por usuario/contraseña ────────────────
+FACTU_USER = 'factu'
+FACTU_PASS = 'factu2026'
+
+@app.route('/login-facturador', methods=['GET', 'POST'])
+def facturador_login():
+    if request.method == 'POST':
+        user = request.form.get('usuario', '').strip()
+        clave = request.form.get('clave', '').strip()
+        if user == FACTU_USER and clave == FACTU_PASS:
+            session['facturador_auth'] = True
+            return redirect('/facturador')
+        return render_template('facturador_login.html', error='Usuario o contraseña incorrectos')
+    return render_template('facturador_login.html', error=None)
+
+@app.route('/facturador')
+def facturador():
+    if not session.get('facturador_auth'):
+        return redirect('/login-facturador')
+    return render_template('facturador.html')
+
+@app.route('/logout-facturador')
+def logout_facturador():
+    session.pop('facturador_auth', None)
+    return redirect('/')
+
+@app.route('/ticket/<int:venta_id>')
+def endpoint_ticket_legacy(venta_id):
+    return endpoint_imprimir_ticket(venta_id)
+
+@app.route('/descargar_factura/<int:venta_id>')
+def descargar_factura(venta_id):
+    venta = db.session.get(Venta, venta_id)
+    if not venta:
+        abort(404, description="Venta no encontrada")
+        
+    import json
+    detalle = json.loads(venta.detalle_json or '[]')
+    
+    # Calcular altura dinámica: 70mm base + 10mm por item + 40mm pie
+    item_count = len(detalle)
+    page_height = 80 + (item_count * 8) + 40
+    
+    # FPDF(orientation, unit, format)
+    # format=(ancho, alto) en mm
+    pdf = FPDF('P', 'mm', (80, page_height))
+    pdf.add_page()
+    pdf.set_auto_page_break(False)
+    
+    # Encabezado
+    pdf.set_font('Arial', 'B', 14)
+    pdf.cell(0, 8, 'TODO GOLOSINA', 0, 1, 'C')
+    pdf.set_font('Arial', '', 8)
+    pdf.cell(0, 4, 'Alberdi 950, Aguilares - Tucuman', 0, 1, 'C')
+    pdf.cell(0, 4, '----------------------------------------------------------', 0, 1, 'C')
+    
+    pdf.ln(2)
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(0, 6, f'TICKET #000-{venta.id}', 0, 1, 'C')
+    pdf.set_font('Arial', '', 8)
+    pdf.cell(0, 4, f"Fecha: {venta.fecha.strftime('%d/%m/%Y %H:%M')}", 0, 1, 'C')
+    pdf.ln(3)
+    
+    # Tabla de Productos
+    pdf.set_font('Arial', 'B', 8)
+    pdf.cell(8, 6, 'Cant', 'B', 0, 'C')
+    pdf.cell(37, 6, 'Producto', 'B', 0, 'L')
+    pdf.cell(15, 6, 'Subtotal', 'B', 1, 'R')
+    
+    pdf.set_font('Arial', '', 8)
+    for item in detalle:
+        # Truncar nombre si es muy largo
+        nombre = item.get('nombre', 'Prod')[:22]
+        pdf.cell(8, 7, f"{item['qty']}", 0, 0, 'C')
+        pdf.cell(37, 7, nombre, 0, 0, 'L')
+        sub = item['qty'] * item['precio_unit']
+        pdf.cell(15, 7, f"${sub:,.0f}".replace(',', '.'), 0, 1, 'R')
+    
+    pdf.ln(2)
+    pdf.cell(0, 0, '', 'T', 1)
+    pdf.ln(2)
+    
+    # Totales
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(35, 8, 'TOTAL:', 0, 0, 'L')
+    pdf.cell(25, 8, f"${venta.total:,.2f}", 0, 1, 'R')
+    
+    pdf.ln(2)
+    pdf.set_font('Arial', 'B', 8)
+    pdf.cell(0, 5, 'MEDIOS DE PAGO:', 0, 1, 'L')
+    pdf.set_font('Arial', '', 8)
+    if venta.pago_efectivo > 0: pdf.cell(0, 4, f"- Efectivo: ${venta.pago_efectivo:,.2f}", 0, 1, 'L')
+    if venta.pago_transferencia > 0: pdf.cell(0, 4, f"- Transf/MP: ${venta.pago_transferencia:,.2f}", 0, 1, 'L')
+    if venta.pago_debito > 0: pdf.cell(0, 4, f"- Débito: ${venta.pago_debito:,.2f}", 0, 1, 'L')
+    if venta.pago_cc > 0: pdf.cell(0, 4, f"- A Cuenta: ${venta.pago_cc:,.2f}", 0, 1, 'L')
+
+    if venta.pago_cc > 0 and venta.cliente:
+        pdf.ln(1)
+        pdf.set_font('Arial', 'B', 9)
+        pdf.cell(0, 5, f"Deuda Total Actual: ${venta.cliente.saldo:,.2f}", 0, 1, 'L')
+    
+    pdf.ln(5)
+    pdf.set_font('Arial', 'I', 8)
+    pdf.cell(0, 5, '¡Gracias por su compra!', 0, 1, 'C')
+    pdf.cell(0, 5, 'www.todogolosina.com', 0, 1, 'C')
+
+    # Generar salida
+    output = io.BytesIO()
+    # fpdf.output returns the pdf content as a string (py2) or bytes (py3) in dest='S'
+    pdf_content = pdf.output(dest='S')
+    if isinstance(pdf_content, str):
+        pdf_content = pdf_content.encode('latin-1')
+    
+    output.write(pdf_content)
+    output.seek(0)
+    
+    return send_file(
+        output,
+        mimetype='application/pdf',
+        download_name=f'Ticket_TodoGolosina_{venta_id}.pdf',
+        as_attachment=True
+    )
 
 @app.route('/logout')
 def logout():
@@ -252,8 +648,23 @@ def logout():
     flash("Sesión cerrada correctamente.", "info")
     return redirect(url_for('index'))
 
+@app.route('/api/clientes/<int:id>', methods=['DELETE'])
+def delete_cliente(id):
+    try:
+        cliente = Cliente.query.get(id)
+        if not cliente:
+            return jsonify({"ok": False, "mensaje": "Cliente no encontrado"}), 404
+        db.session.delete(cliente)
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Error al eliminar cliente: {e}")
+        return jsonify({"ok": False, "mensaje": str(e)}), 500
+
 # ─── API Clientes ────────────────────────────────────────────────────────────────
 @app.route('/api/clientes', methods=['GET'])
+@app.route('/buscar_clientes', methods=['GET'])
+@app.route('/obtener_clientes', methods=['GET'])
 def get_clientes():
     buscar = request.args.get('q', '').strip()
     query = Cliente.query.filter_by(activo=1)
@@ -263,25 +674,250 @@ def get_clientes():
     return jsonify({"ok": True, "clientes": [c.to_dict() for c in clientes]})
 
 @app.route('/api/clientes', methods=['POST'])
+@app.route('/guardar_cliente', methods=['POST'])
 def add_cliente():
     data = request.json or {}
     nombre = data.get('nombre', '').strip()
+    cuit = data.get('cuit', '').strip()
     if not nombre:
         return jsonify({"ok": False, "mensaje": "El nombre es obligatorio"}), 400
-    cliente = Cliente(
-        nombre=nombre,
-        telefono=data.get('telefono', '').strip(),
-        direccion=data.get('direccion', '').strip()
-    )
-    db.session.add(cliente)
-    db.session.commit()
-    return jsonify({"ok": True, "cliente": cliente.to_dict()})
+    
+    # Validación de Duplicados (DNI/CUIT)
+    if cuit:
+        existente = Cliente.query.filter_by(cuit=cuit).first()
+        if existente:
+            return jsonify({"ok": False, "mensaje": "Este cliente ya está registrado con ese DNI/CUIT"}), 400
+    else:
+        # Si no hay CUIT, validamos por nombre exacto para evitar duplicados basura
+        existente_nombre = Cliente.query.filter(Cliente.nombre.ilike(nombre)).first()
+        if existente_nombre:
+            return jsonify({"ok": False, "mensaje": f"Ya existe un cliente registrado con el nombre '{nombre}'"}), 400
+
+    try:
+        cliente = Cliente(
+            nombre=nombre,
+            cuit=cuit,
+            condicion_iva=data.get('condicion_iva', 'Consumidor Final').strip(),
+            telefono=data.get('telefono', '').strip(),
+            direccion=data.get('direccion', '').strip(),
+            descuento_fijo=float(data.get('descuento_fijo', 0.0))
+        )
+        db.session.add(cliente)
+        db.session.commit()
+        return jsonify({"ok": True, "cliente": cliente.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERROR AL GUARDAR CLIENTE: {e}")
+        return jsonify({"ok": False, "mensaje": str(e)}), 500
+
+@app.route('/api/clientes/<int:id>', methods=['PUT'])
+@app.route('/editar_cliente/<int:id>', methods=['POST', 'PUT'])
+def edit_cliente(id):
+    cliente = db.session.get(Cliente, id)
+    if not cliente:
+        return jsonify({"ok": False, "mensaje": "Cliente no encontrado"}), 404
+
+    data = request.json or {}
+    nombre = data.get('nombre', '').strip()
+    cuit   = data.get('cuit', '').strip()
+
+    if not nombre:
+        return jsonify({"ok": False, "mensaje": "El nombre es obligatorio"}), 400
+
+    # ── Validación inteligente: excluye al cliente actual ──
+    if cuit:
+        duplicado = Cliente.query.filter(
+            Cliente.cuit == cuit,
+            Cliente.id != id
+        ).first()
+        if duplicado:
+            return jsonify({"ok": False, "mensaje": f"Ya existe otro cliente con ese DNI/CUIT ({duplicado.nombre})"}), 400
+
+    try:
+        # ── Actualizar todos los campos ──
+        cliente.nombre        = nombre
+        cliente.cuit          = cuit
+        cliente.condicion_iva = data.get('condicion_iva', cliente.condicion_iva or 'Consumidor Final').strip()
+        cliente.telefono      = data.get('telefono', '').strip()
+        cliente.direccion     = data.get('direccion', '').strip()
+        cliente.descuento_fijo = float(data.get('descuento_fijo', cliente.descuento_fijo or 0.0))
+
+        db.session.commit()
+        return jsonify({"ok": True, "cliente": cliente.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERROR AL EDITAR CLIENTE: {e}")
+        return jsonify({"ok": False, "mensaje": str(e)}), 500
+
+@app.route('/api/clientes/deudores', methods=['GET'])
+def get_clientes_deudores():
+    clientes = Cliente.query.filter(Cliente.saldo > 0, Cliente.activo == 1).order_by(Cliente.saldo.desc()).all()
+    return jsonify({"ok": True, "clientes": [c.to_dict() for c in clientes]})
+
+@app.route('/api/clientes/registrar_pago', methods=['POST'])
+def registrar_pago():
+    data = request.json or {}
+    cliente_id = data.get('cliente_id')
+    monto = float(data.get('monto', 0))
+    if not cliente_id or monto <= 0:
+        return jsonify({"ok": False, "mensaje": "Datos inválidos"}), 400
+    
+    cliente = db.session.get(Cliente, cliente_id)
+    if not cliente:
+        return jsonify({"ok": False, "mensaje": "Cliente no encontrado"}), 404
+        
+    try:
+        cliente.saldo -= monto
+        # Registrar como ingreso en caja
+        pago_mov = Gasto(
+            descripcion=f"Cobranza: {cliente.nombre}",
+            monto=monto,
+            categoria="Cobranza",
+            tipo="Ingreso"
+        )
+        db.session.add(pago_mov)
+        db.session.commit()
+        return jsonify({"ok": True, "nuevo_saldo": cliente.saldo})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"ok": False, "mensaje": str(e)}), 500
+
+@app.route('/api/caja/estado', methods=['GET'])
+def get_caja_estado():
+    hoy = date.today()
+    # Buscamos si hay una caja abierta
+    caja = CajaDiaria.query.filter_by(estado='Abierta').order_by(CajaDiaria.id.desc()).first()
+    if caja:
+        return jsonify({"ok": True, "abierta": True, "caja": caja.to_dict()})
+    return jsonify({"ok": True, "abierta": False})
+
+@app.route('/api/caja/abrir', methods=['POST'])
+def abrir_caja():
+    data = request.json or {}
+    monto = float(data.get('monto_inicial', 0))
+    # Cerrar cualquier caja que haya quedado abierta por error antes de abrir una nueva?
+    # O simplemente no permitir abrir si ya hay una.
+    existente = CajaDiaria.query.filter_by(estado='Abierta').first()
+    if existente:
+        return jsonify({"ok": False, "mensaje": "Ya existe una caja abierta"}), 400
+    
+    try:
+        nueva = CajaDiaria(monto_inicial=monto, estado='Abierta')
+        db.session.add(nueva)
+        db.session.commit()
+        return jsonify({"ok": True, "caja": nueva.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"ok": False, "mensaje": str(e)}), 500
+
+@app.route('/api/caja/cerrar', methods=['POST'])
+def cerrar_caja():
+    caja = CajaDiaria.query.filter_by(estado='Abierta').order_by(CajaDiaria.id.desc()).first()
+    if not caja:
+        return jsonify({"ok": False, "mensaje": "No hay una caja abierta para cerrar"}), 400
+    
+    try:
+        # Aquí se podrían calcular totales finales y guardarlos si el modelo tuviera esos campos
+        caja.estado = 'Cerrada'
+        caja.fecha_cierre = datetime.now()
+        db.session.commit()
+        return jsonify({"ok": True, "mensaje": "Caja cerrada correctamente"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"ok": False, "mensaje": str(e)}), 500
+
+@app.route('/api/ventas_hoy', methods=['GET'])
+def get_ventas_hoy():
+    try:
+        # Buscamos la fecha de apertura de la caja actual o hoy a las 00:00
+        caja = CajaDiaria.query.filter_by(estado='Abierta').order_by(CajaDiaria.id.desc()).first()
+        if caja:
+            inicio_rango = caja.fecha_apertura
+        else:
+            inicio_rango = datetime.combine(date.today(), time.min)
+
+        ventas = Venta.query.filter(Venta.fecha >= inicio_rango).order_by(Venta.fecha.desc()).all()
+        gastos = Gasto.query.filter(Gasto.fecha >= inicio_rango).all()
+        
+        m_ef = sum((v.pago_efectivo or 0.0) for v in ventas)
+        m_tr = sum((v.pago_transferencia or 0.0) for v in ventas)
+        m_db = sum((v.pago_debito or 0.0) for v in ventas)
+        m_cc = sum((v.pago_cc or 0.0) for v in ventas)
+        
+        total_ventas = sum((v.total or 0.0) for v in ventas)
+        
+        ingresos_extra = sum((g.monto or 0.0) for g in gastos if g.tipo == 'Ingreso' and g.categoria != 'Cobranza')
+        cobranzas = sum((g.monto or 0.0) for g in gastos if g.tipo == 'Ingreso' and g.categoria == 'Cobranza')
+        egresos = sum((g.monto or 0.0) for g in gastos if g.tipo == 'Egreso')
+        
+        monto_inicial = caja.monto_inicial if caja else 0.0
+        # Efectivo Real = Inicio + Ventas Efectivo + Cobranzas + Ingresos Extra - Egresos
+        efectivo_real = monto_inicial + m_ef + cobranzas + ingresos_extra - egresos
+
+        # Métricas extra para el Dashboard
+        tickets_hoy = len(ventas)
+        clientes_hoy = len(set(v.cliente_id for v in ventas if v.cliente_id))
+        alertas_stock = Producto.query.filter(Producto.activo == 1, Producto.stock <= 5).count()
+
+        return jsonify({
+            "ok": True,
+            "caja_abierta": True if caja else False,
+            "monto_inicial": monto_inicial,
+            "total_ventas": total_ventas,
+            "tickets_hoy": tickets_hoy,
+            "clientes_hoy": clientes_hoy,
+            "alertas_stock": alertas_stock,
+            "metodos": {
+                "efectivo": m_ef,
+                "transferencia": m_tr,
+                "debito": m_db,
+                "cc": m_cc
+            },
+            "ingresos_extra": ingresos_extra,
+            "cobranzas": cobranzas,
+            "egresos": egresos,
+            "efectivo_real": efectivo_real,
+            "ventas": [{
+                "id": v.id,
+                "hora": v.fecha.strftime('%H:%M') if hasattr(v.fecha, 'strftime') else (str(v.fecha)[:16] if v.fecha else '--:--'),
+                "metodo_pago": getattr(v, 'metodo_pago', 'No especificado') or 'No especificado',
+                "total": v.total or 0.0
+            } for v in ventas],
+            "gastos": [g.to_dict() for g in gastos]
+        })
+    except Exception as e:
+        print(f"ERROR CRÍTICO en /api/ventas_hoy: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"ok": False, "mensaje": str(e)}), 500
+
+@app.route('/api/gastos', methods=['POST'])
+def add_gasto():
+    data = request.json or {}
+    descripcion = data.get('descripcion', '').strip()
+    monto = data.get('monto', 0)
+    if not descripcion or not monto:
+        return jsonify({"ok": False, "mensaje": "Descripción y monto son obligatorios"}), 400
+    
+    try:
+        gasto = Gasto(
+            descripcion=descripcion, 
+            monto=float(monto), 
+            categoria=data.get('categoria', 'General'),
+            tipo=data.get('tipo', 'Egreso')
+        )
+        db.session.add(gasto)
+        db.session.commit()
+        return jsonify({"ok": True, "gasto": gasto.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"ok": False, "mensaje": str(e)}), 500
 
 @app.route('/api/ventas', methods=['GET'])
 def get_ventas_general():
     import json as _json
     buscar = request.args.get('q', '').strip()
-    query = Venta.query.join(Cliente, Venta.cliente_id == Cliente.id)
+    query = Venta.query.outerjoin(Cliente, Venta.cliente_id == Cliente.id)
     if buscar:
         query = query.filter(Cliente.nombre.ilike(f'%{buscar}%'))
     
@@ -318,7 +954,8 @@ def get_ventas_cliente(cliente_id):
 
 @app.route('/productos')
 def productos():
-    return render_template('productos.html')
+    productos = Producto.query.filter_by(activo=1).order_by(Producto.id.desc()).all()
+    return render_template('productos.html', productos=productos)
 
 @app.route('/producto/<int:id>')
 def producto_detalle(id):
@@ -335,9 +972,7 @@ def producto_detalle(id):
         ).order_by(db.func.random()).limit(4).all()
     return render_template('detalle.html', producto=producto, relacionados=relacionados)
 
-@app.route('/nosotros')
-def nosotros():
-    return render_template('nosotros.html')
+
 
 @app.route('/contacto')
 def contacto():
@@ -404,6 +1039,25 @@ def admin_add_product():
     favorito = True if request.form.get('favorito') else False
     permitir_sin_stock = True if request.form.get('permitir_sin_stock') else False
 
+    # Triple Lista de Precios
+    precio_1_str = request.form.get('precio', '0').strip().replace(',', '.')
+    precio_2_str = request.form.get('precio_2', '').strip().replace(',', '.')
+    precio_3_str = request.form.get('precio_3', '').strip().replace(',', '.')
+    
+    try:
+        precio_lista_1 = float(precio_1_str) if precio_1_str else 0.0
+    except ValueError:
+        precio_lista_1 = 0.0
+
+    try:
+        precio_lista_2 = float(precio_2_str) if precio_2_str else precio_lista_1
+    except ValueError:
+        precio_lista_2 = precio_lista_1
+    try:
+        precio_lista_3 = float(precio_3_str) if precio_3_str else precio_lista_1
+    except ValueError:
+        precio_lista_3 = precio_lista_1
+
     # Descuento por volumen
     descuento_volumen_activo = True if request.form.get('descuento_volumen_activo') else False
     cant_min_str = request.form.get('cantidad_minima_descuento', '').strip()
@@ -417,10 +1071,14 @@ def admin_add_product():
     except ValueError:
         porcentaje_descuento_volumen = None
 
+    codigo_barra = request.form.get('codigo_barra', '').strip()
+
     nuevo = Producto(
-        nombre=nombre, precio=precio, precio_anterior=precio_anterior, descripcion=descripcion,
+        nombre=nombre, precio_lista_1=precio_lista_1, precio_lista_2=precio_lista_2, precio_lista_3=precio_lista_3,
+        precio_anterior=precio_anterior, descripcion=descripcion,
         imagen_url=imagen_url, categoria_id=categoria_id, stock=stock,
         favorito=favorito, permitir_sin_stock=permitir_sin_stock,
+        codigo_barra=codigo_barra,
         descuento_volumen_activo=descuento_volumen_activo,
         cantidad_minima_descuento=cantidad_minima_descuento,
         porcentaje_descuento_volumen=porcentaje_descuento_volumen
@@ -439,12 +1097,6 @@ def admin_edit_product(id):
         return redirect(url_for('admin_dashboard'))
 
     producto.nombre = request.form.get('nombre')
-    
-    precio_str = request.form.get('precio', '0').strip().replace(',', '.')
-    try:
-        producto.precio = float(precio_str) if precio_str else 0.0
-    except ValueError:
-        producto.precio = 0.0
         
     precio_ant_str = request.form.get('precio_anterior', '').strip().replace(',', '.')
     try:
@@ -466,6 +1118,7 @@ def admin_edit_product(id):
 
     producto.favorito = True if request.form.get('favorito') else False
     producto.permitir_sin_stock = True if request.form.get('permitir_sin_stock') else False
+    producto.codigo_barra = request.form.get('codigo_barra', '').strip()
 
     # Descuento por volumen
     producto.descuento_volumen_activo = True if request.form.get('descuento_volumen_activo') else False
@@ -479,6 +1132,23 @@ def admin_edit_product(id):
         producto.porcentaje_descuento_volumen = float(porc_desc_str) if porc_desc_str else None
     except ValueError:
         producto.porcentaje_descuento_volumen = None
+
+    # Triple Lista de Precios
+    p1_str = request.form.get('precio', '0').strip().replace(',', '.')
+    p2_str = request.form.get('precio_2', '').strip().replace(',', '.')
+    p3_str = request.form.get('precio_3', '').strip().replace(',', '.')
+    try:
+        producto.precio_lista_1 = float(p1_str) if p1_str else 0.0
+    except ValueError:
+        producto.precio_lista_1 = 0.0
+    try:
+        producto.precio_lista_2 = float(p2_str) if p2_str else producto.precio_lista_1
+    except ValueError:
+        producto.precio_lista_2 = producto.precio_lista_1
+    try:
+        producto.precio_lista_3 = float(p3_str) if p3_str else producto.precio_lista_1
+    except ValueError:
+        producto.precio_lista_3 = producto.precio_lista_1
 
     db.session.commit()
     flash('Producto editado correctamente.', 'info')
@@ -578,15 +1248,31 @@ def admin_importar():
             
             precio = 0.0
             try:
-                precio = float(row.get('precio', 0))
+                precio = float(row.get('precio', row.get('precio_lista_1', 0)))
             except:
                 pass
+                
+            precio_2 = 0.0
+            try:
+                precio_2 = float(row.get('precio_lista_2', precio))
+            except:
+                precio_2 = precio
+                
+            precio_3 = 0.0
+            try:
+                precio_3 = float(row.get('precio_lista_3', precio))
+            except:
+                precio_3 = precio
                 
             stock = 0
             try:
                 stock = int(row.get('stock', 0))
             except:
                 pass
+                
+            codigo_barra = str(row.get('codigo_barra', row.get('código de barras', ''))).strip()
+            if codigo_barra == 'nan':
+                codigo_barra = ''
                 
             img_url = str(row.get('link imagen', row.get('url imagen', ''))).strip()
             if img_url == 'nan':
@@ -603,17 +1289,24 @@ def admin_importar():
                 # Si no existe, lo creamos con todos los datos
                 prod = Producto(nombre=nombre)
                 db.session.add(prod)
-                prod.precio = precio
+                prod.precio_lista_1 = precio
+                prod.precio_lista_2 = precio_2
+                prod.precio_lista_3 = precio_3
                 prod.stock = stock
                 prod.categoria_id = categoria.id
+                prod.codigo_barra = codigo_barra
                 if img_url:
                     prod.imagen_url = img_url
                 prod.favorito = favorito
                 prod.permitir_sin_stock = permitir_sin_stock
             else:
-                # Si existe, actualizamos solo precio, stock y link de imagen
-                prod.precio = precio
+                # Si existe, actualizamos precios, stock, código e imagen
+                prod.precio_lista_1 = precio
+                prod.precio_lista_2 = precio_2
+                prod.precio_lista_3 = precio_3
                 prod.stock = stock
+                if codigo_barra:
+                    prod.codigo_barra = codigo_barra
                 if img_url:
                     prod.imagen_url = img_url
             
@@ -635,7 +1328,10 @@ def admin_exportar():
         data.append({
             'ID': p.id,
             'Nombre': p.nombre,
-            'Precio': p.precio,
+            'Precio Lista 1': p.precio_lista_1,
+            'Precio Lista 2': p.precio_lista_2,
+            'Precio Lista 3': p.precio_lista_3,
+            'Código de Barras': p.codigo_barra,
             'Stock': p.stock,
             'Categoria': p.categoria_rel.nombre if p.categoria_rel else 'General',
             'Favorito': 'SI' if p.favorito else 'NO',
@@ -689,11 +1385,49 @@ def finalizar_pedido():
         "mensaje": "Pedido recibido con éxito. ¡Gracias por tu compra!"
     })
 
+from sqlalchemy import text
+
 def setup_database():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with app.app_context():
         db.create_all()
         
+        # Intentar añadir la columna de código de barras de manera segura por si la tabla ya existe
+        try:
+            db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN codigo_barra VARCHAR(100);'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        
+        # Columnas nuevas para Clientes (MIGRACIÓN PASO A PASO)
+        columnas_clientes = [
+            ('cuit', 'VARCHAR(20)'),
+            ('condicion_iva', 'VARCHAR(50)'),
+            ('descuento_fijo', 'FLOAT DEFAULT 0.0'),
+            ('saldo', 'FLOAT DEFAULT 0.0'),
+            ('limite_credito', 'FLOAT DEFAULT 0.0')
+        ]
+        for col, tip in columnas_clientes:
+            try:
+                db.session.execute(text(f'ALTER TABLE "clientes" ADD COLUMN {col} {tip};'))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        
+        # Columnas nuevas para Ventas
+        columnas_ventas = [
+            ('pago_efectivo', 'FLOAT DEFAULT 0.0'),
+            ('pago_transferencia', 'FLOAT DEFAULT 0.0'),
+            ('pago_debito', 'FLOAT DEFAULT 0.0'),
+            ('pago_cc', 'FLOAT DEFAULT 0.0')
+        ]
+        for col, tip in columnas_ventas:
+            try:
+                db.session.execute(text(f'ALTER TABLE "ventas" ADD COLUMN {col} {tip};'))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
         if Categoria.query.count() == 0:
             for cat_name in ['General', 'Gummies', 'Chocolates', 'Chupetines', 'Marshmallows', 'Ácidos', 'Caramelos', 'Gift Boxes']:
                 db.session.add(Categoria(nombre=cat_name))
@@ -713,6 +1447,74 @@ def setup_database():
 # ─── Inicialización de la Base de Datos ──────────────────────
 # Llamamos a esta función aquí para que se ejecute al importar 'app' en Render/Gunicorn
 setup_database()
+
+@app.route('/reportes')
+def reportes_view():
+    if not session.get('facturador_auth'):
+        return redirect('/login-facturador')
+    return render_template('reportes.html')
+
+@app.route('/api/reportes', methods=['GET'])
+def api_reportes():
+    from datetime import datetime, time
+    import json
+    
+    fecha_desde_str = request.args.get('desde')
+    fecha_hasta_str = request.args.get('hasta')
+    
+    query = Venta.query
+    
+    if fecha_desde_str:
+        try:
+            fecha_desde = datetime.strptime(fecha_desde_str, '%Y-%m-%d')
+            query = query.filter(Venta.fecha >= datetime.combine(fecha_desde, time.min))
+        except ValueError:
+            pass
+    
+    if fecha_hasta_str:
+        try:
+            fecha_hasta = datetime.strptime(fecha_hasta_str, '%Y-%m-%d')
+            query = query.filter(Venta.fecha <= datetime.combine(fecha_hasta, time.max))
+        except ValueError:
+            pass
+        
+    ventas = query.all()
+    
+    resumen = {
+        "Efectivo": 0.0,
+        "Transferencia": 0.0,
+        "Débito": 0.0,
+        "Total": 0.0
+    }
+    
+    clientes_reporte = {}
+    
+    for v in ventas:
+        resumen["Efectivo"] += (v.pago_efectivo or 0.0)
+        resumen["Transferencia"] += (v.pago_transferencia or 0.0)
+        resumen["Débito"] += (v.pago_debito or 0.0)
+        resumen["Total"] += v.total
+        
+        # Reporte por Clientes
+        c_id = v.cliente_id or 0
+        c_nombre = v.cliente.nombre if v.cliente else 'Consumidor Final'
+        
+        if c_id not in clientes_reporte:
+            clientes_reporte[c_id] = {"nombre": c_nombre, "total": 0.0}
+        
+        clientes_reporte[c_id]["total"] += v.total
+        
+    clientes_lista = sorted(
+        [{"id": cid, "nombre": data["nombre"], "total": data["total"]} for cid, data in clientes_reporte.items()],
+        key=lambda x: x["total"],
+        reverse=True
+    )
+    
+    return jsonify({
+        "ok": True,
+        "resumen": resumen,
+        "clientes": clientes_lista
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

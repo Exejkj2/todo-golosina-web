@@ -153,5 +153,24 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      /**
+       * Formatea un string a Title Case (Primera letra de cada palabra en Mayúscula)
+       */
+      function toTitleCase(str) {
+        if (!str) return "";
+        return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      }
+
+      // Aplicar Capitalize a los nombres de categorías antes de enviar
+      document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function() {
+          const nombreInput = this.querySelector('input[name="nombre"]');
+          if (nombreInput) {
+            nombreInput.value = toTitleCase(nombreInput.value.trim());
+          }
+        });
+      });
+    </script>
   </body>
 </html>

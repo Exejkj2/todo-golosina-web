@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Ticket de Venta #{{ venta.id }}</title>
+  <style>
+    @page { 
+      size: 80mm auto; 
+      margin: 0; 
+    }
+    body {
+      font-family: 'Outfit', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 12px;
+      margin: 0;
+      padding: 2mm;
+      width: 100%;
+      color: #000;
+      display: flex;
+      justify-content: center;
+    }
+    .ticket-container {
+      width: 100%;
+      max-width: 72mm; /* Ancho real de impresión */
+      margin: 0 auto;
+    }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .text-left { text-align: left; }
+    .bold { font-weight: bold; }
+    
+    .ticket-header {
+      margin-bottom: 8px;
+      border-bottom: 1px dashed #000;
+      padding-bottom: 8px;
+    }
+    .ticket-header h1 {
+      font-size: 18px;
+      margin: 0 0 2px 0;
+      font-weight: 800;
+    }
+    .ticket-header p {
+      margin: 1px 0;
+      font-size: 11px;
+    }
+
+    .ticket-body {
+      margin-bottom: 8px;
+      border-bottom: 1px dashed #000;
+      padding-bottom: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th, td {
+      padding: 3px 0;
+      font-size: 11px;
+      vertical-align: top;
+      overflow: hidden;
+      word-wrap: break-word;
+    }
+    .col-qty { width: 15%; text-align: center; }
+    .col-name { width: 55%; text-align: left; padding-right: 4px; }
+    .col-price { width: 30%; text-align: right; }
+
+    .ticket-footer {
+      margin-top: 8px;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .payment-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-bottom: 12px;
+    }
+    .thanks {
+      text-align: center;
+      font-size: 12px;
+      margin-top: 15px;
+    }
+
+    .paper-feed {
+      height: 60px;
+    }
+
+    @media print {
+      body { width: 100%; margin: 0; padding: 2mm; }
+      .ticket-container { max-width: 72mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ticket-container">
+    <div class="ticket-header text-center">
+      <h1 style="margin-bottom: 2px; font-size: 18px;">TODO GOLOSINA</h1>
+      <p style="font-weight: bold; margin-bottom: 5px;">Golosinas por Mayor y Menor</p>
+      <p>Alberdi 950, Aguilares - Tucumán</p>
+      <div style="border-top: 1px dashed #000; margin: 10px 0;"></div>
+      
+      <p class="bold" style="font-size: 16px;">COMPROBANTE DE VENTA</p>
+      <p>Ticket #{{ "%05d"|format(venta.id) }}</p>
+      <p>{{ venta.fecha.strftime('%d/%m/%Y %H:%M') if venta.fecha else '' }}</p>
+    </div>
+
+    <div class="ticket-body">
+      {% if not es_venta_rapida %}
+        <p class="bold" style="margin-bottom: 5px;">Cliente: {{ cliente_nombre }}</p>
+      {% else %}
+        <p class="bold" style="margin-bottom: 5px;">Venta al Público</p>
+      {% endif %}
+      
+      <table>
+        <thead>
+          <tr style="border-bottom: 1px solid #000;">
+            <th class="col-qty">Cant</th>
+            <th class="col-name">Producto</th>
+            <th class="col-price">Subtot</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in detalle %}
+          <tr>
+            <td class="col-qty">{{ item.qty }}</td>
+            <td class="col-name">{{ item.nombre }}</td>
+            <td class="col-price">${{ "{:,.0f}".format(item.qty * item.precio_unit).replace(',', '.') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="ticket-footer">
+      <div class="total-row" style="border-top: 1px solid #000; padding-top: 10px; margin-top: 5px;">
+        <span style="font-size: 14px;">TOTAL A PAGAR</span>
+        <span style="font-size: 24px; letter-spacing: -1px;">${{ "{:,.0f}".format(venta.total).replace(',', '.') }}</span>
+      </div>
+      <div class="payment-row">
+        <span>Método: {{ venta.metodo_pago }}</span>
+      </div>
+
+      <div class="thanks bold text-center">
+        *** ¡GRACIAS POR SU COMPRA! ***
+        <br>
+        TodoGolosina.com.ar
+      </div>
+      
+      <div class="paper-feed"></div>
+    </div>
+  </div>
+
+  <script>
+    window.onload = function() { 
+      window.print();
+      // El foco volverá automáticamente a la ventana padre cuando esta se cierre o pierda foco
+      setTimeout(() => { window.close(); }, 3000);
+    }
+  </script>
+</body>
+</html>

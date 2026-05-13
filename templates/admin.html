@@ -4,9 +4,10 @@
     <meta charset="UTF-8" />
     <title>Dashboard - Todo Golosina</title>
     <link
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&family=Roboto:wght@300;400;500;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>">
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -18,7 +19,7 @@
     <style>
       body {
         background-color: #f8f9fa;
-        font-family: "Roboto", sans-serif;
+        font-family: "Montserrat", sans-serif;
       }
       .sidebar {
         min-height: 100vh;
@@ -131,6 +132,7 @@
         </h4>
         <a href="{{ url_for('admin_dashboard') }}" class="active"><i class="bi bi-box-seam me-2"></i> Productos</a>
         <a href="{{ url_for('admin_categorias') }}"><i class="bi bi-tags me-2"></i> Categorías</a>
+        <a href="{{ url_for('facturador') }}" class="text-success fw-bold"><i class="bi bi-calculator me-2"></i> Facturador Local</a>
         <a href="{{ url_for('admin_estadisticas') }}"><i class="bi bi-bar-chart-fill me-2"></i> Estadísticas</a>
         <div
           style="
@@ -301,7 +303,7 @@
                       >
                       {% endif %}
                     </td>
-                    <td class="fw-bold">${{ p.precio }}</td>
+                    <td class="fw-bold">${{ p.precio_lista_1 }}</td>
                     <td class="text-end pe-4">
                       <button
                         class="btn btn-sm btn-light text-primary me-1"
@@ -365,9 +367,9 @@
                             />
                           </div>
                           <div class="row mb-3">
-                            <div class="col">
+                            <div class="col-md-4">
                               <label class="form-label small fw-bold text-muted"
-                                >Precio ($)</label
+                                >Precio Lista 1 ($)</label
                               >
                               <input
                                 type="number"
@@ -378,9 +380,35 @@
                                 required
                               />
                             </div>
+                            <div class="col-md-4">
+                              <label class="form-label small fw-bold text-muted"
+                                >Precio Lista 2 ($)</label
+                              >
+                              <input
+                                type="number"
+                                step="0.01"
+                                name="precio_2"
+                                class="form-control bg-light"
+                                value="{{ p.precio_2 or '' }}"
+                              />
+                            </div>
+                            <div class="col-md-4">
+                              <label class="form-label small fw-bold text-muted"
+                                >Precio Lista 3 ($)</label
+                              >
+                              <input
+                                type="number"
+                                step="0.01"
+                                name="precio_3"
+                                class="form-control bg-light"
+                                value="{{ p.precio_3 or '' }}"
+                              />
+                            </div>
+                          </div>
+                          <div class="row mb-3">
                             <div class="col">
                               <label class="form-label small fw-bold text-muted"
-                                >Precio Anterior ($)</label
+                                >Precio Anterior (Oferta) ($)</label
                               >
                               <input
                                 type="number"
@@ -401,6 +429,18 @@
                                 name="stock"
                                 class="form-control bg-light"
                                 value="{{ p.stock }}"
+                              />
+                            </div>
+                            <div class="col">
+                              <label class="form-label small fw-bold text-muted"
+                                >Código de Barras</label
+                              >
+                              <input
+                                type="text"
+                                name="codigo_barra"
+                                class="form-control bg-light"
+                                value="{{ p.codigo_barra or '' }}"
+                                placeholder="Escaneá o escribí aquí"
                               />
                             </div>
                           </div>
@@ -617,9 +657,9 @@
               />
             </div>
             <div class="row mb-3">
-              <div class="col">
+              <div class="col-md-4">
                 <label class="form-label small fw-bold text-muted"
-                  >Precio ($)</label
+                  >Precio Lista 1 ($)</label
                 >
                 <input
                   type="number"
@@ -629,9 +669,33 @@
                   required
                 />
               </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-muted"
+                  >Precio Lista 2 ($)</label
+                >
+                <input
+                  type="number"
+                  step="0.01"
+                  name="precio_2"
+                  class="form-control bg-light"
+                />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-muted"
+                  >Precio Lista 3 ($)</label
+                >
+                <input
+                  type="number"
+                  step="0.01"
+                  name="precio_3"
+                  class="form-control bg-light"
+                />
+              </div>
+            </div>
+            <div class="row mb-3">
               <div class="col">
                 <label class="form-label small fw-bold text-muted"
-                  >Precio Anterior ($)</label
+                  >Precio Anterior (Oferta) ($)</label
                 >
                 <input
                   type="number"
@@ -649,6 +713,15 @@
                   name="stock"
                   class="form-control bg-light"
                   value="0"
+                />
+              </div>
+              <div class="col">
+                <label class="form-label small fw-bold text-muted">Código de Barras</label>
+                <input
+                  type="text"
+                  name="codigo_barra"
+                  class="form-control bg-light"
+                  placeholder="Escaneá o escribí aquí"
                 />
               </div>
             </div>
@@ -773,6 +846,24 @@
         if (!container) return;
         container.style.display = checkbox.checked ? 'block' : 'none';
       }
+
+      /**
+       * Formatea un string a Title Case (Primera letra de cada palabra en Mayúscula)
+       */
+      function toTitleCase(str) {
+        if (!str) return "";
+        return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      }
+
+      // Aplicar Capitalize a los nombres de productos antes de enviar
+      document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function() {
+          const nombreInput = this.querySelector('input[name="nombre"]');
+          if (nombreInput) {
+            nombreInput.value = toTitleCase(nombreInput.value.trim());
+          }
+        });
+      });
     </script>
   </body>
 </html>

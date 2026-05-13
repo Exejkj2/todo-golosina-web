@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reportes — Todo Golosina</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      :root {
+        --bg: #ebebeb;
+        --panel: #ffffff;
+        --primary: #3483fa; /* Azul ML */
+        --accent: #fff159; /* Amarillo ML */
+        --success: #00a650; /* Verde ML */
+        --warning: #ff7733;
+        --sidebar: #fff159;
+        --sidebar-hover: #e6d84f;
+        --text: #333333;
+        --text-muted: #666666;
+        --border: #dddddd;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Montserrat', sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+        display: flex;
+        margin: 0px;
+      }
+
+      /* SIDEBAR */
+      .sidebar {
+        width: 260px;
+        background: var(--sidebar);
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        border-right: 1px solid rgba(0,0,0,0.05);
+        z-index: 100;
+      }
+      .sidebar-header {
+        padding: 25px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+      }
+      .sidebar-header span {
+        font-weight: 800;
+        font-size: 1.1rem;
+        color: #2d3748;
+      }
+      .sidebar-menu {
+        flex: 1;
+        padding: 20px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .sidebar-item {
+        padding: 15px 22px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: #333;
+        text-decoration: none;
+        border-radius: 0 30px 30px 0;
+        transition: all 0.2s;
+        font-weight: 600;
+        cursor: pointer;
+        margin-right: 10px;
+      }
+      .sidebar-item i { font-size: 1.2rem; }
+      .sidebar-item:hover { background: var(--sidebar-hover); }
+      .sidebar-item.active {
+        background: rgba(0,0,0,0.05);
+        color: var(--primary);
+        border-left: 5px solid var(--primary);
+      }
+      .sidebar-footer {
+        padding: 20px;
+        border-top: 1px solid rgba(0,0,0,0.05);
+      }
+
+      .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 30px;
+      }
+
+      .card-report {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border: none;
+        height: 100%;
+        transition: transform 0.2s;
+      }
+      .card-report:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+      
+      .stat-val { font-size: 1.8rem; font-weight: 800; margin-top: 5px; color: #1e293b; }
+      .stat-label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+      .filter-bar {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 25px;
+        display: flex;
+        align-items: flex-end;
+        gap: 15px;
+        flex-wrap: wrap;
+      }
+
+      .table-custom {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      .table-custom th {
+        background: #f8fafc;
+        padding: 15px 20px;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: #64748b;
+        font-weight: 700;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .table-custom td {
+        padding: 15px 20px;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+      }
+      .table-custom tr:last-child td { border-bottom: none; }
+
+      .btn-primary { background: var(--primary); border: none; font-weight: 600; padding: 10px 25px; border-radius: 8px; }
+      .btn-primary:hover { background: #2968c8; }
+
+      .icon-circle {
+        width: 45px;
+        height: 45px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        margin-bottom: 15px;
+      }
+      .bg-soft-success { background: #dcfce7; color: #166534; }
+      .bg-soft-blue { background: #dbeafe; color: #1e40af; }
+      .bg-soft-purple { background: #f3e8ff; color: #6b21a8; }
+      .bg-soft-dark { background: #f1f5f9; color: #1e293b; }
+    </style>
+  </head>
+  <body>
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <i class="bi bi-shop fs-3 text-primary"></i>
+        <span>Todo Golosina</span>
+      </div>
+      <div class="sidebar-menu">
+        <a href="/facturador" class="sidebar-item">
+          <i class="bi bi-house"></i> Volver al Facturador
+        </a>
+        <a href="/reportes" class="sidebar-item active">
+          <i class="bi bi-graph-up"></i> Reportes
+        </a>
+      </div>
+      <div class="sidebar-footer">
+        <a href="/logout-facturador" class="sidebar-item text-danger w-100">
+          <i class="bi bi-box-arrow-left"></i> Salir
+        </a>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 class="fw-bold m-0">Inteligencia de Negocio</h2>
+          <p class="text-muted">Analizá el rendimiento de tus ventas por período</p>
+        </div>
+        <button class="btn btn-outline-primary" onclick="loadReport()">
+          <i class="bi bi-arrow-clockwise me-2"></i> Actualizar Datos
+        </button>
+      </div>
+
+      <!-- FILTROS -->
+      <div class="filter-bar">
+        <div style="flex: 1; min-width: 200px;">
+          <label class="small fw-bold text-muted mb-2 d-block">FECHA DESDE</label>
+          <input type="date" id="dateDesde" class="form-control" onchange="loadReport()" />
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+          <label class="small fw-bold text-muted mb-2 d-block">FECHA HASTA</label>
+          <input type="date" id="dateHasta" class="form-control" onchange="loadReport()" />
+        </div>
+        <div>
+          <button class="btn btn-primary h-100" onclick="setToday()">Hoy</button>
+          <button class="btn btn-outline-secondary h-100" onclick="setThisMonth()">Mes</button>
+        </div>
+      </div>
+
+      <!-- RESUMEN TOTALIZADOR -->
+      <div class="row g-4 mb-5">
+        <div class="col-md-3">
+          <div class="card-report">
+            <div class="icon-circle bg-soft-success">
+              <i class="bi bi-cash"></i>
+            </div>
+            <div class="stat-label">Ventas Efectivo</div>
+            <div class="stat-val" id="totalEfectivo">$0.00</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card-report">
+            <div class="icon-circle bg-soft-blue">
+              <i class="bi bi-bank"></i>
+            </div>
+            <div class="stat-label">Transferencias / MP</div>
+            <div class="stat-val" id="totalTransferencia">$0.00</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card-report">
+            <div class="icon-circle bg-soft-purple">
+              <i class="bi bi-credit-card"></i>
+            </div>
+            <div class="stat-label">Ventas Débito</div>
+            <div class="stat-val" id="totalDebito">$0.00</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card-report" style="background: #1e293b; color: white;">
+            <div class="icon-circle bg-soft-dark" style="background: rgba(255,255,255,0.1); color: white;">
+              <i class="bi bi-calculator"></i>
+            </div>
+            <div class="stat-label" style="color: rgba(255,255,255,0.6);">Total General</div>
+            <div class="stat-val" id="totalGeneral" style="color: white;">$0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRAFICOS -->
+      <div class="row g-4 mb-5">
+        <div class="col-lg-6">
+          <div class="card-report">
+            <h5 class="fw-bold mb-4">Distribución por Método de Pago</h5>
+            <div style="height: 300px; position: relative;">
+              <canvas id="chartMetodos"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card-report">
+            <h5 class="fw-bold mb-4">Top 5 Clientes (Ventas)</h5>
+            <div style="height: 300px; position: relative;">
+              <canvas id="chartClientes"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPORTE POR CLIENTES -->
+      <h4 class="fw-bold mb-3">Ventas por Clientes</h4>
+      <div class="table-custom">
+        <table class="table table-hover m-0">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th class="text-end">Total Comprado</th>
+              <th class="text-center" style="width: 100px;">% de Ventas</th>
+            </tr>
+          </thead>
+          <tbody id="clientesTableBody">
+            <!-- Injected by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      let chartMetodos = null;
+      let chartClientes = null;
+
+      // Establecer fechas por defecto (hoy)
+      function initDates() {
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById('dateDesde').value = hoy;
+        document.getElementById('dateHasta').value = hoy;
+      }
+
+      function setToday() {
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById('dateDesde').value = hoy;
+        document.getElementById('dateHasta').value = hoy;
+        loadReport();
+      }
+
+      function setThisMonth() {
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        document.getElementById('dateDesde').value = firstDay;
+        document.getElementById('dateHasta').value = lastDay;
+        loadReport();
+      }
+
+      async function loadReport() {
+        const desde = document.getElementById('dateDesde').value;
+        const hasta = document.getElementById('dateHasta').value;
+
+        // Feedback visual
+        document.querySelectorAll('.stat-val').forEach(el => el.style.opacity = '0.5');
+
+        try {
+          const r = await fetch(`/api/reportes?desde=${desde}&hasta=${hasta}`);
+          const d = await r.json();
+
+          if (d.ok) {
+            // Actualizar Tarjetas
+            document.getElementById('totalEfectivo').textContent = `$${d.resumen.Efectivo.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+            document.getElementById('totalTransferencia').textContent = `$${d.resumen.Transferencia.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+            document.getElementById('totalDebito').textContent = `$${d.resumen.Débito.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+            document.getElementById('totalGeneral').textContent = `$${d.resumen.Total.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+
+            // Actualizar Tabla Clientes
+            const body = document.getElementById('clientesTableBody');
+            body.innerHTML = '';
+
+            // Preparar datos para los gráficos
+            updateCharts(d);
+
+            if (d.clientes.length === 0) {
+              body.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-muted">No hay ventas registradas en este período</td></tr>';
+            } else {
+              d.clientes.forEach(c => {
+                const perc = d.resumen.Total > 0 ? (c.total / d.resumen.Total * 100).toFixed(1) : 0;
+                body.innerHTML += `
+                  <tr>
+                    <td class="fw-bold">${c.nombre}</td>
+                    <td class="text-end fw-bold text-dark">$${c.total.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                    <td class="text-center">
+                      <span class="badge bg-light text-primary border">${perc}%</span>
+                    </td>
+                  </tr>
+                `;
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Error cargando reporte:", e);
+          alert("Error: No se pudo cargar el reporte");
+        } finally {
+          document.querySelectorAll('.stat-val').forEach(el => el.style.opacity = '1');
+        }
+      }
+
+      function updateCharts(data) {
+        // --- GRÁFICO MÉTODOS DE PAGO ---
+        const ctxMetodos = document.getElementById('chartMetodos').getContext('2d');
+        const metodosData = [
+          data.resumen.Efectivo,
+          data.resumen.Transferencia,
+          data.resumen.Débito
+        ];
+
+        if (chartMetodos) chartMetodos.destroy();
+        chartMetodos = new Chart(ctxMetodos, {
+          type: 'doughnut',
+          data: {
+            labels: ['Efectivo', 'Transferencia / MP', 'Débito'],
+            datasets: [{
+              data: metodosData,
+              backgroundColor: ['#00a650', '#3483fa', '#6b21a8'],
+              borderWidth: 0,
+              hoverOffset: 10
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { font: { family: 'Montserrat', weight: '600' }, padding: 20 } }
+            },
+            cutout: '70%'
+          }
+        });
+
+        // --- GRÁFICO TOP CLIENTES ---
+        const ctxClientes = document.getElementById('chartClientes').getContext('2d');
+        const top5 = data.clientes.slice(0, 5);
+        const labelsClientes = top5.map(c => c.nombre.length > 15 ? c.nombre.substring(0, 15) + '...' : c.nombre);
+        const valuesClientes = top5.map(c => c.total);
+
+        if (chartClientes) chartClientes.destroy();
+        chartClientes = new Chart(ctxClientes, {
+          type: 'bar',
+          data: {
+            labels: labelsClientes,
+            datasets: [{
+              label: 'Total Comprado ($)',
+              data: valuesClientes,
+              backgroundColor: '#fff159',
+              borderRadius: 8,
+              borderSkipped: false,
+              barThickness: 30
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              y: { beginAtZero: true, grid: { display: false }, ticks: { font: { family: 'Montserrat' } } },
+              x: { grid: { display: false }, ticks: { font: { family: 'Montserrat', size: 10 } } }
+            }
+          }
+        });
+      }
+
+      window.onload = () => {
+        initDates();
+        loadReport();
+      };
+    </script>
+  </body>
+</html>
