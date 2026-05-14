@@ -11,7 +11,7 @@ from datetime import datetime, time, date
 
 # ─── Configuración ────────────────────────────────────────────
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_PATH  = os.path.join(BASE_DIR, 'database', 'tienda.db')
+DB_PATH = os.path.join(BASE_DIR, 'tienda.db')
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'todo_golosina_secreto_super_seguro'
@@ -34,6 +34,7 @@ print(f"CONECTANDO A: {'PostgreSQL' if os.environ.get('DATABASE_URL') else 'SQLi
 # Rutina de migración automática
 def migrate_db():
     with app.app_context():
+        db.create_all()  # Asegurar que las tablas existan
         # Columnas para 'ventas'
         ventas_cols = {
             'metodo_pago': 'VARCHAR(100)',
@@ -663,7 +664,7 @@ def delete_cliente(id):
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Error al eliminar cliente: {e}")
-        return jsonify({"ok": False, "mensaje": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
 # ─── API Clientes ────────────────────────────────────────────────────────────────
 @app.route('/api/clientes', methods=['GET'])
@@ -679,29 +680,29 @@ def get_clientes():
         return jsonify({"ok": True, "clientes": [c.to_dict() for c in clientes]})
     except Exception as e:
         print(f"ERROR CRÍTICO AL OBTENER CLIENTES: {e}")
-        return jsonify({"ok": False, "mensaje": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/clientes', methods=['POST'])
 @app.route('/guardar_cliente', methods=['POST'])
 def add_cliente():
-    data = request.json or {}
-    nombre = data.get('nombre', '').strip()
-    cuit = data.get('cuit', '').strip()
-    if not nombre:
-        return jsonify({"ok": False, "mensaje": "El nombre es obligatorio"}), 400
-    
-    # Validación de Duplicados (DNI/CUIT)
-    if cuit:
-        existente = Cliente.query.filter_by(cuit=cuit).first()
-        if existente:
-            return jsonify({"ok": False, "mensaje": "Este cliente ya está registrado con ese DNI/CUIT"}), 400
-    else:
-        # Si no hay CUIT, validamos por nombre exacto para evitar duplicados basura
-        existente_nombre = Cliente.query.filter(Cliente.nombre.ilike(nombre)).first()
-        if existente_nombre:
-            return jsonify({"ok": False, "mensaje": f"Ya existe un cliente registrado con el nombre '{nombre}'"}), 400
-
     try:
+        data = request.json or {}
+        nombre = data.get('nombre', '').strip()
+        cuit = data.get('cuit', '').strip()
+        if not nombre:
+            return jsonify({"ok": False, "mensaje": "El nombre es obligatorio"}), 400
+        
+        # Validación de Duplicados (DNI/CUIT)
+        if cuit:
+            existente = Cliente.query.filter_by(cuit=cuit).first()
+            if existente:
+                return jsonify({"ok": False, "mensaje": "Este cliente ya está registrado con ese DNI/CUIT"}), 400
+        else:
+            # Si no hay CUIT, validamos por nombre exacto para evitar duplicados basura
+            existente_nombre = Cliente.query.filter(Cliente.nombre.ilike(nombre)).first()
+            if existente_nombre:
+                return jsonify({"ok": False, "mensaje": f"Ya existe un cliente registrado con el nombre '{nombre}'"}), 400
+
         cliente = Cliente(
             nombre=nombre,
             cuit=cuit,
@@ -716,7 +717,7 @@ def add_cliente():
     except Exception as e:
         db.session.rollback()
         print(f"ERROR AL GUARDAR CLIENTE: {e}")
-        return jsonify({"ok": False, "mensaje": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/clientes/<int:id>', methods=['PUT'])
 @app.route('/editar_cliente/<int:id>', methods=['POST', 'PUT'])
@@ -755,12 +756,15 @@ def edit_cliente(id):
     except Exception as e:
         db.session.rollback()
         print(f"ERROR AL EDITAR CLIENTE: {e}")
-        return jsonify({"ok": False, "mensaje": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/clientes/deudores', methods=['GET'])
 def get_clientes_deudores():
-    clientes = Cliente.query.filter(Cliente.saldo > 0, Cliente.activo == 1).order_by(Cliente.saldo.desc()).all()
-    return jsonify({"ok": True, "clientes": [c.to_dict() for c in clientes]})
+    try:
+        clientes = Cliente.query.filter(Cliente.saldo > 0, Cliente.activo == 1).order_by(Cliente.saldo.desc()).all()
+        return jsonify({"ok": True, "clientes": [c.to_dict() for c in clientes]})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/clientes/registrar_pago', methods=['POST'])
 def registrar_pago():
@@ -788,7 +792,7 @@ def registrar_pago():
         return jsonify({"ok": True, "nuevo_saldo": cliente.saldo})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"ok": False, "mensaje": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/caja/estado', methods=['GET'])
 def get_caja_estado():
