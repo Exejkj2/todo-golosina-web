@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
 from fpdf import FPDF
 from datetime import datetime, time, date
+import json
 
 # ─── Configuración ────────────────────────────────────────────
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -25,77 +26,8 @@ if uri and uri.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = uri or f'sqlite:///{DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-import json
 CORS(app)
 db = SQLAlchemy(app)
-
-# Log para verificar DB en Render
-print(f"CONECTANDO A: {'PostgreSQL' if os.environ.get('DATABASE_URL') else 'SQLite local'}")
-# Rutina de migración automática
-def migrate_db():
-    with app.app_context():
-        db.create_all()  # Asegurar que las tablas existan
-        # Columnas para 'ventas'
-        ventas_cols = {
-            'metodo_pago': 'VARCHAR(100)',
-            'pago_efectivo': 'FLOAT DEFAULT 0.0',
-            'pago_transferencia': 'FLOAT DEFAULT 0.0',
-            'pago_debito': 'FLOAT DEFAULT 0.0',
-            'pago_cc': 'FLOAT DEFAULT 0.0',
-            'entregado': 'FLOAT DEFAULT 0.0',
-            'lista_precios': 'INTEGER DEFAULT 1',
-            'tipo': 'VARCHAR(20) DEFAULT "Local"',
-            'subtotal': 'FLOAT DEFAULT 0.0',
-            'descuento': 'FLOAT DEFAULT 0.0'
-        }
-        
-        # Intentar con y sin comillas para máxima compatibilidad
-        for table in ['ventas', '"ventas"']:
-            for col, type_ in ventas_cols.items():
-                try:
-                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
-                    db.session.commit()
-                    print(f"Columna {col} agregada a tabla {table}")
-                except Exception:
-                    db.session.rollback()
-
-        # Columnas para 'clientes'
-        clientes_cols = {
-            'cuit': 'VARCHAR(20)',
-            'telefono': 'VARCHAR(50)',
-            'direccion': 'VARCHAR(200)',
-            'condicion_iva': 'VARCHAR(50) DEFAULT "Consumidor Final"',
-            'descuento_fijo': 'FLOAT DEFAULT 0.0',
-            'limite_credito': 'FLOAT DEFAULT 0.0',
-            'saldo': 'FLOAT DEFAULT 0.0'
-        }
-        for table in ['clientes', '"clientes"']:
-            for col, type_ in clientes_cols.items():
-                try:
-                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
-        # Columnas para 'gastos'
-        gastos_cols = {
-            'tipo': 'VARCHAR(20) DEFAULT "Egreso"'
-        }
-        for table in ['gastos', '"gastos"']:
-            for col, type_ in gastos_cols.items():
-                try:
-                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
-
-migrate_db()
-
-@app.after_request
-def add_no_cache_headers(response):
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -281,6 +213,75 @@ class CajaDiaria(db.Model):
             'fecha_apertura': self.fecha_apertura.strftime('%Y-%m-%d %H:%M') if self.fecha_apertura else '',
             'fecha_cierre': self.fecha_cierre.strftime('%Y-%m-%d %H:%M') if self.fecha_cierre else ''
         }
+
+# ─── INICIALIZACIÓN CRÍTICA (Render/Gunicorn compatible) ──────
+with app.app_context():
+    db.create_all()
+    print("Base de datos y tablas inicializadas correctamente.")
+
+# Rutina de migración automática
+def migrate_db():
+    with app.app_context():
+        # Columnas para 'ventas'
+        ventas_cols = {
+            'metodo_pago': 'VARCHAR(100)',
+            'pago_efectivo': 'FLOAT DEFAULT 0.0',
+            'pago_transferencia': 'FLOAT DEFAULT 0.0',
+            'pago_debito': 'FLOAT DEFAULT 0.0',
+            'pago_cc': 'FLOAT DEFAULT 0.0',
+            'entregado': 'FLOAT DEFAULT 0.0',
+            'lista_precios': 'INTEGER DEFAULT 1',
+            'tipo': 'VARCHAR(20) DEFAULT "Local"',
+            'subtotal': 'FLOAT DEFAULT 0.0',
+            'descuento': 'FLOAT DEFAULT 0.0'
+        }
+        
+        # Intentar con y sin comillas para máxima compatibilidad
+        for table in ['ventas', '"ventas"']:
+            for col, type_ in ventas_cols.items():
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+        # Columnas para 'clientes'
+        clientes_cols = {
+            'cuit': 'VARCHAR(20)',
+            'telefono': 'VARCHAR(50)',
+            'direccion': 'VARCHAR(200)',
+            'condicion_iva': 'VARCHAR(50) DEFAULT "Consumidor Final"',
+            'descuento_fijo': 'FLOAT DEFAULT 0.0',
+            'limite_credito': 'FLOAT DEFAULT 0.0',
+            'saldo': 'FLOAT DEFAULT 0.0'
+        }
+        for table in ['clientes', '"clientes"']:
+            for col, type_ in clientes_cols.items():
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        # Columnas para 'gastos'
+        gastos_cols = {
+            'tipo': 'VARCHAR(20) DEFAULT "Egreso"'
+        }
+        for table in ['gastos', '"gastos"']:
+            for col, type_ in gastos_cols.items():
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+migrate_db()
+
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 # ─── API REST (Para el Frontend) ─────────────────────────────
 @app.route('/api/productos', methods=['GET'])
