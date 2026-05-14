@@ -7,3 +7,4 @@ openpyxl
 gunicorn
 psycopg2-binary
 fpdf
+openpyxl==3.1.2
