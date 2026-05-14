@@ -25,8 +25,12 @@ if uri and uri.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = uri or f'sqlite:///{DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+import json
 CORS(app)
 db = SQLAlchemy(app)
+
+# Log para verificar DB en Render
+print(f"CONECTANDO A: {'PostgreSQL' if os.environ.get('DATABASE_URL') else 'SQLite local'}")
 # Rutina de migración automática
 def migrate_db():
     with app.app_context():
@@ -666,12 +670,16 @@ def delete_cliente(id):
 @app.route('/buscar_clientes', methods=['GET'])
 @app.route('/obtener_clientes', methods=['GET'])
 def get_clientes():
-    buscar = request.args.get('q', '').strip()
-    query = Cliente.query.filter_by(activo=1)
-    if buscar:
-        query = query.filter(Cliente.nombre.ilike(f'%{buscar}%'))
-    clientes = query.order_by(Cliente.nombre.asc()).all()
-    return jsonify({"ok": True, "clientes": [c.to_dict() for c in clientes]})
+    try:
+        buscar = request.args.get('q', '').strip()
+        query = Cliente.query.filter_by(activo=1)
+        if buscar:
+            query = query.filter(Cliente.nombre.ilike(f'%{buscar}%'))
+        clientes = query.order_by(Cliente.nombre.asc()).all()
+        return jsonify({"ok": True, "clientes": [c.to_dict() for c in clientes]})
+    except Exception as e:
+        print(f"ERROR CRÍTICO AL OBTENER CLIENTES: {e}")
+        return jsonify({"ok": False, "mensaje": str(e)}), 500
 
 @app.route('/api/clientes', methods=['POST'])
 @app.route('/guardar_cliente', methods=['POST'])
