@@ -252,6 +252,7 @@ def migrate_db():
             'direccion': 'VARCHAR(200)',
             'condicion_iva': 'VARCHAR(50) DEFAULT "Consumidor Final"',
             'descuento_fijo': 'FLOAT DEFAULT 0.0',
+            'descuento': 'FLOAT DEFAULT 0.0',
             'limite_credito': 'FLOAT DEFAULT 0.0',
             'saldo': 'FLOAT DEFAULT 0.0'
         }
@@ -1455,6 +1456,24 @@ def setup_database():
 # ─── Inicialización de la Base de Datos ──────────────────────
 # Llamamos a esta función aquí para que se ejecute al importar 'app' en Render/Gunicorn
 setup_database()
+
+# Parche de migración PostgreSQL para Render
+def patch_postgres_migration():
+    from sqlalchemy import text
+    from sqlalchemy.exc import ProgrammingError
+    with app.app_context():
+        try:
+            # Ejecución de sentencia SQL pura para agregar la columna faltante
+            db.session.execute(text("ALTER TABLE clientes ADD COLUMN descuento FLOAT DEFAULT 0.0;"))
+            db.session.commit()
+            print("Migración exitosa: Columna 'descuento' agregada a la tabla 'clientes'.")
+        except Exception as e:
+            db.session.rollback()
+            # Capturamos errores de columna duplicada o problemas de sintaxis si ya existe
+            # No bloqueamos el arranque del servidor
+            print(f"Aviso de migración (ignorando si ya existe): {str(e)}")
+
+patch_postgres_migration()
 
 @app.route('/reportes')
 def reportes_view():
