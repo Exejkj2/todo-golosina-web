@@ -1099,6 +1099,10 @@ def admin_add_product():
         porcentaje_descuento_volumen = None
 
     codigo_barra = request.form.get('codigo_barra', '').strip()
+    if codigo_barra:
+        existente = Producto.query.filter_by(codigo_barra=codigo_barra, activo=1).first()
+        if existente:
+            return jsonify({"error": f"El código de barras ya está registrado en el producto: {existente.nombre}"}), 400
 
     nuevo = Producto(
         nombre=nombre, precio_lista_1=precio_lista_1, precio_lista_2=precio_lista_2, precio_lista_3=precio_lista_3,
@@ -1160,26 +1164,48 @@ def admin_edit_product(id):
     except ValueError:
         producto.porcentaje_descuento_volumen = None
 
-    # Triple Lista de Precios
-    p1_str = request.form.get('precio', '0').strip().replace(',', '.')
-    p2_str = request.form.get('precio_2', '').strip().replace(',', '.')
-    p3_str = request.form.get('precio_3', '').strip().replace(',', '.')
-    try:
-        producto.precio_lista_1 = float(p1_str) if p1_str else 0.0
-    except ValueError:
-        producto.precio_lista_1 = 0.0
-    try:
-        producto.precio_lista_2 = float(p2_str) if p2_str else producto.precio_lista_1
-    except ValueError:
-        producto.precio_lista_2 = producto.precio_lista_1
-    try:
-        producto.precio_lista_3 = float(p3_str) if p3_str else producto.precio_lista_1
-    except ValueError:
-        producto.precio_lista_3 = producto.precio_lista_1
+    # Validación de Duplicados en Edición
+    nuevo_codigo = request.form.get('codigo_barra', '').strip()
+    if nuevo_codigo:
+        duplicado = Producto.query.filter(
+            Producto.codigo_barra == nuevo_codigo, 
+            Producto.id != id,
+            Producto.activo == 1
+        ).first()
+        if duplicado:
+            return jsonify({"error": f"No se puede guardar. El código '{nuevo_codigo}' ya lo tiene el producto: {duplicado.nombre}"}), 400
 
-    db.session.commit()
-    flash('Producto editado correctamente.', 'info')
-    return redirect(url_for('admin_dashboard'))
+    try:
+        # Triple Lista de Precios
+        p1_str = request.form.get('precio', '0').strip().replace(',', '.')
+        p2_str = request.form.get('precio_2', '').strip().replace(',', '.')
+        p3_str = request.form.get('precio_3', '').strip().replace(',', '.')
+        try:
+            producto.precio_lista_1 = float(p1_str) if p1_str else 0.0
+        except ValueError:
+            producto.precio_lista_1 = 0.0
+        try:
+            producto.precio_lista_2 = float(p2_str) if p2_str else producto.precio_lista_1
+        except ValueError:
+            producto.precio_lista_2 = producto.precio_lista_1
+        try:
+            producto.precio_lista_3 = float(p3_str) if p3_str else producto.precio_lista_1
+        except ValueError:
+            producto.precio_lista_3 = producto.precio_lista_1
+
+        db.session.commit()
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"ok": True, "mensaje": "Producto editado correctamente."})
+            
+        flash('Producto editado correctamente.', 'info')
+        return redirect(url_for('admin_dashboard'))
+    except Exception as e:
+        db.session.rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"error": f"Error de integridad: {str(e)}"}), 500
+        flash(f'Error al editar producto: {str(e)}', 'danger')
+        return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/producto/delete/<int:id>', methods=['POST'])
 @login_required

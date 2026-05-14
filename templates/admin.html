@@ -163,11 +163,12 @@
               <i class="bi bi-file-earmark-excel me-1"></i> Importación Masiva
             </button>
             <button
+              id="btnNuevoProducto"
               class="btn btn-pink px-4"
               data-bs-toggle="modal"
               data-bs-target="#addModal"
             >
-              <i class="bi bi-plus-lg me-1"></i> Nuevo Producto
+              <i class="bi bi-plus-lg me-1"></i> Nuevo Producto (F4)
             </button>
           </div>
         </div>
@@ -207,6 +208,7 @@
                 <thead>
                   <tr>
                     <th class="ps-4">ID</th>
+                    <th>Código</th>
                     <th>Imagen</th>
                     <th>Nombre</th>
                     <th>Categoría</th>
@@ -219,6 +221,7 @@
                   {% for p in productos %}
                   <tr>
                     <td class="ps-4 text-muted">#{{ p.id }}</td>
+                    <td><small class="text-muted fw-bold">{{ p.codigo_barra or '-' }}</small></td>
                     <td>
                       {% if p.imagen_url or p.imagen %}
                       <img
@@ -352,6 +355,9 @@
                             class="btn-close"
                             data-bs-dismiss="modal"
                           ></button>
+                        </div>
+                        <div id="error-container-edit-{{ p.id }}" class="px-3 pt-3" style="display:none;">
+                          <div class="alert alert-danger border-0 small mb-0"></div>
                         </div>
                         <div class="modal-body">
                           <div class="mb-3">
@@ -646,11 +652,15 @@
               data-bs-dismiss="modal"
             ></button>
           </div>
+          <div id="error-container-add" class="px-3 pt-3" style="display:none;">
+            <div class="alert alert-danger border-0 small mb-0"></div>
+          </div>
           <div class="modal-body">
             <div class="mb-3">
               <label class="form-label small fw-bold text-muted">Nombre</label>
               <input
                 type="text"
+                id="add_nombre"
                 name="nombre"
                 class="form-control bg-light"
                 required
@@ -719,6 +729,7 @@
                 <label class="form-label small fw-bold text-muted">Código de Barras</label>
                 <input
                   type="text"
+                  id="add_codigo_barra"
                   name="codigo_barra"
                   class="form-control bg-light"
                   placeholder="Escaneá o escribí aquí"
@@ -862,6 +873,136 @@
           if (nombreInput) {
             nombreInput.value = toTitleCase(nombreInput.value.trim());
           }
+        });
+      });
+
+      // --- Atajo de teclado F4 para Nuevo Producto ---
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'F4') {
+          e.preventDefault();
+          // Intentamos clickear el botón para aprovechar el data-bs-toggle si ya está inicializado, 
+          // o usamos la API de Bootstrap.
+          const btn = document.getElementById('btnNuevoProducto');
+          if (btn) btn.click();
+        }
+      });
+
+      // --- Auto-focus Inteligente (UX) ---
+      const addModalEl = document.getElementById('addModal');
+      if (addModalEl) {
+        addModalEl.addEventListener('shown.bs.modal', function () {
+          // El usuario prefiere el foco en el Nombre
+          const nameInput = document.getElementById('add_nombre');
+          if (nameInput) {
+            nameInput.focus();
+          }
+        });
+      }
+
+      // --- Manejo de Envío de Formulario con AJAX (Senior UX) ---
+      const addForm = document.querySelector('#addModal form');
+      if (addForm) {
+        addForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          
+          // Primero aplicamos el Capitalize que ya estaba
+          const nombreInput = this.querySelector('input[name="nombre"]');
+          if (nombreInput) {
+            nombreInput.value = toTitleCase(nombreInput.value.trim());
+          }
+
+          const formData = new FormData(this);
+          const errorContainer = document.getElementById('error-container-add');
+          const errorAlert = errorContainer.querySelector('.alert');
+
+          try {
+            const response = await fetch(this.action, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+              }
+            });
+
+            if (response.ok) {
+              // Si todo bien, recargamos para ver el nuevo producto
+              window.location.reload();
+            } else {
+              const data = await response.json();
+              if (data.error) {
+                errorAlert.textContent = data.error;
+                errorContainer.style.display = 'block';
+                // Scroll al error si es necesario
+                errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }
+          } catch (err) {
+            console.error('Error al guardar producto:', err);
+            errorAlert.textContent = 'Ocurrió un error inesperado al guardar el producto.';
+            errorContainer.style.display = 'block';
+          }
+        });
+      }
+
+      // Limpiar errores cuando se cierra o abre el modal
+      if (addModalEl) {
+        addModalEl.addEventListener('hidden.bs.modal', function() {
+          const errorContainer = document.getElementById('error-container-add');
+          if (errorContainer) errorContainer.style.display = 'none';
+        });
+      }
+
+      // --- Manejo de Envío de Formulario de EDICIÓN con AJAX ---
+      document.querySelectorAll('form[action*="/admin/producto/edit/"]').forEach(editForm => {
+        editForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          
+          const nombreInput = this.querySelector('input[name="nombre"]');
+          if (nombreInput) {
+            nombreInput.value = toTitleCase(nombreInput.value.trim());
+          }
+
+          const formData = new FormData(this);
+          const modal = this.closest('.modal');
+          const productId = modal.id.replace('editModal', '');
+          const errorContainer = document.getElementById('error-container-edit-' + productId);
+          const errorAlert = errorContainer ? errorContainer.querySelector('.alert') : null;
+
+          try {
+            const response = await fetch(this.action, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+              }
+            });
+
+            if (response.ok) {
+              window.location.reload();
+            } else {
+              const data = await response.json();
+              if (data.error && errorAlert) {
+                errorAlert.textContent = data.error;
+                errorContainer.style.display = 'block';
+                errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }
+          } catch (err) {
+            console.error('Error al editar producto:', err);
+            if (errorAlert) {
+              errorAlert.textContent = 'Ocurrió un error inesperado al editar.';
+              errorContainer.style.display = 'block';
+            }
+          }
+        });
+      });
+
+      // Limpiar errores en modales de edición al cerrarse
+      document.querySelectorAll('.modal[id^="editModal"]').forEach(m => {
+        m.addEventListener('hidden.bs.modal', function() {
+          const productId = this.id.replace('editModal', '');
+          const errorContainer = document.getElementById('error-container-edit-' + productId);
+          if (errorContainer) errorContainer.style.display = 'none';
         });
       });
     </script>
