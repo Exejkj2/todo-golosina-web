@@ -1,6 +1,7 @@
 import os 
 from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session
 import io
+import traceback
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -11,8 +12,7 @@ from datetime import datetime, time, date
 import json
 
 # ─── Configuración ────────────────────────────────────────────
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'tienda.db')
+DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tienda.db')
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'todo_golosina_secreto_super_seguro'
@@ -680,8 +680,7 @@ def get_clientes():
         clientes = query.order_by(Cliente.nombre.asc()).all()
         return jsonify({"ok": True, "clientes": [c.to_dict() for c in clientes]})
     except Exception as e:
-        print(f"ERROR CRÍTICO AL OBTENER CLIENTES: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error_interno": str(e), "detalle": traceback.format_exc()}), 500
 
 @app.route('/api/clientes', methods=['POST'])
 @app.route('/guardar_cliente', methods=['POST'])
@@ -717,8 +716,7 @@ def add_cliente():
         return jsonify({"ok": True, "cliente": cliente.to_dict()})
     except Exception as e:
         db.session.rollback()
-        print(f"ERROR AL GUARDAR CLIENTE: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error_interno": str(e), "detalle": traceback.format_exc()}), 500
 
 @app.route('/api/clientes/<int:id>', methods=['PUT'])
 @app.route('/editar_cliente/<int:id>', methods=['POST', 'PUT'])
@@ -899,10 +897,7 @@ def get_ventas_hoy():
             "gastos": [g.to_dict() for g in gastos]
         })
     except Exception as e:
-        print(f"ERROR CRÍTICO en /api/ventas_hoy: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"ok": False, "mensaje": str(e)}), 500
+        return jsonify({"error_interno": str(e), "detalle": traceback.format_exc()}), 500
 
 @app.route('/api/gastos', methods=['POST'])
 def add_gasto():
