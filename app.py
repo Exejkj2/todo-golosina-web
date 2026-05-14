@@ -492,7 +492,7 @@ def index():
 @app.route('/dashboard')
 @login_required
 def dashboard_admin():
-    return render_template('dashboard_admin.html')
+    return redirect(url_for('admin_dashboard'))
 
 # ─── Preventa: protección por contraseña ──────────────────────
 PREVENTA_PASSWORD = 'todo2026'
