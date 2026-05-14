@@ -221,7 +221,16 @@
                   {% for p in productos %}
                   <tr>
                     <td class="ps-4 text-muted">#{{ p.id }}</td>
-                    <td><small class="text-muted fw-bold">{{ p.codigo_barra or '-' }}</small></td>
+                    <td>
+                      <small class="text-muted fw-bold">
+                        {% if p.codigo_barra %}
+                          {% set codigos = p.codigo_barra.split(',') %}
+                          {{ codigos[0] }}{% if codigos|length > 1 %} <span class="text-muted" style="font-size: 0.8em;" title="{{ p.codigo_barra }}">...</span>{% endif %}
+                        {% else %}
+                          -
+                        {% endif %}
+                      </small>
+                    </td>
                     <td>
                       {% if p.imagen_url or p.imagen %}
                       <img
@@ -438,16 +447,23 @@
                               />
                             </div>
                             <div class="col">
-                              <label class="form-label small fw-bold text-muted"
-                                >Código de Barras</label
-                              >
-                              <input
-                                type="text"
-                                name="codigo_barra"
-                                class="form-control bg-light"
-                                value="{{ p.codigo_barra or '' }}"
-                                placeholder="Escaneá o escribí aquí"
-                              />
+                                <label class="form-label small fw-bold text-muted"
+                                  >Código(s) de Barras (Escanee o escriba y presione Enter)</label
+                                >
+                                <input
+                                  type="hidden"
+                                  id="edit_codigo_barra_hidden_{{ p.id }}"
+                                  name="codigo_barra"
+                                  value="{{ p.codigo_barra or '' }}"
+                                />
+                                <input
+                                  type="text"
+                                  id="edit_codigo_barra_input_{{ p.id }}"
+                                  class="form-control bg-light barcode-tag-input"
+                                  placeholder="Escanee aquí..."
+                                  data-product-id="{{ p.id }}"
+                                />
+                                <div id="edit_contenedor_codigos_{{ p.id }}" class="mt-2 d-flex flex-wrap gap-1"></div>
                             </div>
                           </div>
                           <div class="mb-3">
@@ -726,14 +742,19 @@
                 />
               </div>
               <div class="col">
-                <label class="form-label small fw-bold text-muted">Código de Barras</label>
+                <label class="form-label small fw-bold text-muted">Código(s) de Barras (Escanee o escriba y presione Enter)</label>
+                <input
+                  type="hidden"
+                  id="add_codigo_barra_hidden"
+                  name="codigo_barra"
+                />
                 <input
                   type="text"
-                  id="add_codigo_barra"
-                  name="codigo_barra"
-                  class="form-control bg-light"
-                  placeholder="Escaneá o escribí aquí"
+                  id="add_codigo_barra_input"
+                  class="form-control bg-light barcode-tag-input"
+                  placeholder="Escanee aquí..."
                 />
+                <div id="add_contenedor_codigos" class="mt-2 d-flex flex-wrap gap-1"></div>
               </div>
             </div>
             <div class="mb-3">
@@ -1003,6 +1024,113 @@
           const productId = this.id.replace('editModal', '');
           const errorContainer = document.getElementById('error-container-edit-' + productId);
           if (errorContainer) errorContainer.style.display = 'none';
+        });
+      });
+      // --- Lógica de Tags para Códigos de Barras (Scanner UX) ---
+      function setupBarcodeManager(inputId, hiddenId, containerId) {
+        const inputEl = document.getElementById(inputId);
+        const hiddenEl = document.getElementById(hiddenId);
+        const containerEl = document.getElementById(containerId);
+        
+        if (!inputEl || !hiddenEl || !containerEl) return;
+
+        let codigosArray = hiddenEl.value ? hiddenEl.value.split(',').filter(c => c.trim()) : [];
+
+        function renderizarCodigos() {
+          containerEl.innerHTML = '';
+          codigosArray.forEach((codigo, index) => {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-primary d-flex align-items-center gap-2 px-3 py-2 rounded-pill';
+            badge.style.fontSize = '0.85rem';
+            badge.innerHTML = `
+              ${codigo}
+              <i class="bi bi-x-circle-fill cursor-pointer" style="cursor:pointer;" onclick="window.removeBarcode('${hiddenId}', ${index})"></i>
+            `;
+            containerEl.appendChild(badge);
+          });
+          hiddenEl.value = codigosArray.join(',');
+        }
+
+        // Exponer la función de remoción globalmente para que el onclick funcione
+        window.removeBarcode = function(hId, idx) {
+          // Buscamos el hidden correspondiente y actualizamos su array
+          const hEl = document.getElementById(hId);
+          if (!hEl) return;
+          let arr = hEl.value.split(',').filter(c => c.trim());
+          arr.splice(idx, 1);
+          hEl.value = arr.join(',');
+          // Re-renderizamos usando el contenedor correspondiente
+          const cId = hId.includes('edit') ? hId.replace('hidden', 'input').replace('edit_codigo_barra_input_', 'edit_contenedor_codigos_') : 'add_contenedor_codigos';
+          // Como necesitamos una forma de volver a llamar renderizarCodigos, 
+          // simplificamos re-inicializando o disparando un evento.
+          // Por simplicidad en este entorno, llamamos a una versión que busque el contenedor.
+          const currentContainer = hId.includes('edit') 
+            ? document.getElementById('edit_contenedor_codigos_' + hId.split('_').pop())
+            : document.getElementById('add_contenedor_codigos');
+          
+          if (currentContainer) {
+            currentContainer.innerHTML = '';
+            arr.forEach((c, i) => {
+              const b = document.createElement('span');
+              b.className = 'badge bg-primary d-flex align-items-center gap-2 px-3 py-2 rounded-pill';
+              b.style.fontSize = '0.85rem';
+              b.innerHTML = `${c} <i class="bi bi-x-circle-fill cursor-pointer" style="cursor:pointer;" onclick="window.removeBarcode('${hId}', ${i})"></i>`;
+              currentContainer.appendChild(b);
+            });
+          }
+        };
+
+        inputEl.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault(); // BLOQUEO CRÍTICO: Evitar envío de formulario
+            
+            const val = this.value.trim();
+            if (val && !codigosArray.includes(val) && codigosArray.length < 10) {
+              codigosArray.push(val);
+              this.value = '';
+              renderizarCodigos();
+            } else if (val) {
+              this.value = ''; // Limpiar si ya existe o límite alcanzado
+            }
+          }
+        });
+
+        // Inicializar vista
+        renderizarCodigos();
+      }
+
+      // Inicializar para el modal de Alta
+      const addModal = document.getElementById('addModal');
+      if (addModal) {
+        addModal.addEventListener('shown.bs.modal', function() {
+          setupBarcodeManager('add_codigo_barra_input', 'add_codigo_barra_hidden', 'add_contenedor_codigos');
+          document.getElementById('add_codigo_barra_input').focus();
+        });
+      }
+
+      // Inicializar para todos los modales de Edición (cuando se abren)
+      document.querySelectorAll('.modal[id^="editModal"]').forEach(modal => {
+        modal.addEventListener('shown.bs.modal', function() {
+          const productId = this.id.replace('editModal', '');
+          setupBarcodeManager(
+            `edit_codigo_barra_input_${productId}`,
+            `edit_codigo_barra_hidden_${productId}`,
+            `edit_contenedor_codigos_${productId}`
+          );
+          document.getElementById(`edit_codigo_barra_input_${productId}`).focus();
+        });
+      });
+
+      // Bloqueo Global de Enter en formularios para evitar envíos accidentales
+      document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+            // Si no estamos en el input de códigos (que ya tiene su propio preventDefault), 
+            // también bloqueamos aquí para mayor seguridad.
+            if (!e.target.classList.contains('barcode-tag-input')) {
+              e.preventDefault();
+            }
+          }
         });
       });
     </script>

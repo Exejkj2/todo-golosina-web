@@ -4,7 +4,7 @@ import io
 import traceback
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from sqlalchemy import text, or_
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
@@ -351,14 +351,28 @@ def buscar_productos():
 def buscar_por_codigo(codigo):
     codigo = codigo.strip()
     
-    # Intenta buscar por codigo_barras primero
-    # Como la columna se acaba de agregar, envolvemos en try-except por si la BD aún no actualizó el schema
+    # Búsqueda multi-variante (coma-separated barcodes)
     try:
-        p = Producto.query.filter_by(codigo_barra=codigo, activo=1).first()
+        # Filtro rápido en BD para traer candidatos potenciales
+        candidatos = Producto.query.filter(
+            Producto.codigo_barra.ilike(f'%{codigo}%'),
+            Producto.activo == 1
+        ).all()
+        
+        producto_encontrado = None
+        # Validación estricta en Python
+        for p in candidatos:
+            if not p.codigo_barra: continue
+            lista_codigos = [c.strip() for c in p.codigo_barra.split(',') if c.strip()]
+            if codigo in lista_codigos:
+                producto_encontrado = p
+                break
+        
+        p = producto_encontrado
     except Exception:
         p = None
         
-    # Fallback: buscar por ID si el código es numérico (útil para códigos generados internamente)
+    # Fallback: buscar por ID if el código es numérico
     if not p and codigo.isdigit():
         p = Producto.query.filter_by(id=int(codigo), activo=1).first()
         
@@ -1100,9 +1114,16 @@ def admin_add_product():
 
     codigo_barra = request.form.get('codigo_barra', '').strip()
     if codigo_barra:
-        existente = Producto.query.filter_by(codigo_barra=codigo_barra, activo=1).first()
-        if existente:
-            return jsonify({"error": f"El código de barras ya está registrado en el producto: {existente.nombre}"}), 400
+        # Validación multi-variante: separar por comas y verificar cada uno
+        nuevos_codigos = [c.strip() for c in codigo_barra.split(',') if c.strip()]
+        filtros = [Producto.codigo_barra.ilike(f'%{c}%') for c in nuevos_codigos]
+        posibles_duplicados = Producto.query.filter(or_(*filtros), Producto.activo == 1).all()
+
+        for p in posibles_duplicados:
+            codigos_existentes = [c.strip() for c in p.codigo_barra.split(',') if c.strip()]
+            for nc in nuevos_codigos:
+                if nc in codigos_existentes:
+                     return jsonify({"error": f"El código '{nc}' ya está registrado en el producto: {p.nombre}"}), 400
 
     nuevo = Producto(
         nombre=nombre, precio_lista_1=precio_lista_1, precio_lista_2=precio_lista_2, precio_lista_3=precio_lista_3,
@@ -1164,16 +1185,19 @@ def admin_edit_product(id):
     except ValueError:
         producto.porcentaje_descuento_volumen = None
 
-    # Validación de Duplicados en Edición
-    nuevo_codigo = request.form.get('codigo_barra', '').strip()
-    if nuevo_codigo:
-        duplicado = Producto.query.filter(
-            Producto.codigo_barra == nuevo_codigo, 
-            Producto.id != id,
-            Producto.activo == 1
-        ).first()
-        if duplicado:
-            return jsonify({"error": f"No se puede guardar. El código '{nuevo_codigo}' ya lo tiene el producto: {duplicado.nombre}"}), 400
+    # Validación de Duplicados en Edición (Multi-variante)
+    nuevo_codigo_str = request.form.get('codigo_barra', '').strip()
+    if nuevo_codigo_str:
+        nuevos_codigos = [c.strip() for c in nuevo_codigo_str.split(',') if c.strip()]
+        filtros = [Producto.codigo_barra.ilike(f'%{c}%') for c in nuevos_codigos]
+        # Buscamos en OTROS productos
+        posibles_duplicados = Producto.query.filter(or_(*filtros), Producto.id != id, Producto.activo == 1).all()
+
+        for p in posibles_duplicados:
+            codigos_existentes = [c.strip() for c in p.codigo_barra.split(',') if c.strip()]
+            for nc in nuevos_codigos:
+                if nc in codigos_existentes:
+                     return jsonify({"error": f"El código '{nc}' ya está registrado en el producto: {p.nombre}"}), 400
 
     try:
         # Triple Lista de Precios
