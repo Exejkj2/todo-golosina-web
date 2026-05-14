@@ -4,6 +4,7 @@ import io
 import traceback
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
@@ -154,7 +155,7 @@ class Venta(db.Model):
     total = db.Column(db.Float, default=0.0)
     detalle_json = db.Column(db.Text, default='[]')
     lista_precios = db.Column(db.Integer, default=1)
-    tipo = db.Column(db.String(20), default='Preventa')
+    tipo = db.Column(db.String(50), default='local')
     metodo_pago = db.Column(db.String(100), nullable=True)
     pago_efectivo = db.Column(db.Float, default=0.0)
     pago_transferencia = db.Column(db.Float, default=0.0)
@@ -217,6 +218,23 @@ class CajaDiaria(db.Model):
 # ─── INICIALIZACIÓN CRÍTICA (Render/Gunicorn compatible) ──────
 with app.app_context():
     db.create_all()
+    # Migración PostgreSQL para Render: Agregar columna descuento si no existe
+    try:
+        db.session.execute(text('ALTER TABLE clientes ADD COLUMN descuento FLOAT DEFAULT 0;'))
+        db.session.commit()
+        print("Columna 'descuento' agregada con éxito a 'clientes'.")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Migración omitida (probablemente la columna ya existe): {e}")
+
+    # Migración PostgreSQL para Render: Agregar columna tipo en ventas si no existe
+    try:
+        db.session.execute(text("ALTER TABLE ventas ADD COLUMN tipo VARCHAR(50) DEFAULT 'local';"))
+        db.session.commit()
+        print("Columna 'tipo' agregada con éxito a 'ventas'.")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Migración de ventas omitida (probablemente la columna ya existe): {e}")
     print("Base de datos y tablas inicializadas correctamente.")
 
 # Rutina de migración automática
@@ -1456,24 +1474,6 @@ def setup_database():
 # ─── Inicialización de la Base de Datos ──────────────────────
 # Llamamos a esta función aquí para que se ejecute al importar 'app' en Render/Gunicorn
 setup_database()
-
-# Parche de migración PostgreSQL para Render
-def patch_postgres_migration():
-    from sqlalchemy import text
-    from sqlalchemy.exc import ProgrammingError
-    with app.app_context():
-        try:
-            # Ejecución de sentencia SQL pura para agregar la columna faltante
-            db.session.execute(text("ALTER TABLE clientes ADD COLUMN descuento FLOAT DEFAULT 0.0;"))
-            db.session.commit()
-            print("Migración exitosa: Columna 'descuento' agregada a la tabla 'clientes'.")
-        except Exception as e:
-            db.session.rollback()
-            # Capturamos errores de columna duplicada o problemas de sintaxis si ya existe
-            # No bloqueamos el arranque del servidor
-            print(f"Aviso de migración (ignorando si ya existe): {str(e)}")
-
-patch_postgres_migration()
 
 @app.route('/reportes')
 def reportes_view():
