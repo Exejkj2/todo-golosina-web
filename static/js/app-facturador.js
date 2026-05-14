@@ -28,6 +28,7 @@ let lastVentaTotal = 0;
 let postSaleSelectedIndex = 0;
 let editingCustId = null;
 let deudores = [];
+let clienteIdAEliminar = null; // Para el modal de eliminación personalizado
 
 // Bootstrap Modal Instances: se instancian on-demand con getOrCreateInstance()
 
@@ -232,20 +233,39 @@ function renderCustManager() {
 }
 
 async function deleteCliente(id) {
-  const ok = confirm("¿Eliminar cliente?\nEsta acción borrará al cliente permanentemente.");
-  if (ok) {
-    try {
-      const r = await fetch(`/api/clientes/${id}`, { method: "DELETE" });
-      const d = await r.json();
-      if (d.ok) {
-        alert("¡Eliminado! El cliente ha sido borrado.");
-        loadAllClientes();
-      } else {
-        alert("Error: " + (d.mensaje || "No se pudo eliminar"));
-      }
-    } catch (e) {
-      console.error(e);
+  clienteIdAEliminar = id;
+  getModal('modalEliminarCliente')?.show();
+}
+
+// Ejecuta la eliminación real (llamada desde el listener del botón del modal)
+async function ejecutarEliminacionCliente() {
+  if (!clienteIdAEliminar) return;
+  
+  try {
+    const r = await fetch(`/api/clientes/${clienteIdAEliminar}`, { method: "DELETE" });
+    const d = await r.json();
+    
+    getModal('modalEliminarCliente')?.hide();
+    
+    if (d.ok) {
+      Swal.fire({
+        icon: 'success',
+        title: '¡Eliminado!',
+        text: 'El cliente ha sido borrado permanentemente.',
+        timer: 2000,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
+      loadAllClientes();
+    } else {
+      Swal.fire({ icon: 'error', title: 'Error', text: d.mensaje || "No se pudo eliminar" });
     }
+  } catch (e) {
+    console.error(e);
+    Swal.fire({ icon: 'error', title: 'Error de red', text: 'No se pudo conectar con el servidor' });
+  } finally {
+    clienteIdAEliminar = null;
   }
 }
 
@@ -725,8 +745,23 @@ function addItem(p, qty) {
 function remItem(id) {
   const tab = getActiveTab();
   if (!tab) return;
-  tab.cart = tab.cart.filter(i => i.id !== id);
+  // Usamos != para comparar string con number si es necesario
+  tab.cart = tab.cart.filter(i => i.id != id);
   if (cartSelectedIndex >= tab.cart.length) cartSelectedIndex = tab.cart.length - 1;
+  saveTabsToLocal();
+  renderCart();
+}
+
+function eliminarItem(index) {
+  const tab = getActiveTab();
+  if (!tab || !tab.cart[index]) return;
+  
+  tab.cart.splice(index, 1);
+  
+  if (cartSelectedIndex >= tab.cart.length) {
+    cartSelectedIndex = tab.cart.length - 1;
+  }
+  
   saveTabsToLocal();
   renderCart();
 }
@@ -794,7 +829,9 @@ function renderCart() {
       </td>
       <td class="text-end subtotal-text">$${subtotalFila.toLocaleString()}</td>
       <td class="text-end">
-        <button class="btn btn-sm p-0 text-danger" data-action="remItem" data-id="${item.id}"><i class="bi bi-trash"></i></button>
+        <button class="btn btn-sm p-0 text-danger" data-action="eliminarItem" data-index="${i}" title="Eliminar artículo">
+          <i class="bi bi-trash fs-5"></i>
+        </button>
       </td>
     </tr>
   `;
@@ -1028,12 +1065,10 @@ async function confirmarVenta() {
       document.body.style.backgroundColor = "#dcfce7";
       setTimeout(() => (document.body.style.backgroundColor = ""), 300);
       
-      document.getElementById("waForm")?.classList.add("d-none");
-      postSaleSelectedIndex = 0; 
-      updatePostOptions();
-      getModal('modal-opciones-cobro')?.show(); 
+      // Abrir Modal de Opciones (Restaurado)
+      getModal('modalOpcionesVenta')?.show();
       
-      cargarDashboard(); // Actualizar métricas del dashboard
+      cargarDashboard(); 
     } else { 
       Swal.fire({ icon: 'error', title: 'Error', text: d.mensaje });
     }
@@ -1148,19 +1183,109 @@ function finalizarVentaUX() {
 }
 
 // FUNCIONES CADENA DE MODALES
-function abrirVistaPrevia() {
-  getModal('modal-opciones-cobro')?.hide();
-  const frame = document.getElementById("frame-ticket-preview");
-  if (frame) {
-    frame.src = `/imprimir_ticket/${lastVentaId}`;
-  }
-  getModal('modal-vista-previa-ticket')?.show();
+function imprimirTicketDirecto() {
+  const tab = getActiveTab();
+  if (!tab) return;
+
+  const now = new Date();
+  const fechaStr = now.toLocaleDateString() + " " + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  let itemsHtml = tab.cart.map(item => {
+    const priceFinal = item.price - (item.price * (item.discount || 0) / 100);
+    return `
+      <tr>
+        <td style="padding: 1mm 0;">
+          <div style="font-weight: bold;">${item.nombre.toUpperCase()}</div>
+          <div style="font-size: 11px;">${item.qty} x $${item.price.toLocaleString()} ${item.discount > 0 ? `(-${item.discount}%)` : ""}</div>
+        </td>
+        <td style="text-align: right; vertical-align: middle;">$${(priceFinal * item.qty).toLocaleString()}</td>
+      </tr>
+    `;
+  }).join("");
+
+  const subtotalGeneral = tab.cart.reduce((acc, item) => {
+    const priceFinal = item.price - (item.price * (item.discount || 0) / 100);
+    return acc + (priceFinal * item.qty);
+  }, 0);
+  const montoDescuentoGral = subtotalGeneral * ((tab.generalDiscount || 0) / 100);
+  const total = subtotalGeneral - montoDescuentoGral;
+
+  const ticketHtml = `
+    <html>
+    <head>
+      <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+      <style>
+        body { font-family: 'Montserrat', sans-serif; font-size: 13px; line-height: 1.4; color: #000; width: 80mm; margin: 0; padding: 5mm; }
+        .ticket-header { text-align: center; margin-bottom: 5mm; }
+        .ticket-logo { font-size: 22px; font-weight: 900; letter-spacing: -1px; }
+        .ticket-info { font-size: 12px; margin-bottom: 4mm; border-bottom: 1px dashed #ccc; padding-bottom: 3mm; }
+        .ticket-table { width: 100%; border-collapse: collapse; margin-bottom: 4mm; }
+        .ticket-table th { text-align: left; border-bottom: 1px solid #000; padding: 2mm 0; font-size: 11px; text-transform: uppercase; }
+        .ticket-table td { padding: 2mm 0; vertical-align: top; border-bottom: 0.5px solid #f0f0f0; }
+        .ticket-total { margin-top: 4mm; border-top: 2px solid #000; padding-top: 3mm; font-weight: 800; font-size: 16px; text-align: right; }
+        .ticket-footer { text-align: center; margin-top: 6mm; font-size: 11px; border-top: 1px dashed #ccc; padding-top: 4mm; }
+        @media print { @page { margin: 0; } }
+      </style>
+    </head>
+    <body onload="window.print();">
+      <div class="ticket-header">
+        <div class="ticket-logo">TODO GOLOSINA</div>
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">Golosinas & Snacks</div>
+      </div>
+      <div class="ticket-info">
+        <div><strong>FECHA:</strong> ${fechaStr}</div>
+        <div><strong>TICKET:</strong> #${lastVentaId || '---'}</div>
+        <div><strong>CLIENTE:</strong> ${tab.selectedCliente.nombre.toUpperCase()}</div>
+      </div>
+      <table class="ticket-table">
+        <thead><tr><th>DESCRIPCIÓN</th><th style="text-align: right;">TOTAL</th></tr></thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+      <div class="ticket-total">
+        ${tab.generalDiscount > 0 ? `<div style="font-size: 12px; font-weight: normal;">DESC. GRAL (${tab.generalDiscount}%): -$${montoDescuentoGral.toLocaleString()}</div>` : ""}
+        <div style="font-size: 20px; margin-top: 2mm;">TOTAL: $${total.toLocaleString()}</div>
+      </div>
+      <div class="ticket-footer">
+        <div style="font-weight: bold; margin-bottom: 1mm;">¡GRACIAS POR SU COMPRA!</div>
+        <div>Aguilares, Tucumán</div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Imprimir vía Iframe Oculto
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.bottom = '0';
+  iframe.style.right = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(ticketHtml);
+  doc.close();
+
+  // Se elimina el iframe tras un tiempo prudencial
+  setTimeout(() => {
+    document.body.removeChild(iframe);
+  }, 3000);
 }
 
-function confirmarImpresion() {
-  getModal('modal-vista-previa-ticket')?.hide();
-  printTicket(lastVentaId);
-  getModal('postSaleModal')?.show();
+function finalizarYLimpiarVenta() {
+  resetFacturador();
+  getModal('modalOpcionesVenta')?.hide();
+  
+  // Feedback visual de éxito
+  const modalExito = getModal('modalExitoVenta');
+  modalExito?.show();
+  
+  setTimeout(() => {
+    modalExito?.hide();
+    document.getElementById("scannerInput")?.focus();
+  }, 1500);
 }
 
 async function prepararWA() {
@@ -1313,8 +1438,11 @@ function setupEventListeners() {
     const target = e.target.closest("[data-action]");
     if (!target) return;
     const action = target.getAttribute("data-action");
-    const id = target.getAttribute("data-id"); // Mantener como string o int según convenga
+    const id = target.getAttribute("data-id");
+    const index = target.getAttribute("data-index");
+
     if (action === "remItem") remItem(id);
+    else if (action === "eliminarItem") eliminarItem(parseInt(index));
   });
 
   document.getElementById("cartBody")?.addEventListener("change", (e) => {
@@ -1340,6 +1468,25 @@ function setupEventListeners() {
   document.getElementById("btnSaveGasto")?.addEventListener("click", saveGasto);
   document.getElementById("btnSaveNewCust")?.addEventListener("click", saveNewCust);
   document.getElementById("btnConfirmarPago")?.addEventListener("click", registrarPagoCobranza);
+  document.getElementById("btnConfirmarEliminar")?.addEventListener("click", ejecutarEliminacionCliente);
+
+  // Listeners Modal Opciones Post-Venta (Restaurados)
+  document.getElementById("btnImprimirTicket")?.addEventListener("click", () => {
+    imprimirTicketDirecto();
+    finalizarYLimpiarVenta();
+  });
+
+  document.getElementById("btnEnviarWhatsApp")?.addEventListener("click", () => {
+    const tab = getActiveTab();
+    const total = lastVentaTotal || 0;
+    const msg = encodeURIComponent(`Hola ${tab.selectedCliente.nombre}! Tu compra en Todo Golosina fue de $${total.toLocaleString()}. ¡Gracias!`);
+    window.open(`https://wa.me/${tab.selectedCliente.telefono || ''}?text=${msg}`, '_blank');
+    finalizarYLimpiarVenta();
+  });
+
+  document.getElementById("btnSoloRegistrar")?.addEventListener("click", () => {
+    finalizarYLimpiarVenta();
+  });
 
   // General Discount listener
   document.getElementById("inputGeneralDiscount")?.addEventListener("input", (e) => {
