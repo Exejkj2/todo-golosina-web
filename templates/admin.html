@@ -190,7 +190,7 @@
         <!-- Toolbar Buscador y Exportar -->
         <div class="d-flex justify-content-between align-items-center mb-3">
           <form method="GET" action="{{ url_for('admin_dashboard') }}" class="d-flex gap-2" style="max-width: 450px; width: 100%;">
-            <input type="text" name="q" class="form-control bg-white" placeholder="Buscar producto por nombre..." value="{{ search or '' }}" />
+            <input type="text" id="buscador_admin" name="q" class="form-control bg-white" placeholder="Buscar producto por nombre..." value="{{ search or '' }}" />
             <button type="submit" class="btn btn-secondary px-3"><i class="bi bi-search"></i> Buscar</button>
             {% if search %}
             <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary" title="Limpiar búsqueda"><i class="bi bi-x-lg"></i></a>
@@ -204,7 +204,7 @@
         <div class="card card-admin">
           <div class="card-body p-0">
             <div class="table-responsive">
-              <table class="table table-hover mb-0">
+              <table id="tabla_productos" class="table table-hover mb-0">
                 <thead>
                   <tr>
                     <th class="ps-4">ID</th>
@@ -1135,6 +1135,33 @@
           }
         });
       });
+      // --- Live Search (Filtrado en tiempo real) ---
+      const inputBuscador = document.getElementById('buscador_admin');
+      if (inputBuscador) {
+        inputBuscador.addEventListener('input', function(e) {
+          const termino = e.target.value.toLowerCase();
+          const filas = document.querySelectorAll('#tabla_productos tbody tr');
+          
+          filas.forEach(fila => {
+            // Filtramos por el contenido de texto de la fila (Nombre, Código, etc.)
+            const textoFila = fila.textContent.toLowerCase();
+            
+            if (textoFila.includes(termino)) {
+              fila.style.display = '';
+            } else {
+              fila.style.display = 'none';
+            }
+          });
+        });
+
+        // Prevenir el envío del formulario al presionar Enter para favorecer el filtrado live
+        const searchForm = inputBuscador.closest('form');
+        if (searchForm) {
+          searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+          });
+        }
+      }
     </script>
   </body>
 </html>
