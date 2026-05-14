@@ -1104,7 +1104,9 @@
       if (addModal) {
         addModal.addEventListener('shown.bs.modal', function() {
           setupBarcodeManager('add_codigo_barra_input', 'add_codigo_barra_hidden', 'add_contenedor_codigos');
-          document.getElementById('add_codigo_barra_input').focus();
+          // UX: El usuario prefiere tipear primero el nombre antes de escanear
+          const nameInput = document.getElementById('add_nombre');
+          if (nameInput) nameInput.focus();
         });
       }
 
