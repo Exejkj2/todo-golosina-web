@@ -3,284 +3,180 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Todo Golosina 🍬 — Tu tienda de dulces</title>
-  <meta name="description" content="Todo Golosina — La mejor tienda de golosinas de Argentina. Gummies, chocolates, chupetines y más. Pedidos online con envío a domicilio."/>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&family=Outfit:wght@300;400;500;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet"/>
+  <title>Todo Golosina — Dulzura en cada bocado 🍬</title>
+  <meta name="description" content="La tienda de golosinas más grande de Tucumán. Envíos a todo el país."/>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NYF6GLTJET"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-NYF6GLTJET');
-  </script>
+  <style>
+    :root {
+      --tg-yellow: #FFD700;
+      --tg-pink: #fe3994;
+      --tg-dark: #212529;
+    }
+  </style>
 </head>
 <body>
 
-<!-- ===================== NAVBAR ===================== -->
-<nav class="navbar navbar-expand-lg tg-navbar fixed-top" id="mainNavbar">
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg tg-navbar sticky-top" id="mainNavbar">
   <div class="container">
-
-    <!-- Brand -->
-    <a class="navbar-brand tg-brand" href="#inicio">
+    <a class="navbar-brand tg-brand" href="{{ url_for('index') }}">
       <span class="tg-brand-icon">🍬</span>
       <span class="tg-brand-name">Todo Golosina</span>
     </a>
-
-    <!-- Acciones de Navegación (Siempre visibles) -->
-    <div class="d-flex align-items-center gap-2 gap-lg-3 order-lg-3">
-      <!-- Botón Preventista (Visible en todos los tamaños) -->
-      <a href="/preventa" class="btn btn-sm rounded-pill fw-bold" 
-         style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:.35rem .75rem;font-size:.78rem;border:none;box-shadow:0 2px 8px rgba(245,158,11,.35);" title="Ventas Externas">
-        <i class="bi bi-briefcase-fill me-lg-1"></i><span class="d-none d-lg-inline">Preventista</span>
-      </a>
-
-      <!-- Carrito -->
-      <button class="tg-cart-btn" aria-label="Carrito" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
-        <i class="bi bi-bag-heart-fill"></i>
-        <span class="tg-cart-badge">0</span>
-      </button>
-
-      <!-- Botón Hacer Pedido (Solo Desktop) -->
-      <a href="{{ url_for('contacto') }}" class="btn tg-btn-pill d-none d-lg-flex">Hacer Pedido</a>
-
-      <!-- Toggler (Solo Móvil) -->
-      <button class="navbar-toggler tg-toggler d-lg-none" type="button"
-              data-bs-toggle="collapse" data-bs-target="#navMenu"
-              aria-controls="navMenu" aria-expanded="false" aria-label="Menú">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-    </div>
-
-    <!-- Menú Colapsable -->
-    <div class="collapse navbar-collapse order-lg-2" id="navMenu">
-      <ul class="navbar-nav mx-auto gap-lg-1">
-        <li class="nav-item">
-          <a class="nav-link tg-nav-link active" href="#inicio">
-            <i class="bi bi-house-heart me-1"></i>Inicio
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link tg-nav-link" href="{{ url_for('productos') }}">
-            <i class="bi bi-grid-3x3-gap me-1"></i>Productos
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link tg-nav-link" href="{{ url_for('nosotros') }}">
-            <i class="bi bi-people-fill me-1"></i>Quiénes Somos
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link tg-nav-link" href="{{ url_for('contacto') }}">
-            <i class="bi bi-chat-heart me-1"></i>Contacto
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link tg-nav-link text-pink" href="{{ url_for('login') }}">
-            <i class="bi bi-person-circle me-1"></i>Admin
-          </a>
-        </li>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav mx-auto">
+        <li class="nav-item"><a class="nav-link tg-nav-link active" href="{{ url_for('index') }}">Inicio</a></li>
+        <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('productos') }}">Productos</a></li>
+        <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('contacto') }}">Contacto</a></li>
       </ul>
+      <div class="d-flex align-items-center gap-2 mt-3 mt-lg-0">
+        <!-- Botón Facturador: Solo escritorio -->
+        <a href="/login-facturador" class="btn btn-primary rounded-pill px-3 fw-bold d-none d-md-inline-block" style="background: var(--tg-pink); border: none;">
+          <i class="bi bi-upc-scan me-1"></i> Facturador
+        </a>
+        <a href="/dashboard" class="btn btn-outline-dark rounded-pill px-3 fw-bold">
+          <i class="bi bi-speedometer2 me-1"></i> Administrador
+        </a>
+        <a href="/preventa" class="btn btn-outline-primary rounded-pill px-3 fw-bold">
+          <i class="bi bi-person-badge me-1"></i> Preventista
+        </a>
+        <button class="tg-cart-btn ms-2" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+          <i class="bi bi-bag-heart-fill"></i>
+          <span class="tg-cart-badge">0</span>
+        </button>
+      </div>
     </div>
   </div>
 </nav>
 
-<!-- ===== OFFCANVAS CARRITO ===== -->
-<div class="offcanvas offcanvas-end tg-offcanvas" tabindex="-1" id="cartOffcanvas" aria-labelledby="cartLabel">
+<!-- OFFCANVAS CARRITO -->
+<div class="offcanvas offcanvas-end tg-offcanvas" tabindex="-1" id="cartOffcanvas">
   <div class="offcanvas-header tg-offcanvas-header">
-    <h5 class="offcanvas-title" id="cartLabel"><i class="bi bi-bag-heart-fill me-2"></i>Tu Carrito</h5>
-    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    <h5 class="offcanvas-title"><i class="bi bi-bag-heart-fill me-2"></i>Tu Carrito</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
   </div>
   <div class="offcanvas-body tg-offcanvas-body" id="cartBody"></div>
   <div class="tg-offcanvas-footer" id="cartFooter"></div>
 </div>
 
-<!-- ===================== HERO ===================== -->
-<section class="tg-hero d-flex align-items-center" id="inicio">
-  <div class="tg-hero-blobs" aria-hidden="true">
-    <div class="tg-blob tg-blob--1"></div>
-    <div class="tg-blob tg-blob--2"></div>
-    <div class="tg-blob tg-blob--3"></div>
-  </div>
-  <div class="tg-floating-emojis" aria-hidden="true">
-    <span class="tg-emoji" style="--x:8%;--y:20%;--dur:6s">🍭</span>
-    <span class="tg-emoji" style="--x:85%;--y:15%;--dur:8s;--d:-2s">🍬</span>
-    <span class="tg-emoji" style="--x:5%;--y:70%;--dur:7s;--d:-4s">🍫</span>
-    <span class="tg-emoji" style="--x:90%;--y:60%;--dur:9s;--d:-1s">🍡</span>
-    <span class="tg-emoji" style="--x:50%;--y:8%;--dur:6.5s;--d:-3s">🧁</span>
-    <span class="tg-emoji" style="--x:75%;--y:82%;--dur:7.5s;--d:-5s">🍩</span>
-  </div>
-
-  <div class="container position-relative z-1">
-    <div class="row align-items-center gy-5">
-      <div class="col-lg-6">
-        <span class="tg-badge mb-3 d-inline-block">✨ Envíos a todo el país</span>
-        <h1 class="tg-hero-title">El mundo más <span class="tg-gradient-text">dulce</span> está aquí</h1>
-        <p class="tg-hero-sub mt-3 mb-4">Gummies, chocolates, chupetines, caramelos importados y mucho más. ¡Pedí online y recibí en tu casa!</p>
-        <div class="d-flex flex-wrap gap-3">
-          <a href="{{ url_for('productos') }}" class="btn tg-btn-primary tg-btn-pill px-4">
-            Ver Productos <i class="bi bi-arrow-right ms-1"></i>
-          </a>
-          <a href="{{ url_for('contacto') }}" class="btn tg-btn-ghost tg-btn-pill px-4">Hacer Pedido</a>
-        </div>
-        <div class="tg-stats d-flex flex-wrap gap-4 mt-5">
-          <div class="tg-stat">
-            <span class="tg-stat-num">500+</span>
-            <span class="tg-stat-label">Productos</span>
-          </div>
-          <div class="tg-stat-divider"></div>
-          <div class="tg-stat">
-            <span class="tg-stat-num">5k+</span>
-            <span class="tg-stat-label">Clientes felices</span>
-          </div>
-          <div class="tg-stat-divider"></div>
-          <div class="tg-stat">
-            <span class="tg-stat-num">24h</span>
-            <span class="tg-stat-label">Envío express</span>
-          </div>
+<!-- HERO PREMIUM -->
+<section class="hero-premium py-5">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-7" data-aos="fade-right">
+        <h1 class="hero-title-premium mb-4">La mayor variedad de <span class="text-pink">DULZURA</span> en un solo lugar.</h1>
+        <p class="fs-5 text-muted mb-5">Venta por mayor y menor de golosinas. Los mejores precios de Tucumán en la puerta de tu negocio.</p>
+        <div class="d-flex flex-wrap gap-3 hero-btns">
+          <a href="{{ url_for('productos') }}" class="btn btn-premium-yellow px-5 py-3 rounded-pill fw-bold">VER PRODUCTOS</a>
+          <a href="{{ url_for('contacto') }}" class="btn btn-premium-outline px-5 py-3 rounded-pill fw-bold">HACER PEDIDO</a>
         </div>
       </div>
-      <div class="col-lg-6 text-center position-relative">
-        <div class="tg-hero-glow"></div>
-        <img src="{{ url_for('static', filename='assets/hero_candies.png') }}" alt="Surtido de golosinas premium"
-             class="tg-hero-img img-fluid rounded-4 shadow-lg"/>
-        <div class="tg-float-card tg-float-card--1">
-          <span>⭐</span>
-          <div><strong>4.9 / 5</strong><small>+2000 reseñas</small></div>
-        </div>
-        <div class="tg-float-card tg-float-card--2">
-          <span>🚀</span>
-          <div><strong>Envío gratis</strong><small>en compras +$5000</small></div>
+      <div class="col-lg-5 d-none d-lg-block" data-aos="zoom-in">
+        <div class="hero-image-wrapper">
+          <img src="https://images.unsplash.com/photo-1581798459219-318e76aecc7b?q=80&w=1200&auto=format&fit=crop" alt="Mix de Golosinas" class="img-fluid rounded-4 shadow-lg">
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ===================== MARQUEE ===================== -->
-<div class="tg-marquee" aria-hidden="true">
+<!-- TICKER AMARILLO OPTIMIZADO -->
+<section id="ticker-marcas" class="tg-marquee">
   <div class="tg-marquee-track">
-    <span>🍬 Gummies</span><span>🍫 Chocolates</span><span>🍭 Chupetines</span>
-    <span>🍡 Caramelos</span><span>🍩 Gomitas</span><span>🧁 Cupcakes</span>
-    <span>🍪 Cookies</span><span>🎁 Gift Boxes</span><span>🌟 Importados</span>
-    <span>🍬 Gummies</span><span>🍫 Chocolates</span><span>🍭 Chupetines</span>
-    <span>🍡 Caramelos</span><span>🍩 Gomitas</span><span>🧁 Cupcakes</span>
-    <span>🍪 Cookies</span><span>🎁 Gift Boxes</span><span>🌟 Importados</span>
+    <div class="tg-logo-item"><i class="fas fa-candy-cane"></i> chupetines</div>
+    <div class="tg-logo-item"><i class="fas fa-cookie"></i> caramelos</div>
+    <div class="tg-logo-item"><i class="fas fa-ice-cream"></i> chicles</div>
+    <div class="tg-logo-item"><i class="fas fa-donut"></i> alfajores</div>
+    <!-- Duplicamos para bucle infinito -->
+    <div class="tg-logo-item"><i class="fas fa-candy-cane"></i> chupetines</div>
+    <div class="tg-logo-item"><i class="fas fa-cookie"></i> caramelos</div>
+    <div class="tg-logo-item"><i class="fas fa-ice-cream"></i> chicles</div>
+    <div class="tg-logo-item"><i class="fas fa-donut"></i> alfajores</div>
+    <div class="tg-logo-item"><i class="fas fa-candy-cane"></i> chupetines</div>
+    <div class="tg-logo-item"><i class="fas fa-cookie"></i> caramelos</div>
+    <div class="tg-logo-item"><i class="fas fa-ice-cream"></i> chicles</div>
+    <div class="tg-logo-item"><i class="fas fa-donut"></i> alfajores</div>
   </div>
-</div>
+</section>
 
-<!-- ===================== PRODUCTOS ===================== -->
-<section class="tg-section" id="productos">
+<!-- LO MEJOR EN GOLOSINAS -->
+<section class="py-5" data-aos="fade-up">
   <div class="container">
-    <div class="text-center mb-4">
-      <span class="tg-section-tag">Nuestros Productos</span>
-      <h2 class="tg-section-title mt-2">Lo mejor en <span class="tg-gradient-text">golosinas</span></h2>
-      <p class="tg-section-sub">Seleccionamos los mejores dulces para una experiencia única.</p>
+    <div class="text-center mb-5">
+      <h2 class="fw-bold display-5 text-dark">Lo mejor en <span class="text-pink">Golosinas</span></h2>
+      <p class="text-muted">Selección premium para vos</p>
     </div>
-
-    <div class="row g-4" id="gridDestacados">
+    <div class="row g-4 mt-4">
       {% for p in destacados %}
-      <div class="col-md-6 col-lg-4">
-        <div class="tg-product-card h-100" id="prod-{{ p.id }}">
-          <a href="{{ url_for('productos') }}#prod-{{ p.id }}" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; flex: 1;">
-            <div class="tg-product-img-wrap">
-              <img src="{{ p.imagen_url or p.imagen }}" alt="{{ p.nombre }}" style="width: 100%; height: 200px; object-fit: cover; object-position: center; border-radius: 12px;"/>
-              <span class="tg-product-badge">⭐ Destacado</span>
-            </div>
-            <div class="tg-product-body">
-              <span class="tg-product-tag">{{ p.categoria_rel.nombre if p.categoria_rel else 'General' }}</span>
-              <h3 class="tg-product-name">{{ p.nombre }}</h3>
-              <p class="tg-product-desc">{{ p.descripcion }}</p>
-              <div class="tg-product-footer">
-                
-                {% if p.precio_anterior and p.precio_anterior > p.precio %}
-                  <div class="d-flex flex-column">
-                    <span class="text-decoration-line-through text-muted" style="font-size:0.85rem">${{ p.precio_anterior }}</span>
-                    <div class="d-flex align-items-center gap-2">
-                      <span class="tg-price text-success">${{ p.precio }}</span>
-                      <span class="badge bg-success" style="font-size:0.7rem;">{{ ((p.precio_anterior - p.precio) / p.precio_anterior * 100)|round|int }}% OFF</span>
-                    </div>
-                  </div>
-                {% else %}
-                  <span class="tg-price">${{ p.precio }}</span>
-                {% endif %}
-
-                {% if p.descuento_volumen_activo and p.cantidad_minima_descuento and p.porcentaje_descuento_volumen %}
-                <div style="margin-top:0.5rem; background:linear-gradient(90deg,#009EE3,#0070b8); color:#fff; border-radius:8px; padding:0.4rem 0.65rem; font-size:0.75rem; font-weight:700; display:flex; align-items:center; gap:0.3rem; box-shadow:0 2px 6px rgba(0,158,227,0.35);">
-                  🛒 Llevando {{ p.cantidad_minima_descuento }}+, <span style="color:#FFE600;margin:0 0.2rem;">{{ p.porcentaje_descuento_volumen|int }}% OFF</span> mayorista
-                </div>
-                {% endif %}
-
-                <!--
-                {% if p.stock > 0 or p.permitir_sin_stock %}
-                <button class="btn tg-btn-small tg-btn-pill" onclick="event.preventDefault(); addToCart({id: '{{ p.id }}', name: '{{ p.nombre }}', price: {{ p.precio }}, img: '{{ p.imagen_url or p.imagen }}', stock: {{ p.stock }}, permitir_sin_stock: {{ 'true' if p.permitir_sin_stock else 'false' }}})">
-                  <i class="bi bi-bag-plus me-1"></i>Agregar
-                </button>
-                {% else %}
-                <button class="btn tg-btn-small tg-btn-pill btn-secondary" disabled style="background: #cbd5e1; border-color: #cbd5e1; color: #475569;">
-                  Agotado
-                </button>
-                {% endif %}
-                -->
-              </div>
-            </div>
-          </a>
+      <div class="col-6 col-md-3">
+        <div class="tg-product-card h-100 bg-white border-0 shadow-sm p-3">
+          <div class="tg-product-img-wrap mb-3" style="aspect-ratio: 1; border-radius: 20px;">
+             <img src="{{ p.imagen_url or 'https://placehold.co/400x400?text=Todo+Golosina' }}" class="img-fluid w-100 h-100 object-fit-cover" alt="{{ p.nombre }}">
+          </div>
+          <h6 class="fw-black mb-1 text-dark text-capitalize" style="font-family: 'Montserrat', sans-serif;">{{ p.nombre.lower() }}</h6>
+          <p class="text-muted small mb-3 text-capitalize">{{ (p.categoria or 'Golosinas').lower() }}</p>
+          <div class="d-flex justify-content-between align-items-center mt-auto">
+            <span class="tg-price">${{ "{:,.0f}".format(p.precio).replace(',', '.') }}</span>
+            <button class="btn btn-add-modern" onclick="addToCart({{ p.id }}, {{ p.nombre|tojson|safe }}, {{ p.precio }}, {{ (p.imagen_url or '')|tojson|safe }})">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
         </div>
-      </div>
-      {% else %}
-      <div class="col-12 text-center text-muted py-5">
-        <p>Aún no hay productos destacados.</p>
       </div>
       {% endfor %}
     </div>
-
-
   </div>
 </section>
 
-
-
-<!-- ===================== TESTIMONIOS ===================== -->
-<section class="tg-section" id="testimonios">
+<!-- TESTIMONIOS -->
+<section class="testimonials-section" data-aos="fade-up">
   <div class="container">
     <div class="text-center mb-5">
-      <span class="tg-section-tag">Reseñas</span>
-      <h2 class="tg-section-title mt-2">Lo que dicen nuestros <span class="tg-gradient-text">clientes</span></h2>
+      <h2 class="fw-black display-6">Lo que dicen nuestros <span class="text-pink">Clientes</span></h2>
     </div>
     <div class="row g-4">
-      <div class="col-md-4">
-        <div class="tg-testimonial-card" id="test-1">
-          <div class="tg-stars">⭐⭐⭐⭐⭐</div>
-          <p class="tg-text-muted mt-2">"¡Las mejores golosinas! La caja sorpresa para el cumple de mi hija fue un éxito total."</p>
-          <div class="d-flex align-items-center gap-2 mt-3">
-            <div class="tg-avatar">S</div>
-            <div><strong class="d-block small">Sofía M.</strong><span class="tg-text-muted" style="font-size:.8rem">Buenos Aires</span></div>
+      <div class="col-md-4" data-aos="fade-up">
+        <div class="testimonial-card">
+          <p class="testimonial-text">"Las mejores golosinas de Tucumán. Siempre frescos y el envío es rapidísimo."</p>
+          <div class="testimonial-user">
+            <img src="https://i.pravatar.cc/150?u=1" alt="User">
+            <div>
+              <h6>María García</h6>
+              <div class="text-warning small"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i></div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="col-md-4">
-        <div class="tg-testimonial-card" id="test-2">
-          <div class="tg-stars">⭐⭐⭐⭐⭐</div>
-          <p class="tg-text-muted mt-2">"Pedí los gummies y llegaron súper frescos. Ya hice 3 pedidos y nunca me fallaron."</p>
-          <div class="d-flex align-items-center gap-2 mt-3">
-            <div class="tg-avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">M</div>
-            <div><strong class="d-block small">Mateo R.</strong><span class="tg-text-muted" style="font-size:.8rem">Córdoba</span></div>
+      <div class="col-md-4" data-aos="fade-up" data-aos-delay="100">
+        <div class="testimonial-card">
+          <p class="testimonial-text">"Compré las Gift Boxes para un cumpleaños y quedaron todos encantados. Gran variedad."</p>
+          <div class="testimonial-user">
+            <img src="https://i.pravatar.cc/150?u=2" alt="User">
+            <div>
+              <h6>Juan Pérez</h6>
+              <div class="text-warning small"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i></div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="col-md-4">
-        <div class="tg-testimonial-card" id="test-3">
-          <div class="tg-stars">⭐⭐⭐⭐⭐</div>
-          <p class="tg-text-muted mt-2">"Usé Todo Golosina para los souvenirs de mi casamiento. ¡Todos mis invitados preguntaron dónde las compramos!"</p>
-          <div class="d-flex align-items-center gap-2 mt-3">
-            <div class="tg-avatar" style="background:linear-gradient(135deg,#06b6d4,#6366f1)">L</div>
-            <div><strong class="d-block small">Laura G.</strong><span class="tg-text-muted" style="font-size:.8rem">Rosario</span></div>
+      <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
+        <div class="testimonial-card">
+          <p class="testimonial-text">"Excelente atención mayorista. Precios imbatibles y stock permanente."</p>
+          <div class="testimonial-user">
+            <img src="https://i.pravatar.cc/150?u=3" alt="User">
+            <div>
+              <h6>Ana López</h6>
+              <div class="text-warning small"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i></div>
+            </div>
           </div>
         </div>
       </div>
@@ -288,66 +184,88 @@
   </div>
 </section>
 
-
-
-<!-- ===================== FOOTER ===================== -->
-
-<!-- ===================== FOOTER DE CONFIANZA ===================== -->
-<footer class="tg-footer" style="background-color: #F5F5F5; border-top: 1px solid rgba(0,0,0,0.1);">
+<!-- NEWSLETTER PRE-FOOTER -->
+<section class="newsletter-footer">
   <div class="container">
-    <div class="row py-5 text-center text-md-start">
-      <!-- Columna 1: Medios de Pago -->
-      <div class="col-md-4 mb-4 mb-md-0">
-        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-credit-card me-2"></i>Medios de Pago</h5>
-        <ul class="list-unstyled text-muted small d-flex flex-column gap-2">
-          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Mercado Pago</li>
-          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Transferencia Bancaria</li>
-          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Efectivo</li>
-        </ul>
+    <div class="row align-items-center">
+      <div class="col-lg-6 mb-4 mb-lg-0">
+        <h3 class="fw-bold text-white mb-2">¡No te pierdas ninguna oferta!</h3>
+        <p class="text-white-50 mb-0">Suscribite a nuestro newsletter y recibí promociones exclusivas.</p>
       </div>
-      <!-- Columna 2: Logística -->
-      <div class="col-md-4 mb-4 mb-md-0">
-        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-truck me-2"></i>Envíos y Entregas</h5>
-        <p class="text-muted small mb-0">
-          Envíos a domicilio en <strong>Aguilares, Famaillá y Los Ralos</strong>.<br>
-          Retiro por sucursal disponible.
-        </p>
-      </div>
-      <!-- Columna 3: Redes Sociales -->
-      <div class="col-md-4">
-        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-phone me-2"></i>Seguinos</h5>
-        <div class="d-flex justify-content-center justify-content-md-start gap-3">
-          <a href="#" class="btn btn-outline-secondary rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-instagram"></i></a>
-          <a href="#" class="btn btn-outline-secondary rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-facebook"></i></a>
+      <div class="col-lg-6">
+        <div class="d-flex">
+          <input type="email" class="newsletter-input" placeholder="Tu correo electrónico">
+          <button class="newsletter-btn">SUSCRIBIRME</button>
         </div>
       </div>
     </div>
-    <div class="text-center py-3 border-top border-secondary-subtle">
-      <p class="mb-0 small text-muted">© 2026 Todo Golosina. Todos los derechos reservados.</p>
+  </div>
+</section>
+
+<!-- FOOTER MODERNO -->
+<footer class="tg-footer py-5">
+  <div class="container">
+    <div class="row gy-5 text-center text-md-start">
+      <div class="col-md-4" data-aos="fade-up">
+        <h3 class="fw-bold mb-3">Todo Golosina</h3>
+        <p class="mb-4">Dulzura en cada momento de tu vida. Líderes en distribución de golosinas en el sur de Tucumán.</p>
+        <div class="payment-methods">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/a/a4/Visa_2021.svg" alt="Visa">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard">
+          <img src="https://www.mercadopago.com.ar/instore/merchant/static/images/mp-logo.png" alt="Mercado Pago" style="height: 20px;">
+        </div>
+      </div>
+      <div class="col-md-2" data-aos="fade-up" data-aos-delay="100">
+        <h5 class="fw-bold mb-4 text-white">Navegación</h5>
+        <ul class="list-unstyled">
+          <li class="mb-2"><a href="{{ url_for('index') }}" class="text-decoration-none text-white-50">Inicio</a></li>
+          <li class="mb-2"><a href="{{ url_for('productos') }}" class="text-decoration-none text-white-50">Productos</a></li>
+          <li class="mb-2"><a href="{{ url_for('contacto') }}" class="text-decoration-none text-white-50">Contacto</a></li>
+        </ul>
+      </div>
+      <div class="col-md-3" data-aos="fade-up" data-aos-delay="200">
+        <h5 class="fw-bold mb-4 text-white">Ubicación</h5>
+        <p class="mb-2 text-white-50"><i class="bi bi-geo-alt me-2 text-pink"></i> Alberdi 950, Aguilares, Tucumán</p>
+        <p class="mb-2 text-white-50"><i class="bi bi-clock me-2 text-pink"></i> Lun a Sab: 8:30 - 21:00</p>
+      </div>
+      <div class="col-md-3" data-aos="fade-up" data-aos-delay="300">
+        <h5 class="fw-bold mb-4 text-white">Contacto</h5>
+        <p class="mb-2 text-white-50"><i class="bi bi-telephone me-2 text-pink"></i> +54 3865 000000</p>
+        <a href="https://wa.me/5493865000000" class="btn btn-outline-light rounded-pill px-4 mt-3" target="_blank">
+          <i class="bi bi-whatsapp me-2"></i>Escribinos por WhatsApp
+        </a>
+      </div>
+    </div>
+    <div class="border-top border-secondary mt-5 pt-4 text-center">
+      <p class="text-white-50 small mb-0">© 2025 Todo Golosina — Rediseño Premium de Alta Calidad</p>
     </div>
   </div>
 </footer>
 
-
-<!-- Cart Toast -->
-<div class="tg-toast" id="cartToast" role="alert" aria-live="polite">
-  <i class="bi bi-bag-check-fill me-2"></i>
-  <span id="toastMsg">¡Producto agregado!</span>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='cart.js') }}"></script>
-<script src="{{ url_for('static', filename='main.js') }}"></script>
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script>
+  // Initialize AOS
+  AOS.init({
+    duration: 1000,
+    once: true,
+    easing: 'ease-in-out'
+  });
+
+  // Hero animations trigger
+  window.addEventListener('load', () => {
+    if (document.querySelector('.hero-title-premium')) {
+      document.querySelector('.hero-title-premium').style.opacity = '1';
+    }
+    if (document.querySelector('.hero-btns')) {
+      document.querySelector('.hero-btns').style.opacity = '1';
+    }
+  });
+</script>
 
 <!-- Botón WhatsApp Flotante -->
-<a href="https://wa.me/5491100000000?text=¡Hola! Vengo de la tienda online de Todo Golosina y tengo una consulta..." 
-   target="_blank" 
-   class="tg-whatsapp-btn" 
-   aria-label="Chat en WhatsApp">
-  <i class="bi bi-whatsapp"></i>
-</a>
-
-
+<a href="https://wa.me/5493865000000" target="_blank" class="tg-whatsapp-btn"><i class="bi bi-whatsapp"></i></a>
 
 
 </body>

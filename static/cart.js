@@ -13,6 +13,9 @@ function saveCart() {
 // ─── Agregar producto (qty opcional: agrega N unidades de una vez) ──
 function addToCart(product, qty) {
   qty = Math.max(1, parseInt(qty) || 1);
+  const price = parseFloat(product.price.toString().replace(/[^0-9.-]+/g,"")) || 0;
+  product.price = price; // Asegurar que sea número en el objeto
+
   const existing = cart.find((p) => p.id === product.id);
   if (existing) {
     // Check stock limit
@@ -41,7 +44,8 @@ function addToCart(product, qty) {
 
 // ─── Editar cantidad directamente en el carrito ────────────────
 function setQtyInCart(id, newQty) {
-  newQty = parseInt(newQty);
+  newQty = parseInt(newQty.toString().replace(/[^0-9]+/g,"")) || 1;
+
   if (isNaN(newQty) || newQty < 1) return; // ignorar valores inválidos mientras escribe
   const item = cart.find((p) => p.id === id);
   if (!item) return;
@@ -91,15 +95,17 @@ function clearCart() {
 
 // ─── Precio efectivo (con descuento por volumen si aplica) ────
 function getEffectivePrice(p) {
+  const price = parseFloat(p.price) || 0;
+  const qty = parseInt(p.qty) || 0;
   if (
     p.descuento_volumen_activo &&
     p.cantidad_minima_descuento &&
     p.porcentaje_descuento_volumen &&
-    p.qty >= p.cantidad_minima_descuento
+    qty >= p.cantidad_minima_descuento
   ) {
-    return p.price * (1 - p.porcentaje_descuento_volumen / 100);
+    return price * (1 - (parseFloat(p.porcentaje_descuento_volumen) || 0) / 100);
   }
-  return p.price;
+  return price;
 }
 
 // ─── Totales ───────────────────────────────────────────────────
@@ -108,7 +114,11 @@ function cartTotalItems() {
 }
 
 function cartTotalPrice() {
-  return cart.reduce((acc, p) => acc + getEffectivePrice(p) * p.qty, 0);
+  return cart.reduce((acc, p) => {
+    const price = getEffectivePrice(p);
+    const qty = parseInt(p.qty) || 0;
+    return acc + (price * qty);
+  }, 0);
 }
 
 // ─── Enviar pedido por WhatsApp (CORREGIDO) ───────────────────
@@ -194,7 +204,7 @@ function renderOffcanvas() {
   body.innerHTML = cart
     .map((p) => {
         const precioEfectivo = getEffectivePrice(p);
-        const subtotal = (precioEfectivo * p.qty).toLocaleString('es-AR');
+        const subtotal = (precioEfectivo * p.qty).toFixed(2);
         const tieneDescuento = (
           p.descuento_volumen_activo &&
           p.cantidad_minima_descuento &&
@@ -205,7 +215,7 @@ function renderOffcanvas() {
           ? `<span style="background:#009EE3;color:#fff;font-size:0.65rem;font-weight:700;padding:0.1rem 0.4rem;border-radius:99px;white-space:nowrap;">🎉 ${Math.round(p.porcentaje_descuento_volumen)}% OFF mayorista</span>`
           : '';
         const precioDisplay = tieneDescuento
-          ? `<span style="text-decoration:line-through;color:#94a3b8;font-size:0.8rem;">$${(p.price * p.qty).toLocaleString('es-AR')}</span> <strong style="color:#16a34a;" id="subtotal-${p.id}">$${subtotal}</strong>`
+          ? `<span style="text-decoration:line-through;color:#94a3b8;font-size:0.8rem;">$${(p.price * p.qty).toFixed(2)}</span> <strong style="color:#16a34a;" id="subtotal-${p.id}">$${subtotal}</strong>`
           : `<span id="subtotal-${p.id}">$${subtotal}</span>`;
         const maxStock = (!p.permitir_sin_stock && p.stock > 0) ? p.stock : 9999;
         return `
@@ -228,6 +238,7 @@ function renderOffcanvas() {
           max="${maxStock}"
           inputmode="numeric"
           pattern="[0-9]*"
+          onfocus="this.select()"
           oninput="setQtyInCart('${p.id}', this.value)"
           onblur="_cleanQtyInput('${p.id}', this)"
         >
@@ -245,7 +256,7 @@ function renderOffcanvas() {
 function _updateCartPricesOnly() {
   cart.forEach((p) => {
     const precioEfectivo = getEffectivePrice(p);
-    const subtotal = (precioEfectivo * p.qty).toLocaleString('es-AR');
+    const subtotal = (precioEfectivo * p.qty).toFixed(2);
     const tieneDescuento = (
       p.descuento_volumen_activo &&
       p.cantidad_minima_descuento &&
@@ -259,7 +270,7 @@ function _updateCartPricesOnly() {
       const parent = el.closest('.tg-cart-item-price')?.parentElement;
       if (parent && tieneDescuento) {
         const tachado = parent.querySelector('span[style*="line-through"]');
-        if (tachado) tachado.textContent = `$${(p.price * p.qty).toLocaleString('es-AR')}`;
+        if (tachado) tachado.textContent = `$${(p.price * p.qty).toFixed(2)}`;
       }
     }
     // Actualizar input si el valor no coincide (por ej. stock truncado)
@@ -287,7 +298,7 @@ function _renderCartFooter() {
   footer.innerHTML = `
     <div class="tg-cart-total d-flex justify-content-between fw-bold p-3">
       <span>Total</span>
-      <span id="cart-total-display">$${total.toLocaleString('es-AR')}</span>
+      <span id="cart-total-display">$${total.toFixed(2)}</span>
     </div>
     <button class="btn btn-success w-100 mb-2" onclick="enviarPedidoWsp()">
       <i class="bi bi-whatsapp me-2"></i>Finalizar Pedido

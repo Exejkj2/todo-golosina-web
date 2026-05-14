@@ -4,17 +4,19 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Preventista — Todo Golosina</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="/static/js/offline-manager.js"></script>
 <style>
-:root{--blue:#009EE3;--dark:#2D3277;--green:#25D366;--amber:#f59e0b;--bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--muted:#94a3b8;--text:#1e293b}
+:root{--blue:#3483fa;--dark:#333;--green:#00a650;--amber:#fff159;--bg:#ebebeb;--card:#fff;--border:#dddddd;--muted:#666;--text:#333}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--text);overflow-x:hidden}
+html,body{margin:0;padding:0;background:var(--bg);font-family:'Montserrat',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--text);overflow-x:hidden}
 
 /* ── HEADER STICKY ── */
-.hdr{position:sticky;top:0;z-index:200;background:linear-gradient(135deg,var(--dark),var(--blue));color:#fff;padding:10px 14px;box-shadow:0 2px 12px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:space-between;min-height:56px}
-.hdr-info h6{margin:0;font-size:.68rem;opacity:.6;letter-spacing:.03em}.hdr-info .cli{font-size:.92rem;font-weight:700}
-.hdr-btn{min-width:48px;min-height:48px;border-radius:12px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)}
-.hdr-btn:active{background:rgba(255,255,255,.3)}
-.hdr-btn.hist{background:rgba(255,255,255,0.25); border: 1.5px solid rgba(255,255,255,0.3)}
+.hdr{position:sticky;top:0;z-index:200;background:var(--amber);color:#333;padding:10px 14px;box-shadow:0 1px 10px rgba(0,0,0,.1);display:flex;align-items:center;justify-content:space-between;min-height:56px}
+.hdr-info h6{margin:0;font-size:.68rem;color:#666;font-weight:800;text-transform:uppercase;letter-spacing:.05em}.hdr-info .cli{font-size:.92rem;font-weight:800;color:#333}
+.hdr-btn{min-width:48px;min-height:48px;border-radius:12px;background:rgba(0,0,0,.05);border:none;color:#333;font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.hdr-btn:active{background:rgba(0,0,0,.1)}
+.hdr-btn.hist{background:rgba(0,0,0,0.05); border: 1.5px solid rgba(0,0,0,0.1)}
 
 /* ── BUSCADOR STICKY ── */
 .srch{position:sticky;top:56px;z-index:150;background:var(--card);border-bottom:1px solid var(--border);padding:8px 12px}
@@ -36,7 +38,7 @@ html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,'Seg
 .item-price{font-size:.88rem;color:var(--blue);font-weight:800}
 .item-tag{font-size:.55rem;background:linear-gradient(90deg,var(--blue),#0070b8);color:#fff;border-radius:99px;padding:2px 6px;font-weight:700}
 .item-actions{display:flex;align-items:center;gap:5px;flex-shrink:0}
-.qty-in{width:48px;height:48px;border:2px solid var(--border);border-radius:12px;text-align:center;font-weight:800;font-size:1rem;background:var(--bg);color:var(--text);outline:none;-moz-appearance:textfield}
+.qty-in{width:48px;height:48px;border:2px solid var(--border);border-radius:12px;text-align:center;font-weight:800;font-size:1rem;background:var(--bg);color:var(--text);outline:none;appearance:textfield;-moz-appearance:textfield}
 .qty-in::-webkit-inner-spin-button,.qty-in::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .qty-in:focus{border-color:var(--blue);background:#fff}
 .btn-add{min-width:48px;height:48px;border-radius:12px;background:var(--blue);color:#fff;border:none;font-size:1.15rem;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;font-weight:700}
@@ -80,8 +82,8 @@ html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,'Seg
 .ci{display:flex !important;justify-content:space-between !important;align-items:center !important;padding:10px 0 !important;border-bottom:1px solid #eee !important;min-height:50px;background:transparent !important}
 .ci:nth-child(even){background:rgba(0,0,0,0.02) !important}
 .ci:last-child{border-bottom:none !important}
-.ci-name{max-width:60% !important;font-size:.85rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.2}
-.ci-qty{width:48px;height:40px;border:1.5px solid var(--border);border-radius:10px;text-align:center;font-weight:800;font-size:.9rem;outline:none;-moz-appearance:textfield;background:var(--bg)}
+.ci-name{max-width:60% !important;font-size:.85rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.2}
+.ci-qty{width:48px;height:40px;border:1.5px solid var(--border);border-radius:10px;text-align:center;font-weight:800;font-size:.9rem;outline:none;appearance:textfield;-moz-appearance:textfield;background:var(--bg)}
 .ci-qty::-webkit-inner-spin-button,.ci-qty::-webkit-outer-spin-button{-webkit-appearance:none}
 .ci-qty:focus{border-color:var(--blue);background:#fff}
 .ci-sub{font-size:.9rem;font-weight:800;color:var(--blue);white-space:nowrap;min-width:70px;text-align:right}
@@ -104,296 +106,140 @@ html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,'Seg
     <div class="cli" id="cliBanner"><i class="bi bi-person-circle"></i> Seleccioná un cliente</div>
   </div>
   <div style="display:flex; gap:8px">
-    <button class="hdr-btn hist" onclick="abrirHist()" title="Historial"><i class="bi bi-clock-history"></i></button>
-    <button class="hdr-btn" onclick="abrirClientes()" aria-label="Cambiar cliente"><i class="bi bi-people-fill"></i></button>
+    <button class="hdr-btn hist" id="btnAbrirHist" title="Historial"><i class="bi bi-clock-history"></i></button>
+    <button class="hdr-btn" id="btnAbrirCli" aria-label="Cambiar cliente"><i class="bi bi-people-fill"></i></button>
     <a href="{{ url_for('logout') }}" class="hdr-btn" style="color:#ff6b6b; font-size:1.2rem" title="Cerrar Sesión"><i class="bi bi-box-arrow-right"></i></a>
   </div>
 </div>
+<!-- OFFLINE INDICATOR -->
+<div id="offline-indicator" class="badge bg-success" style="width:100%; border-radius:0; padding:6px; font-size:0.7rem; font-weight:700;">
+  <i class="bi bi-wifi"></i> Conectado
+</div>
 
-<!-- BUSCADOR -->
-<div class="srch">
-  <div class="srch-wrap">
+<!-- BUSCADOR Y LISTA DE PRECIOS -->
+<div class="srch" style="display:flex; gap:8px; align-items:center">
+  <div class="srch-wrap" style="flex:1">
     <i class="bi bi-search"></i>
-    <input type="search" id="buscProd" placeholder="Buscar producto..." oninput="filtrar(this.value)" inputmode="search">
+    <input type="search" id="buscProd" placeholder="Buscar producto..." inputmode="search">
   </div>
+  <select id="selLista" style="width:90px; height:48px; border-radius:12px; border:1.5px solid var(--border); background:var(--bg); font-weight:800; font-size:.8rem; padding:0 5px; outline:none">
+    <option value="1" selected>Lista 1</option>
+    <option value="2">Lista 2</option>
+    <option value="3">Lista 3</option>
+  </select>
 </div>
 
 <!-- LISTA -->
 <div class="list" id="grid"></div>
 
 <!-- FAB CARRITO (WhatsApp) -->
-<button class="fab" id="fab" onclick="abrirCart()">
+<button class="fab" id="fab">
   <i class="bi bi-whatsapp" style="font-size:1.2rem"></i>
   Enviar pedido
   <span class="badge" id="fabN">0</span>
 </button>
 
 <!-- FAB VER CARRITO -->
-<button class="fab-secondary" id="fabCart" onclick="abrirCart()">
+<button class="fab-secondary" id="fabCart">
   <i class="bi bi-cart3"></i>
   <span id="fabT">$0</span>
 </button>
 
 <!-- MODAL CLIENTES (Bottom Sheet) -->
-<div class="overlay" id="cliOverlay" onclick="if(event.target===this&&cli)cerrarClientes()">
+<div class="overlay" id="cliOverlay">
   <div class="sheet">
     <div class="sheet-hdr">
       <h6><i class="bi bi-person-check" style="color:var(--blue)"></i> Elegir cliente</h6>
-      <button class="hdr-btn" style="min-width:40px;min-height:40px;background:var(--bg);color:var(--text);font-size:.9rem" onclick="if(cli)cerrarClientes()" id="btnCerrarCli"><i class="bi bi-x-lg"></i></button>
+      <button class="hdr-btn" id="btnCerrarCli" style="min-width:40px;min-height:40px;background:var(--bg);color:var(--text);font-size:.9rem"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="sheet-body">
-      <input type="search" class="cli-search" id="buscCli" placeholder="Buscar cliente..." oninput="buscarCli(this.value)" inputmode="search">
+      <input type="search" class="cli-search" id="buscCli" placeholder="Buscar cliente..." inputmode="search">
       <div id="listaCli"></div>
-      <div class="new-cli">
-        <strong style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:6px">➕ Registrar nuevo cliente</strong>
-        <input type="text" id="ncNom" placeholder="Nombre del cliente *">
-        <input type="tel" id="ncTel" placeholder="Teléfono (opcional)" inputmode="tel">
-        <input type="text" id="ncDir" placeholder="Dirección (opcional)">
-        <button onclick="crearCli()"><i class="bi bi-person-plus me-1"></i>Crear y Seleccionar</button>
+      <div class="new-cli" style="background:#fff; border:1px solid var(--border); box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-top:20px;">
+        <h6 style="font-weight:800; margin-bottom:15px; color:var(--dark); display:flex; align-items:center; gap:8px;">
+          <i class="bi bi-person-plus-fill text-primary"></i> Registrar Nuevo Cliente
+        </h6>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div>
+            <label style="font-size:0.65rem; font-weight:800; color:var(--muted); text-transform:uppercase; margin-left:5px;">Nombre / Razón Social *</label>
+            <input type="text" id="ncNom" name="nombre" placeholder="Ej: Juan Pérez" style="margin-bottom:0;" required>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <div style="flex:1;">
+              <label style="font-size:0.65rem; font-weight:800; color:var(--muted); text-transform:uppercase; margin-left:5px;">Teléfono</label>
+              <input type="tel" id="ncTel" name="telefono" placeholder="381..." style="margin-bottom:0;">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:0.65rem; font-weight:800; color:var(--muted); text-transform:uppercase; margin-left:5px;">CUIT / DNI</label>
+              <input type="text" id="ncCuit" name="cuit" placeholder="20-..." style="margin-bottom:0;">
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size:0.65rem; font-weight:800; color:var(--muted); text-transform:uppercase; margin-left:5px;">Dirección</label>
+            <input type="text" id="ncDir" name="direccion" placeholder="Calle 123..." style="margin-bottom:0;">
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-end;">
+            <div style="flex:1;">
+              <label style="font-size:0.65rem; font-weight:800; color:var(--muted); text-transform:uppercase; margin-left:5px;">Condición IVA</label>
+              <select id="ncIva" name="condicion_iva" style="width:100%; border:2px solid var(--border); border-radius:12px; padding:11px 12px; font-size:.88rem; outline:none; background:#fff; height:48px;">
+                <option value="Consumidor Final">Consumidor Final</option>
+                <option value="Responsable Inscripto">Responsable Inscripto</option>
+                <option value="Monotributo">Monotributo</option>
+                <option value="Exento">Exento</option>
+              </select>
+            </div>
+            <div style="width:100px;">
+              <label style="font-size:0.65rem; font-weight:800; color:var(--muted); text-transform:uppercase; margin-left:5px;">Dcto %</label>
+              <input type="number" id="ncDesc" name="descuento_fijo" value="0" min="0" max="100" style="margin-bottom:0; font-weight:800; color:var(--blue); text-align:center;">
+            </div>
+          </div>
+          <button id="btnCrearCli" style="background:var(--blue); margin-top:10px; height:54px; font-size:1rem; letter-spacing:0.5px;">
+            <i class="bi bi-check-circle-fill me-2"></i> GUARDAR Y SELECCIONAR
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <!-- PANEL CARRITO (Bottom Sheet) -->
-<div class="cart-overlay" id="cartOvl" onclick="if(event.target===this)cerrarCart()"></div>
+<div class="cart-overlay" id="cartOvl"></div>
 <div class="cart-panel" id="cartPanel">
   <div class="cart-hdr" style="position: relative;">
     <h6 style="margin: 0;"><i class="bi bi-cart3"></i> Resumen de Venta</h6>
-    <button class="hdr-btn" style="position: absolute; right: 10px; top: 8px; min-width:40px;min-height:40px;background:var(--bg);color:var(--text);font-size:.9rem" onclick="cerrarCart()"><i class="bi bi-x-lg"></i></button>
+    <button class="hdr-btn" id="btnCerrarCart" style="position: absolute; right: 10px; top: 8px; min-width:40px;min-height:40px;background:var(--bg);color:var(--text);font-size:.9rem"><i class="bi bi-x-lg"></i></button>
   </div>
   <div class="cart-body" id="cartB"></div>
   <div class="cart-footer" id="cartF"></div>
 </div>
 
 <!-- PANEL HISTORIAL -->
-<div class="cart-overlay" id="histOvl" onclick="cerrarHist()"></div>
+<div class="cart-overlay" id="histOvl"></div>
 <div class="cart-panel" id="histPanel">
   <div class="cart-hdr" style="position: relative;">
     <h6 style="margin: 0;"><i class="bi bi-clock-history"></i> Historial de Ventas</h6>
-    <button class="hdr-btn" style="position: absolute; right: 10px; top: 8px; min-width:40px;min-height:40px;background:var(--bg);color:var(--text);font-size:.9rem" onclick="cerrarHist()"><i class="bi bi-x-lg"></i></button>
+    <button class="hdr-btn" id="btnCerrarHist" style="position: absolute; right: 10px; top: 8px; min-width:40px;min-height:40px;background:var(--bg);color:var(--text);font-size:.9rem"><i class="bi bi-x-lg"></i></button>
   </div>
   <div class="px-3 pt-3">
-    <input type="search" class="cli-search" id="buscHist" placeholder="Buscar por cliente..." oninput="cargarHist(this.value)" inputmode="search">
+    <input type="search" class="cli-search" id="buscHist" placeholder="Buscar por cliente..." inputmode="search">
   </div>
   <div class="cart-body" id="histB"></div>
 </div>
 
 <!-- PANEL DETALLE VENTA (Ticket) -->
-<div class="cart-overlay" id="detOvl" onclick="cerrarDetalle()"></div>
+<div class="cart-overlay" id="detOvl"></div>
 <div class="cart-panel" id="detPanel">
   <div class="cart-hdr" style="position: relative;">
     <h6 style="margin: 0;"><i class="bi bi-receipt"></i> Detalle de Venta</h6>
-    <button class="hdr-btn" style="position: absolute; right: 10px; top: 8px; min-width:40px;min-height:40px;background:var(--bg);color:var(--text);font-size:.9rem" onclick="cerrarDetalle()"><i class="bi bi-x-lg"></i></button>
+    <button class="hdr-btn" id="btnCerrarDet" style="position: absolute; right: 10px; top: 8px; min-width:40px;min-height:40px;background:var(--bg);color:var(--text);font-size:.9rem"><i class="bi bi-x-lg"></i></button>
   </div>
   <div class="cart-body" id="detB"></div>
   <div class="cart-footer">
-    <button class="btn-clear" onclick="cerrarDetalle()" style="background:var(--blue); color:#fff; border:none">Cerrar</button>
+    <button class="btn-clear" id="btnCerrarDetalle" style="background:var(--blue); color:#fff; border:none">Cerrar</button>
   </div>
 </div>
 
-<script>
-let prods=[],cart=[],cli=null;
-
-document.addEventListener('DOMContentLoaded',()=>{
-  abrirClientes();buscarCli('');fetchProds();
-});
-
-// ═══ CLIENTES ═══
-function abrirClientes(){document.getElementById('cliOverlay').classList.add('show');document.getElementById('buscCli').focus()}
-function cerrarClientes(){document.getElementById('cliOverlay').classList.remove('show')}
-
-async function buscarCli(q){
-  try{
-    const r=await fetch('/api/clientes?q='+encodeURIComponent(q));const d=await r.json();
-    const el=document.getElementById('listaCli');
-    if(!d.clientes?.length){el.innerHTML='<div class="empty">Sin resultados. Creá un cliente nuevo abajo 👇</div>';return}
-    el.innerHTML=d.clientes.map(c=>{
-      const ini=c.nombre.charAt(0).toUpperCase();
-      return `<div class="cli-item" onclick="selCli(${c.id},\`${c.nombre.replace(/`/g,'')}\`,\`${(c.telefono||'').replace(/`/g,'')}\`)">
-        <div class="avatar">${ini}</div>
-        <div class="cli-item-info"><strong>${c.nombre}</strong>${c.telefono?`<small><i class="bi bi-telephone"></i> ${c.telefono}</small>`:''}</div>
-      </div>`}).join('');
-  }catch(e){console.error(e)}
-}
-
-function selCli(id,n,t){
-  cli={id,nombre:n,telefono:t};
-  document.getElementById('cliBanner').innerHTML=`<i class="bi bi-person-check-fill"></i> Vendiendo a: <strong>${n}</strong>`;
-  cerrarClientes();renderGrid(prods);
-}
-
-async function crearCli(){
-  const n=document.getElementById('ncNom').value.trim();
-  if(!n){alert('Ingresá el nombre del cliente');return}
-  const body={nombre:n,telefono:document.getElementById('ncTel').value.trim(),direccion:document.getElementById('ncDir').value.trim()};
-  const r=await fetch('/api/clientes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const d=await r.json();
-  if(d.ok){selCli(d.cliente.id,d.cliente.nombre,d.cliente.telefono);['ncNom','ncTel','ncDir'].forEach(x=>document.getElementById(x).value='')}
-}
-
-// ═══ PRODUCTOS ═══
-async function fetchProds(){
-  try{const r=await fetch('/api/productos');const d=await r.json();prods=d.productos||[]}catch(e){prods=[]}
-  renderGrid(prods);
-}
-
-function filtrar(q){q=q.toLowerCase().trim();renderGrid(prods.filter(p=>p.nombre.toLowerCase().includes(q)||(p.descripcion||'').toLowerCase().includes(q)))}
-
-function renderGrid(list){
-  const g=document.getElementById('grid');
-  if(!list.length){g.innerHTML='<div class="empty">🔍 Sin productos</div>';return}
-  g.innerHTML=list.map(p=>{
-    const img=(p.imagen&&(p.imagen.startsWith('http')||p.imagen.startsWith('/static/')))?`<img src="${p.imagen}" onerror="this.parentElement.textContent='🍬'">`:'🍬';
-    const pr=Number(p.precio).toLocaleString('es-AR');
-    const tag=(p.descuento_volumen_activo&&p.cantidad_minima_descuento&&p.porcentaje_descuento_volumen)?`<span class="item-tag">x${p.cantidad_minima_descuento}+ → ${Math.round(p.porcentaje_descuento_volumen)}%</span>`:'';
-    const off=(p.stock<=0&&!p.permitir_sin_stock);const dis=(!cli||off)?'disabled':'';
-    return `<div class="item">
-      <div class="item-img">${img}</div>
-      <div class="item-body">
-        <span class="item-cat">${p.categoria||''}</span>
-        <p class="item-name">${p.nombre}</p>
-        <div class="item-meta"><span class="item-price">$${pr}</span>${tag}</div>
-      </div>
-      <div class="item-actions">
-        <input type="number" class="qty-in" value="1" min="1" ${(!p.permitir_sin_stock&&p.stock>0)?`max="${p.stock}"`:''}inputmode="numeric" pattern="[0-9]*" id="qi${p.id}" ${dis}>
-        <button class="btn-add" id="qb${p.id}" ${dis} onclick="agregar(${p.id},\`${p.nombre.replace(/`/g,'')}\`,${p.precio},${p.stock||0},${p.permitir_sin_stock?1:0},${p.descuento_volumen_activo?1:0},${p.cantidad_minima_descuento||0},${p.porcentaje_descuento_volumen||0})" aria-label="Agregar">
-          ${off?'<i class="bi bi-x-lg"></i>':'<i class="bi bi-plus-lg"></i>'}
-        </button>
-      </div>
-    </div>`}).join('');
-}
-
-// ═══ CARRITO ═══
-function ep(i){return(i.da&&i.dm&&i.dp&&i.qty>=i.dm)?i.price*(1-i.dp/100):i.price}
-
-function agregar(id,name,price,stock,pss,da,dm,dp){
-  if(!cli){abrirClientes();return}
-  const inp=document.getElementById('qi'+id);const qty=Math.max(1,parseInt(inp?.value)||1);
-  const ex=cart.find(x=>x.id===id);
-  if(ex){ex.qty+=qty}else{cart.push({id,name,price,stock,pss:!!pss,da:!!da,dm,dp,qty})}
-  if(inp)inp.value=1;
-  const b=document.getElementById('qb'+id);
-  if(b){b.innerHTML='<i class="bi bi-check-lg"></i>';b.classList.add('ok');setTimeout(()=>{b.innerHTML='<i class="bi bi-plus-lg"></i>';b.classList.remove('ok')},1000)}
-  updFab();
-}
-
-function setQ(id,v){const i=cart.find(x=>x.id===id);if(!i)return;v=parseInt(v);if(isNaN(v)||v<1)return;i.qty=v;updFab();updCartPrices()}
-function del(id){cart=cart.filter(x=>x.id!==id);updFab();renderCart()}
-function vaciar(){if(!confirm('¿Vaciar pedido?'))return;cart=[];updFab();renderCart()}
-
-function updFab(){
-  const tot=cart.reduce((a,p)=>a+ep(p)*p.qty,0);const n=cart.reduce((a,p)=>a+p.qty,0);
-  const fab=document.getElementById('fab'),fc=document.getElementById('fabCart');
-  if(!cart.length){fab.style.display='none';fc.style.display='none';return}
-  fab.style.display='flex';fc.style.display='flex';
-  document.getElementById('fabN').textContent=n;
-  document.getElementById('fabT').textContent='$'+tot.toLocaleString('es-AR');
-}
-
-function abrirCart(){renderCart();document.getElementById('cartOvl').classList.add('show');document.getElementById('cartPanel').classList.add('show')}
-function cerrarCart(){document.getElementById('cartOvl').classList.remove('show');document.getElementById('cartPanel').classList.remove('show')}
-
-function renderCart(){
-  const b=document.getElementById('cartB'),f=document.getElementById('cartF');
-  if(!cart.length){b.innerHTML='<div class="empty">Pedido vacío</div>';f.innerHTML='';return}
-  const tot=cart.reduce((a,p)=>a+ep(p)*p.qty,0);
-  b.innerHTML=cart.map(p=>{
-    const s=(ep(p)*p.qty).toLocaleString('es-AR');
-    const dc=(p.da&&p.dm&&p.dp&&p.qty>=p.dm)?`<span class="desc-badge">🎉${Math.round(p.dp)}%</span>`:'';
-    return `<div class="ci">
-      <div style="max-width:60%; flex-shrink:0;">
-        <span class="ci-name">${p.name}${dc}</span>
-      </div>
-      <div style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-end;">
-        <div style="display:flex; align-items:center; gap:2px">
-          <small class="text-muted" style="font-weight:700">x</small>
-          <input type="number" class="ci-qty" value="${p.qty}" min="1" inputmode="numeric" pattern="[0-9]*" id="cq${p.id}" oninput="setQ(${p.id},this.value)" onblur="if(!this.value||this.value<1){this.value=1;setQ(${p.id},1)}" style="width:40px; height:35px;">
-        </div>
-        <span class="ci-sub" id="cs${p.id}" style="font-size:0.85rem; font-weight:800; min-width:65px; text-align:right;">$${s}</span>
-        <button class="ci-del" onclick="del(${p.id})" aria-label="Eliminar" style="min-width:35px; height:35px;"><i class="bi bi-trash3" style="font-size:0.9rem"></i></button>
-      </div>
-    </div>`
-  }).join('');
-  f.innerHTML=`<div class="total-box">
-      <span style="font-weight:700;font-size:1rem;color:var(--dark)">Total del Pedido</span>
-      <span style="font-weight:900;font-size:1.4rem;color:var(--blue)" id="cartTot">$${tot.toLocaleString('es-AR')}</span>
-    </div>
-    <button class="btn-wsp" onclick="finalizar()"><i class="bi bi-whatsapp" style="font-size:1.2rem"></i>Finalizar y enviar por WhatsApp</button>
-    <button class="btn-clear" onclick="vaciar()">Vaciar pedido</button>`;
-}
-
-function updCartPrices(){
-  cart.forEach(p=>{const el=document.getElementById('cs'+p.id);if(el)el.textContent='$'+(ep(p)*p.qty).toLocaleString('es-AR')});
-  const tot=cart.reduce((a,p)=>a+ep(p)*p.qty,0);
-  const tEl=document.getElementById('cartTot');if(tEl)tEl.textContent='$'+tot.toLocaleString('es-AR');
-}
-
-async function finalizar(){
-  if(!cli){alert('Seleccioná un cliente');return}if(!cart.length){alert('Pedido vacío');return}
-  const tot=cart.reduce((a,p)=>a+ep(p)*p.qty,0);
-  const det=cart.map(p=>({nombre:p.name,qty:p.qty,precio_unit:ep(p),subtotal:ep(p)*p.qty}));
-  try{await fetch('/api/registrar_venta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cliente_id:cli.id,items:cart.map(p=>({id:p.id,qty:p.qty})),total:tot,detalle:det})})}catch(e){console.error(e)}
-  const lineas=cart.map(p=>{const s=(ep(p)*p.qty).toLocaleString('es-AR');const di=(p.da&&p.dm&&p.dp&&p.qty>=p.dm)?` 🎉${Math.round(p.dp)}%desc.`:'';return `• ${p.name} x${p.qty}${di} → $${s}`}).join('\n');
-  const msg=`🍬 *Todo Golosina — Pedido*\n👤 Cliente: *${cli.nombre}*\n\n${lineas}\n\n💰 *Total: $${tot.toLocaleString('es-AR')}*\n\n¡Gracias! 😊`;
-  const ph=cli.telefono?cli.telefono.replace(/\D/g,''):'543865860093';
-  const url=`https://wa.me/${ph.startsWith('54')?ph:'54'+ph}?text=${encodeURIComponent(msg)}`;
-  cart=[];updFab();cerrarCart();window.open(url,'_blank');
-}
-
-// ═══ HISTORIAL ═══
-function abrirHist(){cargarHist();document.getElementById('histOvl').classList.add('show');document.getElementById('histPanel').classList.add('show')}
-function cerrarHist(){document.getElementById('histOvl').classList.remove('show');document.getElementById('histPanel').classList.remove('show')}
-
-async function cargarHist(q=''){
-  const b=document.getElementById('histB');
-  b.innerHTML='<div class="empty">Cargando...</div>';
-  try{
-    const r=await fetch(`/api/ventas?q=${encodeURIComponent(q)}`);const d=await r.json();
-    if(!d.ventas?.length){b.innerHTML='<div class="empty">No hay ventas registradas</div>';return}
-    b.innerHTML=d.ventas.map(v=>`
-      <div class="ci" onclick='verDetalle(${JSON.stringify(v).replace(/'/g,"&#39;")})' style="cursor:pointer">
-        <div style="flex:1; min-width:0; padding-right:10px">
-          <small class="text-muted d-block" style="font-size:0.65rem">${v.fecha}</small>
-          <span class="ci-name" style="display:block; font-size:0.9rem">${v.cliente_nombre}</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:8px">
-          <span style="font-weight:800; color:var(--blue)">$${v.total.toLocaleString('es-AR')}</span>
-          <i class="bi bi-chevron-right text-muted"></i>
-        </div>
-      </div>`).join('');
-  }catch(e){b.innerHTML='<div class="empty text-danger">Error al cargar historial</div>'}
-}
-
-function verDetalle(v){
-  const b=document.getElementById('detB');
-  const itemsHtml=(v.detalle||[]).map(i=>`
-    <div class="ci">
-      <div style="max-width:70%; flex-shrink:0;">
-        <span class="ci-name" style="font-size:0.8rem">${i.nombre}</span>
-      </div>
-      <div style="display:flex; align-items:center; gap:10px; flex:1; justify-content:flex-end;">
-        <small class="text-muted">x${i.qty}</small>
-        <span style="font-size:0.8rem; font-weight:700">$${(i.subtotal||0).toLocaleString('es-AR')}</span>
-      </div>
-    </div>`).join('');
-    
-  b.innerHTML=`
-    <div style="padding:10px 0; border-bottom:2px dashed var(--border); margin-bottom:10px">
-      <h6 style="margin:0; font-weight:800">${v.cliente_nombre}</h6>
-      <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>${v.fecha}</small>
-    </div>
-    <div style="margin-bottom:20px">${itemsHtml}</div>
-    <div class="total-box">
-      <span style="font-weight:700">Total Venta</span>
-      <span style="font-weight:900; font-size:1.3rem; color:var(--blue)">$${v.total.toLocaleString('es-AR')}</span>
-    </div>`;
-    
-  document.getElementById('detOvl').classList.add('show');
-  document.getElementById('detPanel').classList.add('show');
-}
-function cerrarDetalle(){document.getElementById('detOvl').classList.remove('show');document.getElementById('detPanel').classList.remove('show')}
-
-</script>
+<script src="/static/js/app-preventa.js?v=1.0.2"></script>
 </body>
 </html>

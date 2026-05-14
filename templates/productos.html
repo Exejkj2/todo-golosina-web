@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Productos — Todo Golosina 🍬</title>
   <meta name="description" content="Catálogo completo de golosinas: gummies, chocolates, chupetines, marshmallows y más."/>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&family=Outfit:wght@300;400;500;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
@@ -25,7 +24,7 @@
 <body>
 
 <!-- ===== NAVBAR ===== -->
-<nav class="navbar navbar-expand-lg tg-navbar fixed-top" id="mainNavbar">
+<nav class="navbar navbar-expand-lg tg-navbar sticky-top" id="mainNavbar">
   <div class="container">
     <a class="navbar-brand tg-brand" href="{{ url_for('index') }}">
       <span class="tg-brand-icon">🍬</span>
@@ -44,7 +43,7 @@
       <ul class="navbar-nav mx-auto gap-lg-1">
         <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('index') }}"><i class="bi bi-house-heart me-1"></i>Inicio</a></li>
         <li class="nav-item"><a class="nav-link tg-nav-link active" href="{{ url_for('productos') }}"><i class="bi bi-grid-3x3-gap me-1"></i>Productos</a></li>
-        <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('nosotros') }}"><i class="bi bi-people-fill me-1"></i>Quiénes Somos</a></li>
+
         <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('contacto') }}"><i class="bi bi-chat-heart me-1"></i>Contacto</a></li>
       </ul>
       <div class="d-none d-lg-flex align-items-center gap-3">
@@ -134,7 +133,37 @@
     </div>
 
     <!-- Cards grid -->
-    <div class="row g-4" id="productsGrid"></div>
+    <div class="row g-4" id="productsGrid">
+      {% if productos %}
+        {% for producto in productos %}
+        <div class="col-sm-6 col-lg-4 col-xl-3 tg-product-item" data-categoria="{{ producto.categoria_rel.nombre if producto.categoria_rel else 'General' }}">
+          <div class="tg-product-card h-100 bg-white border-0 shadow-sm p-3">
+            <div class="tg-product-img-wrap mb-3" style="aspect-ratio: 1; border-radius: 20px; overflow: hidden;">
+              <img src="{{ producto.imagen_url or '/static/img/placeholder.png' }}" 
+                   class="img-fluid w-100 h-100 object-fit-cover" 
+                   alt="{{ producto.nombre }}"
+                   onerror="this.src='https://placehold.co/400x400?text=Todo+Golosina'">
+            </div>
+            <h6 class="fw-bold mb-1 text-dark text-capitalize" style="font-family: 'Montserrat', sans-serif;">{{ producto.nombre.lower() }}</h6>
+            <p class="text-muted small mb-3 text-capitalize">{{ (producto.categoria_rel.nombre if producto.categoria_rel else 'General').lower() }}</p>
+            <div class="d-flex justify-content-between align-items-center mt-auto">
+              <span class="tg-price fw-bold text-pink">${{ "%.2f"|format(producto.precio_lista_1) }}</span>
+              <button class="btn btn-add-modern" 
+                      onclick='addToCart({{ producto.id }}, {{ producto.nombre|tojson }}, {{ producto.precio_lista_1 }}, {{ (producto.imagen_url or "")|tojson }})'>
+                <i class="bi bi-plus-lg"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="col-12 text-center py-5">
+          <div class="display-1 mb-4">🍭</div>
+          <h3 class="fw-bold text-dark">Cargando las dulzuras...</h3>
+          <p class="text-muted">No se encontraron productos disponibles en este momento.</p>
+        </div>
+      {% endif %}
+    </div>
   </div>
 </section>
 
@@ -145,40 +174,31 @@
 </div>
 
 <!-- ===== FOOTER ===== -->
-<footer class="tg-footer mt-auto">
+<footer class="tg-footer mt-auto py-5">
   <div class="container">
-    <div class="row gy-4 py-5">
-      <div class="col-lg-4 col-md-6">
-        <a href="{{ url_for('index') }}" class="tg-brand d-inline-flex align-items-center gap-2 mb-3 text-decoration-none">
-          <span class="tg-brand-icon">🍬</span>
-          <span class="tg-brand-name">Todo Golosina</span>
+    <div class="row gy-4 text-center text-md-start">
+      <div class="col-md-4">
+        <h3 class="fw-bold mb-3">Todo Golosina</h3>
+        <p class="mb-0">Dulzura en cada momento</p>
+      </div>
+      <div class="col-md-4">
+        <h5 class="fw-bold mb-3">Links Rápidos</h5>
+        <ul class="list-unstyled">
+          <li class="mb-2"><a href="{{ url_for('index') }}" class="text-decoration-none text-white-50">Inicio</a></li>
+          <li class="mb-2"><a href="{{ url_for('productos') }}" class="text-decoration-none text-white-50">Productos</a></li>
+          <li class="mb-2"><a href="{{ url_for('contacto') }}" class="text-decoration-none text-white-50">Contacto</a></li>
+        </ul>
+      </div>
+      <div class="col-md-4">
+        <h5 class="fw-bold mb-3">Contacto</h5>
+        <p class="mb-2">Alberdi 950, Aguilares</p>
+        <a href="https://wa.me/5493865000000" class="text-decoration-none text-white-50" target="_blank">
+          <i class="bi bi-whatsapp me-2"></i>WhatsApp
         </a>
-        <p class="tg-text-muted small">La tienda de golosinas más dulce de Argentina.</p>
-        <div class="d-flex gap-3 mt-3">
-          <a href="https://instagram.com/todogolosina" class="tg-social-icon" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
-          <a href="https://wa.me/5491100000000" class="tg-social-icon" aria-label="WhatsApp"><i class="bi bi-whatsapp"></i></a>
-          <a href="mailto:info@todogolosina.com" class="tg-social-icon" aria-label="Email"><i class="bi bi-envelope-heart"></i></a>
-        </div>
-      </div>
-      <div class="col-lg-2 col-md-6 offset-lg-1">
-        <h5 class="tg-footer-heading">Navegación</h5>
-        <ul class="list-unstyled mt-3 d-flex flex-column gap-2">
-          <li><a href="{{ url_for('index') }}" class="tg-footer-link">Inicio</a></li>
-          <li><a href="{{ url_for('productos') }}" class="tg-footer-link">Productos</a></li>
-          <li><a href="{{ url_for('nosotros') }}" class="tg-footer-link">Quiénes Somos</a></li>
-          <li><a href="{{ url_for('contacto') }}" class="tg-footer-link">Contacto</a></li>
-        </ul>
-      </div>
-      <div class="col-lg-3 col-md-6">
-        <h5 class="tg-footer-heading">Contacto</h5>
-        <ul class="list-unstyled mt-3 d-flex flex-column gap-2">
-          <li><a href="https://wa.me/5491100000000" class="tg-footer-link"><i class="bi bi-whatsapp me-1"></i>+54 9 11 0000-0000</a></li>
-          <li><a href="mailto:info@todogolosina.com" class="tg-footer-link"><i class="bi bi-envelope me-1"></i>info@todogolosina.com</a></li>
-        </ul>
       </div>
     </div>
-    <div class="tg-footer-bottom">
-      <p class="mb-0 small tg-text-muted">© 2025 Todo Golosina. Hecho con 🍬 y amor en Argentina.</p>
+    <div class="border-top border-secondary mt-5 pt-4 text-center">
+      <p class="text-muted small mb-0">© 2025 Todo Golosina — Hecho con amor en Tucumán</p>
     </div>
   </div>
 </footer>

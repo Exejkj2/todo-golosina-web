@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{{ producto.nombre }} — Todo Golosina 🍬</title>
   <meta name="description" content="{{ producto.descripcion }}"/>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&family=Outfit:wght@300;400;500;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍬</text></svg>">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
@@ -23,7 +22,7 @@
 <body>
 
 <!-- ===================== NAVBAR ===================== -->
-<nav class="navbar navbar-expand-lg tg-navbar fixed-top" id="mainNavbar">
+<nav class="navbar navbar-expand-lg tg-navbar sticky-top" id="mainNavbar">
   <div class="container">
     <a class="navbar-brand tg-brand" href="{{ url_for('index') }}">
       <span class="tg-brand-icon">🍬</span>
@@ -44,7 +43,7 @@
       <ul class="navbar-nav mx-auto gap-lg-1">
         <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('index') }}"><i class="bi bi-house-heart me-1"></i>Inicio</a></li>
         <li class="nav-item"><a class="nav-link tg-nav-link active" href="{{ url_for('productos') }}"><i class="bi bi-grid-3x3-gap me-1"></i>Productos</a></li>
-        <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('nosotros') }}"><i class="bi bi-people-fill me-1"></i>Quiénes Somos</a></li>
+
         <li class="nav-item"><a class="nav-link tg-nav-link" href="{{ url_for('contacto') }}"><i class="bi bi-chat-heart me-1"></i>Contacto</a></li>
       </ul>
       <div class="d-none d-lg-flex align-items-center gap-3">
@@ -180,35 +179,32 @@
 </section>
 {% endif %}
 
-<!-- ===================== FOOTER DE CONFIANZA ===================== -->
-<footer class="tg-footer" style="background-color: #F5F5F5; border-top: 1px solid rgba(0,0,0,0.1);">
+<!-- ===================== FOOTER ===================== -->
+<footer class="tg-footer mt-auto py-5">
   <div class="container">
-    <div class="row py-5 text-center text-md-start">
-      <div class="col-md-4 mb-4 mb-md-0">
-        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-credit-card me-2"></i>Medios de Pago</h5>
-        <ul class="list-unstyled text-muted small d-flex flex-column gap-2">
-          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Mercado Pago</li>
-          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Transferencia Bancaria</li>
-          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Efectivo</li>
-        </ul>
-      </div>
-      <div class="col-md-4 mb-4 mb-md-0">
-        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-truck me-2"></i>Envíos y Entregas</h5>
-        <p class="text-muted small mb-0">
-          Envíos a domicilio en <strong>Aguilares, Famaillá y Los Ralos</strong>.<br>
-          Retiro por sucursal disponible.
-        </p>
+    <div class="row gy-4 text-center text-md-start">
+      <div class="col-md-4">
+        <h3 class="fw-bold mb-3">Todo Golosina</h3>
+        <p class="mb-0">Dulzura en cada momento</p>
       </div>
       <div class="col-md-4">
-        <h5 class="fw-bold mb-3" style="color: #2D3277;"><i class="bi bi-phone me-2"></i>Seguinos</h5>
-        <div class="d-flex justify-content-center justify-content-md-start gap-3">
-          <a href="#" class="btn btn-outline-secondary rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-instagram"></i></a>
-          <a href="#" class="btn btn-outline-secondary rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-facebook"></i></a>
-        </div>
+        <h5 class="fw-bold mb-3">Links Rápidos</h5>
+        <ul class="list-unstyled">
+          <li class="mb-2"><a href="{{ url_for('index') }}" class="text-decoration-none text-white-50">Inicio</a></li>
+          <li class="mb-2"><a href="{{ url_for('productos') }}" class="text-decoration-none text-white-50">Productos</a></li>
+          <li class="mb-2"><a href="{{ url_for('contacto') }}" class="text-decoration-none text-white-50">Contacto</a></li>
+        </ul>
+      </div>
+      <div class="col-md-4">
+        <h5 class="fw-bold mb-3">Contacto</h5>
+        <p class="mb-2">Alberdi 950, Aguilares</p>
+        <a href="https://wa.me/5493865000000" class="text-decoration-none text-white-50" target="_blank">
+          <i class="bi bi-whatsapp me-2"></i>WhatsApp
+        </a>
       </div>
     </div>
-    <div class="text-center py-3 border-top border-secondary-subtle">
-      <p class="mb-0 small text-muted">© 2026 Todo Golosina. Todos los derechos reservados.</p>
+    <div class="border-top border-secondary mt-5 pt-4 text-center">
+      <p class="text-muted small mb-0">© 2025 Todo Golosina — Hecho con amor en Tucumán</p>
     </div>
   </div>
 </footer>

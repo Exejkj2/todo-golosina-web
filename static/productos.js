@@ -12,6 +12,14 @@ let activeFilter = 'all';
 let activeSort   = 'default';
 let activeSearch = '';         // texto del buscador
 
+/**
+ * Formatea un string a Title Case (Primera letra de cada palabra en Mayúscula)
+ */
+function toTitleCase(str) {
+  if (!str) return "";
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
 // ══════════════════════════════════════════════════════════════
 //  FETCH DESDE LA API
 // ══════════════════════════════════════════════════════════════
@@ -26,10 +34,10 @@ async function fetchProductos() {
     renderProducts();
     await fetchCategorias();    // actualizar filtros según DB
   } catch (err) {
-    console.warn('API no disponible, usando catálogo local.', err);
-    todosLosProductos = FALLBACK_PRODUCTS;
-    renderProducts();
-    mostrarAlertaAPI();
+    console.error('API Error:', err);
+    // todosLosProductos = FALLBACK_PRODUCTS;
+    // renderProducts();
+    // mostrarAlertaAPI();
   }
 }
 
@@ -107,7 +115,8 @@ function renderProducts() {
 function cardHTML(p, i) {
   const emoji    = CATEGORY_ICONS[p.categoria] || '🍬';
   const catLabel = CATEGORY_LABELS[p.categoria] || p.categoria;
-  const precio   = Number(p.precio).toLocaleString('es-AR');
+  const precioLimpio = parseFloat(p.precio.toString().replace(/[^0-9.-]+/g,"")) || 0;
+  const precio = precioLimpio.toFixed(2);
   const stockBadge = p.stock <= 5 && p.stock > 0
     ? `<span class="tg-pc-badge tg-badge--hot">⚠️ Últimas ${p.stock}</span>`
     : p.stock === 0
@@ -122,8 +131,9 @@ function cardHTML(p, i) {
   // Lógica de precio tachado / descuento
   let precioHTML;
   if (p.precio_anterior && p.precio_anterior > p.precio) {
-    const precioAnt = Number(p.precio_anterior).toLocaleString('es-AR');
-    const descPct   = Math.round((p.precio_anterior - p.precio) / p.precio_anterior * 100);
+    const precioAntLimpio = parseFloat(p.precio_anterior.toString().replace(/[^0-9.-]+/g,"")) || 0;
+    const precioAnt = precioAntLimpio.toFixed(2);
+    const descPct   = Math.round((precioAntLimpio - precioLimpio) / precioAntLimpio * 100);
     precioHTML = `
       <span style="text-decoration:line-through; color:#94a3b8; font-size:0.8rem; font-weight:400; display:block;">$${precioAnt}</span>
       <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
@@ -131,7 +141,7 @@ function cardHTML(p, i) {
         <span style="background:#16a34a; color:#fff; font-size:0.65rem; font-weight:700; padding:0.15rem 0.45rem; border-radius:99px; white-space:nowrap;">${descPct}% OFF</span>
       </div>`;
   } else {
-    precioHTML = `$${precio}<small>por unidad</small>`;
+    precioHTML = `$${precio} <small>por unidad</small>`;
   }
 
   // Badge de descuento por volumen / mayorista
@@ -176,11 +186,13 @@ function cardHTML(p, i) {
                 inputmode="numeric"
                 pattern="[0-9]*"
                 aria-label="Cantidad"
+                onfocus="this.select()"
+                onkeydown="if(event.key==='Enter') document.getElementById('btn-${p.id}').click()"
                 ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'disabled' : ''}
               >
               <button class="tg-pc-btn"
                       id="btn-${p.id}"
-                      onclick="handleAddToCart(${p.id}, '${nombre}', ${p.precio}, '${emoji}', '${imgEsc}', ${p.stock}, ${p.permitir_sin_stock ? 'true' : 'false'}, ${p.descuento_volumen_activo ? 'true' : 'false'}, ${p.cantidad_minima_descuento || 'null'}, ${p.porcentaje_descuento_volumen || 'null'}, this)"
+                      onclick="handleAddToCart(${p.id}, '${nombre}', ${precioLimpio}, '${emoji}', '${imgEsc}', ${p.stock}, ${p.permitir_sin_stock ? 'true' : 'false'}, ${p.descuento_volumen_activo ? 'true' : 'false'}, ${p.cantidad_minima_descuento || 'null'}, ${p.porcentaje_descuento_volumen || 'null'}, this)"
                       ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>
                 <i class="bi bi-bag-plus"></i> ${(p.stock <= 0 && !p.permitir_sin_stock) ? 'Agotado' : 'Agregar'}
               </button>
