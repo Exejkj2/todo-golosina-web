@@ -72,6 +72,10 @@
         font-weight: 600;
         text-transform: uppercase;
         font-size: 0.8rem;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
       }
       .table td {
         vertical-align: middle;
@@ -203,7 +207,7 @@
 
         <div class="card card-admin">
           <div class="card-body p-0">
-            <div class="table-responsive">
+            <div class="table-responsive" style="max-height: calc(100vh - 280px); overflow-y: auto;">
               <table id="tabla_productos" class="table table-hover mb-0">
                 <thead>
                   <tr>
@@ -1135,7 +1139,22 @@
           }
         });
       });
-      // --- Live Search (Filtrado en tiempo real) ---
+      // --- Live Search (Filtrado en tiempo real) con Navegación por Teclado ---
+      let filasVisibles = [];
+      let indiceSeleccionado = -1;
+
+      function resaltarFilaSeleccionada() {
+        // Quitar clase de todas las filas
+        document.querySelectorAll('#tabla_productos tbody tr').forEach(f => f.classList.remove('table-active'));
+        
+        if (indiceSeleccionado >= 0 && filasVisibles[indiceSeleccionado]) {
+          const fila = filasVisibles[indiceSeleccionado];
+          fila.classList.add('table-active');
+          // Scroll suave para que la fila sea visible si queda fuera de rango
+          fila.scrollIntoView({ block: 'nearest' });
+        }
+      }
+
       const inputBuscador = document.getElementById('buscador_admin');
       if (inputBuscador) {
         inputBuscador.addEventListener('input', function(e) {
@@ -1143,7 +1162,10 @@
           const filas = document.querySelectorAll('#tabla_productos tbody tr');
           
           filas.forEach(fila => {
-            // Filtramos por el contenido de texto de la fila (Nombre, Código, etc.)
+            // Limpiar selección de todas las filas al filtrar
+            fila.classList.remove('table-active');
+
+            // Filtramos por el contenido de texto de la fila (Nombre y Código están aquí)
             const textoFila = fila.textContent.toLowerCase();
             
             if (textoFila.includes(termino)) {
@@ -1152,9 +1174,49 @@
               fila.style.display = 'none';
             }
           });
+
+          // Resetear estado del buscador
+          indiceSeleccionado = -1;
+          filasVisibles = Array.from(filas).filter(f => f.style.display === '');
         });
 
-        // Prevenir el envío del formulario al presionar Enter para favorecer el filtrado live
+        // Navegación con Teclado (Flechas y Enter)
+        inputBuscador.addEventListener('keydown', function(e) {
+          if (filasVisibles.length === 0) return;
+
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (indiceSeleccionado < filasVisibles.length - 1) {
+              indiceSeleccionado++;
+              resaltarFilaSeleccionada();
+            }
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (indiceSeleccionado > 0) {
+              indiceSeleccionado--;
+              resaltarFilaSeleccionada();
+            }
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            
+            let filaAEditar = null;
+
+            if (filasVisibles.length === 1) {
+              // Lógica 1 (Lector): Si el escaneo filtró una única fila, la abrimos
+              filaAEditar = filasVisibles[0];
+            } else if (indiceSeleccionado >= 0 && filasVisibles[indiceSeleccionado]) {
+              // Lógica 2 (Teclado): Si hay navegación activa, abrimos la resaltada
+              filaAEditar = filasVisibles[indiceSeleccionado];
+            }
+
+            if (filaAEditar) {
+              const btnEditar = filaAEditar.querySelector('button[data-bs-target^="#editModal"]');
+              if (btnEditar) btnEditar.click();
+            }
+          }
+        });
+
+        // Prevenir el envío del formulario al presionar Enter
         const searchForm = inputBuscador.closest('form');
         if (searchForm) {
           searchForm.addEventListener('submit', function(e) {

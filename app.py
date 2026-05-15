@@ -9,8 +9,12 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
 from fpdf import FPDF
-from datetime import datetime, time, date
+from datetime import datetime, time, date, timedelta
 import json
+
+# --- Configuración de Zona Horaria (Argentina UTC-3: Naive approach) ---
+def hora_argentina():
+    return datetime.utcnow() - timedelta(hours=3)
 
 # ─── Configuración ────────────────────────────────────────────
 DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tienda.db')
@@ -151,7 +155,7 @@ class Venta(db.Model):
     __tablename__ = 'ventas'
     id = db.Column(db.Integer, primary_key=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
-    fecha = db.Column(db.DateTime, default=db.func.now())
+    fecha = db.Column(db.DateTime, default=hora_argentina)
     total = db.Column(db.Float, default=0.0)
     detalle_json = db.Column(db.Text, default='[]')
     lista_precios = db.Column(db.Integer, default=1)
@@ -171,7 +175,7 @@ class Gasto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     descripcion = db.Column(db.String(255), nullable=False)
     monto = db.Column(db.Float, nullable=False)
-    fecha = db.Column(db.DateTime, default=db.func.now())
+    fecha = db.Column(db.DateTime, default=hora_argentina)
     categoria = db.Column(db.String(100), default='General')
     tipo = db.Column(db.String(20), default='Egreso') # 'Egreso' o 'Ingreso'
 
@@ -199,7 +203,7 @@ class Gasto(db.Model):
 class CajaDiaria(db.Model):
     __tablename__ = 'cajas_diarias'
     id = db.Column(db.Integer, primary_key=True)
-    fecha_apertura = db.Column(db.DateTime, default=db.func.now())
+    fecha_apertura = db.Column(db.DateTime, default=hora_argentina)
     monto_inicial = db.Column(db.Float, nullable=False)
     monto_final = db.Column(db.Float, nullable=True)
     fecha_cierre = db.Column(db.DateTime, nullable=True)
@@ -476,7 +480,8 @@ def registrar_venta():
             pago_efectivo=p_ef,
             pago_transferencia=p_tr,
             pago_debito=p_db,
-            pago_cc=p_cc
+            pago_cc=p_cc,
+            fecha=hora_argentina()
         )
         db.session.add(venta)
         db.session.commit()
@@ -863,7 +868,7 @@ def cerrar_caja():
     try:
         # Aquí se podrían calcular totales finales y guardarlos si el modelo tuviera esos campos
         caja.estado = 'Cerrada'
-        caja.fecha_cierre = datetime.now()
+        caja.fecha_cierre = hora_argentina()
         db.session.commit()
         return jsonify({"ok": True, "mensaje": "Caja cerrada correctamente"})
     except Exception as e:
