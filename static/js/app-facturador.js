@@ -518,8 +518,17 @@ async function cargarVentasDia() {
   const b = document.getElementById("ventasDiaBody");
   if (!b) return;
   b.innerHTML = '<tr><td colspan="5" class="text-center p-4">Cargando ventas...</td></tr>';
+  
+  let url = "/api/ventas_hoy";
+  const fInicio = document.getElementById("fechaInicio")?.value;
+  const fFin = document.getElementById("fechaFin")?.value;
+  
+  if (fInicio && fFin) {
+      url += `?inicio=${fInicio}&fin=${fFin}`;
+  }
+  
   try {
-    const r = await fetch("/api/ventas_hoy");
+    const r = await fetch(url);
     const d = await r.json();
     if (d.ventas && d.ventas.length > 0) {
       b.innerHTML = d.ventas
@@ -535,7 +544,7 @@ async function cargarVentasDia() {
         </tr>
       `).join("");
     } else {
-      b.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted">No hay ventas hoy</td></tr>';
+      b.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted">No hay ventas registradas en el período seleccionado</td></tr>';
     }
   } catch (e) { b.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-danger">Error al cargar</td></tr>'; }
 }
@@ -1463,6 +1472,14 @@ function setupEventListeners() {
   document.getElementById("btnResetFacturador")?.addEventListener("click", resetFacturador);
   document.getElementById("btnOpenCobro")?.addEventListener("click", openCobro);
   document.getElementById("btnUpdateVentas")?.addEventListener("click", cargarVentasDia);
+  document.getElementById("btnBuscarHistorial")?.addEventListener("click", cargarVentasDia);
+  
+  // Setear fechas por defecto a hoy
+  const hoyStr = new Date().toISOString().split("T")[0];
+  const fInicio = document.getElementById("fechaInicio");
+  const fFin = document.getElementById("fechaFin");
+  if (fInicio) fInicio.value = hoyStr;
+  if (fFin) fFin.value = hoyStr;
   document.getElementById("btnConfirmVenta")?.addEventListener("click", confirmarVenta);
   document.getElementById("btnGasto")?.addEventListener("click", openGastoModal);
   document.getElementById("btnSaveGasto")?.addEventListener("click", saveGasto);
@@ -1476,11 +1493,38 @@ function setupEventListeners() {
     finalizarYLimpiarVenta();
   });
 
-  document.getElementById("btnEnviarWhatsApp")?.addEventListener("click", () => {
+  document.getElementById("btnEnviarWhatsApp")?.addEventListener("click", function(e) {
+    e.preventDefault();
+    let numero = document.getElementById("inputTelefonoCliente")?.value.trim();
+    if (!numero) {
+        alert("Por favor, ingrese el número del cliente.");
+        return;
+    }
+    
+    // Normalizar número para Argentina
+    if (numero.length === 10) {
+        numero = '549' + numero;
+    }
+    
     const tab = getActiveTab();
-    const total = lastVentaTotal || 0;
-    const msg = encodeURIComponent(`Hola ${tab.selectedCliente.nombre}! Tu compra en Todo Golosina fue de $${total.toLocaleString()}. ¡Gracias!`);
-    window.open(`https://wa.me/${tab.selectedCliente.telefono || ''}?text=${msg}`, '_blank');
+    const totalVenta = lastVentaTotal || 0;
+    
+    // Construir el texto del ticket basado en el carrito actual
+    let textoTicket = "*TODO GOLOSINA - Comprobante de Venta* %0A%0A";
+    
+    if (tab && tab.cart) {
+        tab.cart.forEach(item => {
+            const priceFinal = item.price - (item.price * (item.discount || 0) / 100);
+            textoTicket += `- ${item.qty}x ${item.nombre} ($${priceFinal}) %0A`;
+        });
+    }
+    
+    textoTicket += `%0A*TOTAL: $${totalVenta}* %0A%0A¡Gracias por tu compra!`;
+    
+    // Abrir WhatsApp Web o App
+    let url = `https://wa.me/${numero}?text=${textoTicket}`;
+    window.open(url, '_blank');
+    
     finalizarYLimpiarVenta();
   });
 

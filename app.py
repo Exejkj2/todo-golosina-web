@@ -878,15 +878,24 @@ def cerrar_caja():
 @app.route('/api/ventas_hoy', methods=['GET'])
 def get_ventas_hoy():
     try:
-        # Buscamos la fecha de apertura de la caja actual o hoy a las 00:00
+        fecha_inicio_str = request.args.get('inicio')
+        fecha_fin_str = request.args.get('fin')
+        
         caja = CajaDiaria.query.filter_by(estado='Abierta').order_by(CajaDiaria.id.desc()).first()
-        if caja:
-            inicio_rango = caja.fecha_apertura
-        else:
-            inicio_rango = datetime.combine(date.today(), time.min)
 
-        ventas = Venta.query.filter(Venta.fecha >= inicio_rango).order_by(Venta.fecha.desc()).all()
-        gastos = Gasto.query.filter(Gasto.fecha >= inicio_rango).all()
+        if fecha_inicio_str and fecha_fin_str:
+            inicio_rango = datetime.strptime(fecha_inicio_str, '%Y-%m-%d')
+            fin_rango = datetime.strptime(fecha_fin_str + " 23:59:59", '%Y-%m-%d %H:%M:%S')
+            ventas = Venta.query.filter(Venta.fecha >= inicio_rango, Venta.fecha <= fin_rango).order_by(Venta.fecha.desc()).all()
+            gastos = Gasto.query.filter(Gasto.fecha >= inicio_rango, Gasto.fecha <= fin_rango).all()
+        else:
+            if caja:
+                inicio_rango = caja.fecha_apertura
+            else:
+                inicio_rango = datetime.combine(date.today(), time.min)
+
+            ventas = Venta.query.filter(Venta.fecha >= inicio_rango).order_by(Venta.fecha.desc()).all()
+            gastos = Gasto.query.filter(Gasto.fecha >= inicio_rango).all()
         
         m_ef = sum((v.pago_efectivo or 0.0) for v in ventas)
         m_tr = sum((v.pago_transferencia or 0.0) for v in ventas)
