@@ -29,6 +29,7 @@ let postSaleSelectedIndex = 0;
 let editingCustId = null;
 let deudores = [];
 let clienteIdAEliminar = null; // Para el modal de eliminación personalizado
+let isProcessingVenta = false;
 
 // Bootstrap Modal Instances: se instancian on-demand con getOrCreateInstance()
 
@@ -967,121 +968,138 @@ function calcMultiPago() {
   }
 }
 
-async function confirmarVenta() {
-  const tab = getActiveTab();
-  if (!tab || tab.cart.length === 0) return;
+const originalBtnConfirmar = document.getElementById("btnConfirmVenta");
+if (originalBtnConfirmar) {
+  const newBtn = originalBtnConfirmar.cloneNode(true);
+  originalBtnConfirmar.replaceWith(newBtn);
 
-  const subtotalGeneral = tab.cart.reduce((acc, item) => {
-    const nuevoPrecioUnit = item.price - (item.price * ((item.discount || 0) / 100));
-    return acc + (nuevoPrecioUnit * item.qty);
-  }, 0);
-  const montoDescuentoGral = subtotalGeneral * ((tab.generalDiscount || 0) / 100);
-  const tot = Math.max(0, subtotalGeneral - montoDescuentoGral);
-  
-  const ef = parseFloat(document.getElementById("payEf")?.value) || 0;
-  const tr = parseFloat(document.getElementById("payTr")?.value) || 0;
-  const db = parseFloat(document.getElementById("payDb")?.value) || 0;
-  let cc = parseFloat(document.getElementById("payCc")?.value) || 0;
-  
-  // No permitir montos negativos
-  if (ef < 0 || tr < 0 || db < 0 || cc < 0) {
-    Swal.fire({ icon: 'error', title: 'Error', text: 'No se permiten montos negativos.' });
-    return;
-  }
-
-  const sumTotal = ef + tr + db + cc;
-
-  // Lógica de Cuenta Corriente Automática
-  let deudaCC = 0;
-  if (sumTotal < tot) {
-    if (!tab.selectedCliente.id) {
-      // 1. Secuencia de Cierre: Ocultar modal de cobro para evitar solapamientos
-      getModal('cobroModal')?.hide();
-
-      // 2. Alerta de Error con Target y Z-Index de seguridad
-      Swal.fire({
-        icon: 'error',
-        title: '⚠️ Cliente Requerido',
-        text: 'Para vender a cuenta corriente debe identificar al comprador.',
-        target: 'body',
-        confirmButtonColor: '#fe3994'
-      }).then(() => {
-        // 3. Apertura Automática del selector de clientes
-        getModal('custModal')?.show();
-        
-        // 4. Foco automático en el buscador para rapidez UX
-        setTimeout(() => {
-          document.getElementById("custSearchIn")?.focus();
-        }, 500);
-      });
+  newBtn.addEventListener("click", async function(e) {
+    if (e) e.preventDefault();
+    if (isProcessingVenta) {
+      console.log("⚠️ Intento de doble envío bloqueado por estado global.");
       return;
     }
-    deudaCC = tot - sumTotal;
-    cc += deudaCC; // Sumamos la diferencia al pago por cuenta corriente
-  }
+    isProcessingVenta = true;
 
-  const payload = {
-    tipo: "Local",
-    cliente_id: tab.selectedCliente.id,
-    total: tot,
-    items: tab.cart.map((i) => {
-      const nuevoPrecioUnit = i.price - (i.price * ((i.discount || 0) / 100));
-      return { id: i.id, qty: i.qty, discount_perc: i.discount || 0, price_final: nuevoPrecioUnit };
-    }),
-    detalle: tab.cart.map((i) => {
-      const nuevoPrecioUnit = i.price - (i.price * ((i.discount || 0) / 100));
-      return { nombre: i.nombre, qty: i.qty, precio_unit: nuevoPrecioUnit, discount_perc: i.discount || 0, subtotal: nuevoPrecioUnit * i.qty };
-    }),
-    pagos: { efectivo: ef, transferencia: tr, debito: db, cc: cc },
-    general_discount_perc: tab.generalDiscount || 0,
-    general_savings: montoDescuentoGral
-  };
+    try {
+      const tab = getActiveTab();
+      if (!tab || tab.cart.length === 0) return;
 
-  if (!navigator.onLine) {
-    payload.offline = true;
-    payload.fecha = new Date().toISOString();
-    if (typeof queueSale === "function") await queueSale(payload);
-    Swal.fire({ icon: 'info', title: 'Modo Offline', text: 'Venta guardada localmente. Se sincronizará al recuperar conexión.' });
-    getModal('cobroModal')?.hide(); resetFacturador(); return;
-  }
-
-  try {
-    const res = await fetch("/api/registrar_venta", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const d = await res.json();
-    if (d.ok) {
-      getModal('cobroModal')?.hide();
-      lastVentaId = d.venta_id; 
-      lastVentaTotal = tot;
+      const subtotalGeneral = tab.cart.reduce((acc, item) => {
+        const nuevoPrecioUnit = item.price - (item.price * ((item.discount || 0) / 100));
+        return acc + (nuevoPrecioUnit * item.qty);
+      }, 0);
+      const montoDescuentoGral = subtotalGeneral * ((tab.generalDiscount || 0) / 100);
+      const tot = Math.max(0, subtotalGeneral - montoDescuentoGral);
       
-      // Notificación de éxito con detalle de CC si corresponde
-      let successMsg = `Venta por $${tot.toLocaleString()} finalizada.`;
-      if (deudaCC > 0) {
-        successMsg = `✅ Venta completada. $${deudaCC.toLocaleString()} cargados a la cuenta corriente de ${tab.selectedCliente.nombre}.`;
+      const ef = parseFloat(document.getElementById("payEf")?.value) || 0;
+      const tr = parseFloat(document.getElementById("payTr")?.value) || 0;
+      const db = parseFloat(document.getElementById("payDb")?.value) || 0;
+      let cc = parseFloat(document.getElementById("payCc")?.value) || 0;
+      
+      // No permitir montos negativos
+      if (ef < 0 || tr < 0 || db < 0 || cc < 0) {
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se permiten montos negativos.' });
+        return;
       }
 
-      Swal.fire({
-        icon: 'success',
-        title: '¡Venta Exitosa!',
-        text: successMsg,
-        timer: 4000,
-        showConfirmButton: false
-      });
+      const sumTotal = ef + tr + db + cc;
 
-      document.body.style.backgroundColor = "#dcfce7";
-      setTimeout(() => (document.body.style.backgroundColor = ""), 300);
-      
-      // Abrir Modal de Opciones (Restaurado)
-      getModal('modalOpcionesVenta')?.show();
-      
-      cargarDashboard(); 
-    } else { 
-      Swal.fire({ icon: 'error', title: 'Error', text: d.mensaje });
+      // Lógica de Cuenta Corriente Automática
+      let deudaCC = 0;
+      if (sumTotal < tot) {
+        if (!tab.selectedCliente.id) {
+          // 1. Secuencia de Cierre: Ocultar modal de cobro para evitar solapamientos
+          getModal('cobroModal')?.hide();
+
+          // 2. Alerta de Error con Target y Z-Index de seguridad
+          Swal.fire({
+            icon: 'error',
+            title: '⚠️ Cliente Requerido',
+            text: 'Para vender a cuenta corriente debe identificar al comprador.',
+            target: 'body',
+            confirmButtonColor: '#fe3994'
+          }).then(() => {
+            // 3. Apertura Automática del selector de clientes
+            getModal('custModal')?.show();
+            
+            // 4. Foco automático en el buscador para rapidez UX
+            setTimeout(() => {
+              document.getElementById("custSearchIn")?.focus();
+            }, 500);
+          });
+          return;
+        }
+        deudaCC = tot - sumTotal;
+        cc += deudaCC; // Sumamos la diferencia al pago por cuenta corriente
+      }
+
+      const payload = {
+        tipo: "Local",
+        cliente_id: tab.selectedCliente.id,
+        total: tot,
+        items: tab.cart.map((i) => {
+          const nuevoPrecioUnit = i.price - (i.price * ((i.discount || 0) / 100));
+          return { id: i.id, qty: i.qty, discount_perc: i.discount || 0, price_final: nuevoPrecioUnit };
+        }),
+        detalle: tab.cart.map((i) => {
+          const nuevoPrecioUnit = i.price - (i.price * ((i.discount || 0) / 100));
+          return { nombre: i.nombre, qty: i.qty, precio_unit: nuevoPrecioUnit, discount_perc: i.discount || 0, subtotal: nuevoPrecioUnit * i.qty };
+        }),
+        pagos: { efectivo: ef, transferencia: tr, debito: db, cc: cc },
+        general_discount_perc: tab.generalDiscount || 0,
+        general_savings: montoDescuentoGral
+      };
+
+      if (!navigator.onLine) {
+        payload.offline = true;
+        payload.fecha = new Date().toISOString();
+        if (typeof queueSale === "function") await queueSale(payload);
+        Swal.fire({ icon: 'info', title: 'Modo Offline', text: 'Venta guardada localmente. Se sincronizará al recuperar conexión.' });
+        getModal('cobroModal')?.hide(); resetFacturador(); return;
+      }
+
+      const res = await fetch("/api/registrar_venta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        getModal('cobroModal')?.hide();
+        lastVentaId = d.venta_id; 
+        lastVentaTotal = tot;
+        
+        // Notificación de éxito con detalle de CC si corresponde
+        let successMsg = `Venta por $${tot.toLocaleString()} finalizada.`;
+        if (deudaCC > 0) {
+          successMsg = `✅ Venta completada. $${deudaCC.toLocaleString()} cargados a la cuenta corriente de ${tab.selectedCliente.nombre}.`;
+        }
+
+        Swal.fire({
+          icon: 'success',
+          title: '¡Venta Exitosa!',
+          text: successMsg,
+          timer: 4000,
+          showConfirmButton: false
+        });
+
+        document.body.style.backgroundColor = "#dcfce7";
+        setTimeout(() => (document.body.style.backgroundColor = ""), 300);
+        
+        // Abrir Modal de Opciones (Restaurado)
+        getModal('modalOpcionesVenta')?.show();
+        
+        cargarDashboard(); 
+      } else { 
+        Swal.fire({ icon: 'error', title: 'Error', text: d.mensaje });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      isProcessingVenta = false;
     }
-  } catch (e) { console.error(e); }
+  });
 }
 
 // Product Search Modal
@@ -1480,7 +1498,7 @@ function setupEventListeners() {
   const fFin = document.getElementById("fechaFin");
   if (fInicio) fInicio.value = hoyStr;
   if (fFin) fFin.value = hoyStr;
-  document.getElementById("btnConfirmVenta")?.addEventListener("click", confirmarVenta);
+  // confirm sale is attached inline via cloneNode
   document.getElementById("btnGasto")?.addEventListener("click", openGastoModal);
   document.getElementById("btnSaveGasto")?.addEventListener("click", saveGasto);
   document.getElementById("btnSaveNewCust")?.addEventListener("click", saveNewCust);
@@ -1656,7 +1674,7 @@ function setupEventListeners() {
         el.addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
                 e.preventDefault();
-                confirmarVenta();
+                document.getElementById("btnConfirmVenta")?.click();
             }
         });
     }
@@ -1730,7 +1748,7 @@ function handleGlobalShortcuts(e) {
       cobroModalOpen = false;
     } else if (e.key === "Enter") {
       e.preventDefault();
-      confirmarVenta();
+      document.getElementById("btnConfirmVenta")?.click();
     }
     return;
   }

@@ -35,6 +35,7 @@ let lastVentaTotal = 0;
 let postSaleSelectedIndex = 0;
 let editingCustId = null;
 let deudores = [];
+let isProcessingVenta = false;
 
 // Bootstrap Modal Instances
 let modalProductos, cobroModal, custModal, postSaleModal, editCustModal, gastoModal;
@@ -728,51 +729,75 @@ function calcMultiPago() {
   }
 }
 
-async function confirmarVenta() {
-  const tab = getActiveTab();
-  if (!tab || tab.cart.length === 0) return;
-  const tot = tab.cart.reduce((a, b) => a + b.price * b.qty, 0);
-  const ef = parseFloat(document.getElementById("payEf").value) || 0;
-  const tr = parseFloat(document.getElementById("payTr").value) || 0;
-  const db = parseFloat(document.getElementById("payDb").value) || 0;
-  const cc = parseFloat(document.getElementById("payCc").value) || 0;
-  const sumTotal = ef + tr + db + cc;
+const originalBtnConfirmar = document.getElementById("btnConfirmVenta");
+if (originalBtnConfirmar) {
+  // Forzar limpieza absoluta de cualquier evento anterior
+  const newBtn = originalBtnConfirmar.cloneNode(true);
+  originalBtnConfirmar.replaceWith(newBtn);
 
-  if (sumTotal < tot) { Swal.fire("Incompleto", `Faltan $${(tot - sumTotal).toLocaleString()}`, "warning"); return; }
+  newBtn.addEventListener("click", async function(e) {
+    if (e) e.preventDefault();
 
-  const payload = {
-    tipo: "Local",
-    cliente_id: tab.selectedCliente.id,
-    total: tot,
-    items: tab.cart.map((i) => ({ id: i.id, qty: i.qty })),
-    detalle: tab.cart.map((i) => ({ nombre: i.nombre, qty: i.qty, precio_unit: i.price, subtotal: i.price * i.qty })),
-    pagos: { efectivo: ef, transferencia: tr, debito: db, cc: cc }
-  };
+    if (isProcessingVenta) {
+      console.log("⚠️ Intento de doble envío bloqueado por estado global.");
+      return;
+    }
+    isProcessingVenta = true; // Activar escudo
 
-  if (!navigator.onLine) {
-    payload.offline = true;
-    payload.fecha = new Date().toISOString();
-    await queueSale(payload);
-    Swal.fire("Guardado Offline", "Se sincronizará luego.", "success");
-    cobroModal.hide(); resetFacturador(); return;
-  }
+    try {
+      const tab = getActiveTab();
+      if (!tab || tab.cart.length === 0) return;
+      const tot = tab.cart.reduce((a, b) => a + b.price * b.qty, 0);
+      const ef = parseFloat(document.getElementById("payEf").value) || 0;
+      const tr = parseFloat(document.getElementById("payTr").value) || 0;
+      const db = parseFloat(document.getElementById("payDb").value) || 0;
+      const cc = parseFloat(document.getElementById("payCc").value) || 0;
+      const sumTotal = ef + tr + db + cc;
 
-  const res = await fetch("/api/registrar_venta", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+      if (sumTotal < tot) { Swal.fire("Incompleto", `Faltan $${(tot - sumTotal).toLocaleString()}`, "warning"); return; }
+
+      const payload = {
+        tipo: "Local",
+        cliente_id: tab.selectedCliente.id,
+        total: tot,
+        items: [...tab.cart].map((i) => ({ id: i.id, qty: i.qty })),
+        detalle: [...tab.cart].map((i) => ({ nombre: i.nombre, qty: i.qty, precio_unit: i.price, subtotal: i.price * i.qty })),
+        pagos: { efectivo: ef, transferencia: tr, debito: db, cc: cc }
+      };
+
+      // 3. Vaciar el carrito global al instante
+      tab.cart = [];
+      saveTabsToLocal();
+      renderCart();
+
+      if (!navigator.onLine) {
+        payload.offline = true;
+        payload.fecha = new Date().toISOString();
+        await queueSale(payload);
+        Swal.fire("Guardado Offline", "Se sincronizará luego.", "success");
+        cobroModal.hide(); resetFacturador(); return;
+      }
+
+      const res = await fetch("/api/registrar_venta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        cobroModal.hide();
+        lastVentaId = d.venta_id; lastVentaTotal = tot;
+        document.body.style.backgroundColor = "#dcfce7";
+        setTimeout(() => (document.body.style.backgroundColor = ""), 300);
+        document.getElementById("postSaleInfo").textContent = `Venta por $${tot.toLocaleString()}`;
+        document.getElementById("waForm").classList.add("d-none");
+        postSaleSelectedIndex = 0; updatePostOptions();
+        postSaleModal.show(); resetFacturador();
+      } else { Swal.fire("Error", d.mensaje, "error"); }
+    } finally {
+      isProcessingVenta = false; // Resetear estado para próxima venta
+    }
   });
-  const d = await res.json();
-  if (d.ok) {
-    cobroModal.hide();
-    lastVentaId = d.venta_id; lastVentaTotal = tot;
-    document.body.style.backgroundColor = "#dcfce7";
-    setTimeout(() => (document.body.style.backgroundColor = ""), 300);
-    document.getElementById("postSaleInfo").textContent = `Venta por $${tot.toLocaleString()}`;
-    document.getElementById("waForm").classList.add("d-none");
-    postSaleSelectedIndex = 0; updatePostOptions();
-    postSaleModal.show(); resetFacturador();
-  } else { Swal.fire("Error", d.mensaje, "error"); }
 }
 
 // Product Search Modal
@@ -880,7 +905,10 @@ function setupEventListeners() {
   document.getElementById("btnOpenCobro")?.addEventListener("click", openCobro);
   document.getElementById("btnUpdateVentas")?.addEventListener("click", cargarVentasDia);
   document.getElementById("btnUpdateDeudores")?.addEventListener("click", cargarDeudores);
-  document.getElementById("btnConfirmVenta")?.addEventListener("click", confirmarVenta);
+  const btnConfirmVentaSetup = document.getElementById("btnConfirmVenta");
+  if (btnConfirmVentaSetup && !btnConfirmVentaSetup.onclick) {
+    // handled above via inline assignment
+  }
   document.getElementById("btnGasto")?.addEventListener("click", openGastoModal);
   document.getElementById("btnSaveGasto")?.addEventListener("click", saveGasto);
   document.getElementById("btnNewCustSimple")?.addEventListener("click", () => document.getElementById("addCustForm").classList.toggle("d-none"));
@@ -961,7 +989,7 @@ function handleGlobalShortcuts(e) {
   }
   if (cobroModalOpen) {
     if (e.key === "Escape") cobroModal.hide();
-    else if (e.key === "Enter") { e.preventDefault(); confirmarVenta(); }
+    else if (e.key === "Enter") { e.preventDefault(); document.getElementById("btnConfirmVenta")?.click(); }
     return;
   }
   if (modalProductos?._element?.classList.contains("show")) {

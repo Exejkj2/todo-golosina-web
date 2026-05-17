@@ -536,7 +536,7 @@
                </div>
             </div>
             <div class="mt-auto">
-              <button id="btnConfirmVenta" class="btn btn-success w-100 py-3 rounded-4 fw-black fs-4 shadow-sm"><i class="bi bi-check-circle-fill me-2"></i> CONFIRMAR</button>
+              <button type="button" id="btnConfirmVenta" class="btn btn-success w-100 py-3 rounded-4 fw-black fs-4 shadow-sm"><i class="bi bi-check-circle-fill me-2"></i> CONFIRMAR</button>
             </div>
           </div>
         </div>
@@ -588,56 +588,6 @@
       </div>
     </div>
 
-    <!-- MODAL POST-VENTA (FINAL) -->
-    <div class="modal fade" id="postSaleModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content card border-0 shadow-lg text-center p-4">
-          <div class="mb-3"><i class="bi bi-check-circle-fill text-success" style="font-size: 4rem"></i></div>
-          <h2 class="fw-black text-dark">¡Venta Finalizada!</h2>
-          <p class="text-muted fs-5" id="postSaleInfo">La operación se registró con éxito.</p>
-          <div class="d-grid mt-3">
-            <button class="btn btn-dark py-3 fw-bold fs-5 rounded-4" data-action="finish">
-               <i class="bi bi-arrow-right-circle me-2"></i> FINALIZAR (ESC)
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- NUEVO: MODAL SELECCION DE CANAL -->
-    <div class="modal fade" id="modal-opciones-cobro" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content card border-0 shadow-lg p-4">
-          <div class="text-center mb-4">
-             <h3 class="fw-black text-primary">¿Cómo desea el comprobante?</h3>
-             <p class="text-muted">Seleccione una opción para continuar</p>
-          </div>
-          <div class="d-grid gap-3">
-            <button class="btn btn-outline-primary py-4 rounded-4 d-flex align-items-center justify-content-between px-4 transition-scale" onclick="abrirVistaPrevia()">
-               <div class="text-start">
-                  <span class="d-block fw-black fs-4">IMPRIMIR TICKET</span>
-                  <small class="text-muted">Formato térmico 80mm</small>
-               </div>
-               <i class="bi bi-printer fs-1"></i>
-            </button>
-            <button class="btn btn-outline-success py-4 rounded-4 d-flex align-items-center justify-content-between px-4 transition-scale" onclick="prepararWA()">
-               <div class="text-start">
-                  <span class="d-block fw-black fs-4">ENVIAR WHATSAPP</span>
-                  <small class="text-muted">Envío directo al cliente</small>
-               </div>
-               <i class="bi bi-whatsapp fs-1"></i>
-            </button>
-            <button class="btn btn-outline-secondary py-4 rounded-4 d-flex align-items-center justify-content-between px-4 transition-scale" onclick="soloRegistrar()">
-               <div class="text-start">
-                  <span class="d-block fw-black fs-4">SOLO REGISTRAR</span>
-                  <small class="text-muted">Finalizar sin comprobante</small>
-               </div>
-               <i class="bi bi-check2-all fs-1"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- MODAL OPCIONES POST-VENTA -->
     <div class="modal fade" id="modalOpcionesVenta" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
@@ -672,17 +622,6 @@
       </div>
     </div>
 
-    <!-- MODAL ÉXITO VENTA (FEEDBACK VISUAL) -->
-    <div class="modal fade" id="modalExitoVenta" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg text-center p-4" style="border-radius: 20px;">
-          <div class="mb-2">
-            <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
-          </div>
-          <h5 class="fw-bold text-dark m-0">¡Venta realizada con éxito!</h5>
-        </div>
-      </div>
-    </div>
 
     <!-- MODAL NUEVO CLIENTE RAPIDO -->
     <div class="modal fade" id="modal-nuevo-cliente-rapido" tabindex="-1" aria-hidden="true">

@@ -426,6 +426,20 @@ def registrar_venta():
         detalle = data.get('detalle', [])
         lista_sel = data.get('lista_precios', 1)
 
+    if not items or len(items) == 0:
+        return jsonify({"ok": False, "mensaje": "No se puede registrar una venta sin productos."}), 400
+
+    from datetime import timedelta
+    tiempo_limite = hora_argentina() - timedelta(seconds=60)
+    venta_fantasma = Venta.query.filter(
+        Venta.total == total_venta,
+        Venta.fecha >= tiempo_limite
+    ).first()
+
+    if venta_fantasma:
+        print(f"✅ Eco masivo bloqueado (Patovica 60s): Venta de ${total_venta}")
+        return jsonify({"ok": True, "mensaje": "Venta procesada (eco bloqueado)", "venta_id": venta_fantasma.id}), 200
+
     for item in items:
         producto_id = item.get('id')
         qty = item.get('qty', 0)
