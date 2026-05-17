@@ -1309,96 +1309,152 @@ def admin_importar():
         flash('Ningún archivo seleccionado.', 'danger')
         return redirect(url_for('admin_dashboard'))
 
+    stats = {'actualizados_ok': 0, 'no_encontrados': 0, 'leidos_como_cero': 0}
     try:
-        df = pd.read_excel(file)
-        df.columns = [str(c).strip().lower() for c in df.columns]
+        import openpyxl
+        wb = openpyxl.load_workbook(file, data_only=True)
+        hoja = wb.active
         
-        for index, row in df.iterrows():
-            nombre = str(row.get('nombre', '')).strip()
-            if not nombre or nombre == 'nan':
+        # Crear un diccionario: {'nombre de columna': indice}
+        encabezados = {}
+        for i, celda in enumerate(hoja[1]):
+            if celda.value:
+                encabezados[str(celda.value).strip().lower()] = i
+
+        # Buscar las columnas clave permitiendo sinónimos
+        idx_precio = encabezados.get('precio lista 1') or encabezados.get('precio')
+        idx_codigo = encabezados.get('código de barras') or encabezados.get('codigo de barras') or encabezados.get('codigo') or encabezados.get('código')
+        idx_nombre = encabezados.get('nombre')
+
+        if idx_precio is None:
+            return jsonify({"error": "El Excel no tiene la columna 'Precio Lista 1' ni 'Precio'."}), 400
+        if idx_codigo is None:
+            return jsonify({"error": "El Excel no tiene la columna 'Código de barras'."}), 400
+
+        # Índices opcionales
+        idx_cat = encabezados.get('categoría') or encabezados.get('categoria')
+        idx_p2 = encabezados.get('precio_lista_2')
+        idx_p3 = encabezados.get('precio_lista_3')
+        idx_stock = encabezados.get('stock')
+        idx_img = encabezados.get('link imagen') or encabezados.get('url imagen')
+        idx_destacado = encabezados.get('destacado') or encabezados.get('favorito')
+        idx_sinstock = encabezados.get('venta sin stock')
+
+        def limpiar_precio(valor_celda):
+            if valor_celda is None:
+                return 0.0
+            
+            valor_str = str(valor_celda).strip()
+            if valor_str.lower() in ['nan', 'none', '']:
+                return 0.0
+            
+            # Eliminamos signo pesos, puntos de miles o espacios comunes en formatos de moneda
+            valor_str = valor_str.replace('$', '').replace(' ', '')
+            
+            # Si el Excel usa coma para decimales (ej: 150,50), la cambiamos por punto para Python
+            if ',' in valor_str and '.' not in valor_str:
+                valor_str = valor_str.replace(',', '.')
+            elif ',' in valor_str and '.' in valor_str:
+                # Si tiene ambos (ej: 1,500.00), quitamos la coma de miles
+                valor_str = valor_str.replace(',', '')
+                
+            try:
+                return float(valor_str)
+            except ValueError:
+                return 0.0
+
+        for fila in hoja.iter_rows(min_row=2):
+            if fila[idx_codigo].value is None and (idx_nombre is None or fila[idx_nombre].value is None):
+                continue
+                
+            valor_precio_crudo = fila[idx_precio].value
+            precio_final = limpiar_precio(valor_precio_crudo)
+            
+            # LOG PARA RENDER: Imprimir qué está leyendo el sistema
+            print(f"Fila {fila[0].row} - Crudo: '{valor_precio_crudo}' -> Convertido a: {precio_final}")
+            
+            codigo_crudo = fila[idx_codigo].value
+            if not codigo_crudo:
                 continue
             
-            cat_name = str(row.get('categoría', row.get('categoria', 'General'))).strip()
-            if cat_name == 'nan' or not cat_name:
-                cat_name = 'General'
+            # Convertir a string, quitar espacios y si excel le metió un '.0' al final, sacarlo
+            codigo_excel = str(codigo_crudo).strip()
+            if codigo_excel.endswith('.0'):
+                codigo_excel = codigo_excel[:-2]
+                
+            val_nombre = str(fila[idx_nombre].value).strip() if (idx_nombre is not None and fila[idx_nombre].value is not None) else ''
             
-            categoria = Categoria.query.filter(Categoria.nombre.ilike(cat_name)).first()
-            if not categoria:
-                categoria = Categoria(nombre=cat_name)
-                db.session.add(categoria)
-                db.session.commit()
-            
-            precio = 0.0
-            try:
-                precio = float(row.get('precio', row.get('precio_lista_1', 0)))
-            except:
-                pass
+            # Buscar el producto donde el campo codigo_barra contenga el código del Excel
+            prod = Producto.query.filter(Producto.codigo_barra.ilike(f'%{codigo_excel}%')).first()
                 
-            precio_2 = 0.0
-            try:
-                precio_2 = float(row.get('precio_lista_2', precio))
-            except:
-                precio_2 = precio
+            if not prod and val_nombre:
+                prod = Producto.query.filter(Producto.nombre.ilike(val_nombre)).first()
                 
-            precio_3 = 0.0
-            try:
-                precio_3 = float(row.get('precio_lista_3', precio))
-            except:
-                precio_3 = precio
-                
-            stock = 0
-            try:
-                stock = int(row.get('stock', 0))
-            except:
-                pass
-                
-            codigo_barra = str(row.get('codigo_barra', row.get('código de barras', ''))).strip()
-            if codigo_barra == 'nan':
-                codigo_barra = ''
-                
-            img_url = str(row.get('link imagen', row.get('url imagen', ''))).strip()
-            if img_url == 'nan':
-                img_url = ''
-                
-            destacado_val = str(row.get('destacado', row.get('favorito', 'NO'))).strip().upper()
-            favorito = True if destacado_val == 'SI' else False
-            
-            sin_stock_val = str(row.get('venta sin stock', 'NO')).strip().upper()
-            permitir_sin_stock = True if sin_stock_val == 'SI' else False
-            
-            prod = Producto.query.filter(Producto.nombre.ilike(nombre)).first()
             if not prod:
-                # Si no existe, lo creamos con todos los datos
-                prod = Producto(nombre=nombre)
+                stats['no_encontrados'] += 1
+                if not val_nombre:
+                    continue # No se puede crear si no hay nombre
+                prod = Producto(nombre=val_nombre)
                 db.session.add(prod)
-                prod.precio_lista_1 = precio
-                prod.precio_lista_2 = precio_2
-                prod.precio_lista_3 = precio_3
-                prod.stock = stock
-                prod.categoria_id = categoria.id
-                prod.codigo_barra = codigo_barra
-                if img_url:
-                    prod.imagen_url = img_url
-                prod.favorito = favorito
-                prod.permitir_sin_stock = permitir_sin_stock
             else:
-                # Si existe, actualizamos precios, stock, código e imagen
-                prod.precio_lista_1 = precio
-                prod.precio_lista_2 = precio_2
-                prod.precio_lista_3 = precio_3
-                prod.stock = stock
-                if codigo_barra:
-                    prod.codigo_barra = codigo_barra
-                if img_url:
-                    prod.imagen_url = img_url
+                if precio_final <= 0:
+                    stats['leidos_como_cero'] += 1
+                else:
+                    stats['actualizados_ok'] += 1
+                
+            # Actualización en la Base de Datos
+            prod.precio_lista_1 = precio_final
+            if prod.id: # Si el producto ya existe en la BD
+                print(f"Actualizado: {prod.nombre} -> ${precio_final}")
             
+            if codigo_excel and codigo_excel not in (prod.codigo_barra or ''):
+                prod.codigo_barra = codigo_excel
+                
+            if idx_cat is not None and fila[idx_cat].value is not None:
+                cat_name = str(fila[idx_cat].value).strip()
+                if cat_name and cat_name.lower() not in ['nan', 'none']:
+                    categoria = Categoria.query.filter(Categoria.nombre.ilike(cat_name)).first()
+                    if not categoria:
+                        categoria = Categoria(nombre=cat_name)
+                        db.session.add(categoria)
+                        db.session.commit()
+                    prod.categoria_id = categoria.id
+
+            if idx_p2 is not None and fila[idx_p2].value is not None:
+                prod.precio_lista_2 = limpiar_precio(fila[idx_p2].value)
+            else:
+                prod.precio_lista_2 = precio_final
+                
+            if idx_p3 is not None and fila[idx_p3].value is not None:
+                prod.precio_lista_3 = limpiar_precio(fila[idx_p3].value)
+            else:
+                prod.precio_lista_3 = precio_final
+                
+            if idx_stock is not None and fila[idx_stock].value is not None:
+                try:
+                    prod.stock = int(fila[idx_stock].value)
+                except:
+                    pass
+                    
+            if idx_img is not None and fila[idx_img].value is not None:
+                img_val = str(fila[idx_img].value).strip()
+                if img_val and img_val.lower() not in ['nan', 'none']:
+                    prod.imagen_url = img_val
+                    
+            if idx_destacado is not None and fila[idx_destacado].value is not None:
+                dest = str(fila[idx_destacado].value).strip().upper()
+                prod.favorito = True if dest == 'SI' else False
+                
+            if idx_sinstock is not None and fila[idx_sinstock].value is not None:
+                ss = str(fila[idx_sinstock].value).strip().upper()
+                prod.permitir_sin_stock = True if ss == 'SI' else False
+                
         db.session.commit()
-        flash('Importación completada con éxito.', 'success')
+        reporte = f"✅ Éxito: {stats['actualizados_ok']} | ❌ No encontrados: {stats['no_encontrados']} | ⚠️ Precios rotos ($0): {stats['leidos_como_cero']}"
+        return jsonify({"mensaje": reporte}), 200
     except Exception as e:
         db.session.rollback()
-        flash(f'Error procesando Excel: {str(e)}', 'danger')
-
-    return redirect(url_for('admin_dashboard'))
+        return jsonify({"error": str(e)}), 500
 
 # ─── Exportación a Excel ───────────────────────────────────────
 @app.route('/admin/exportar')

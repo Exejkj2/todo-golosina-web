@@ -1484,8 +1484,10 @@ function setupEventListeners() {
     finalizarYLimpiarVenta();
   });
 
-  document.getElementById("btnSoloRegistrar")?.addEventListener("click", () => {
+  document.getElementById("btnSoloRegistrar")?.addEventListener("click", (e) => {
+    e.preventDefault();
     finalizarYLimpiarVenta();
+    getModal('modalOpcionesVenta')?.hide();
   });
 
   // General Discount listener

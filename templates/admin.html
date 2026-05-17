@@ -627,6 +627,7 @@
     <div class="modal fade" id="importModal" tabindex="-1">
       <div class="modal-dialog">
         <form
+          id="formImportarExcel"
           action="{{ url_for('admin_importar') }}"
           method="POST"
           enctype="multipart/form-data"
@@ -1223,6 +1224,44 @@
             e.preventDefault();
           });
         }
+      }
+
+      // --- Manejo de Importación Masiva con Reporte AJAX ---
+      const formImportar = document.getElementById('formImportarExcel');
+      if (formImportar) {
+        formImportar.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          
+          const btn = this.querySelector('button[type="submit"]');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+          btn.disabled = true;
+
+          try {
+            const formData = new FormData(this);
+            const response = await fetch(this.action, {
+              method: 'POST',
+              body: formData,
+              headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+              // El usuario solicita mostrar el reporte del servidor
+              alert(data.mensaje);
+              window.location.reload();
+            } else {
+              alert('Error: ' + (data.error || 'Ocurrió un error en el servidor.'));
+            }
+          } catch (err) {
+            console.error('Error en importación:', err);
+            alert('Error crítico de conexión al procesar el archivo.');
+          } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+          }
+        });
       }
     </script>
   </body>
