@@ -16,6 +16,8 @@ import json
 def hora_argentina():
     return datetime.utcnow() - timedelta(hours=3)
 
+ultima_actualizacion_precios = hora_argentina()
+
 # ─── Configuración ────────────────────────────────────────────
 DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tienda.db')
 
@@ -1473,11 +1475,17 @@ def admin_importar():
                 prod.permitir_sin_stock = True if ss == 'SI' else False
                 
         db.session.commit()
+        global ultima_actualizacion_precios
+        ultima_actualizacion_precios = hora_argentina()
         reporte = f"✅ Éxito: {stats['actualizados_ok']} | ❌ No encontrados: {stats['no_encontrados']} | ⚠️ Precios rotos ($0): {stats['leidos_como_cero']}"
         return jsonify({"mensaje": reporte}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/verificar_precios', methods=['GET'])
+def verificar_precios():
+    return jsonify({"ultima_actualizacion": ultima_actualizacion_precios.isoformat()}), 200
 
 # ─── Exportación a Excel ───────────────────────────────────────
 @app.route('/admin/exportar')

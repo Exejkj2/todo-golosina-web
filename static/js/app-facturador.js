@@ -11,6 +11,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // Global Variables
+const horaCargaPantalla = new Date();
 let salesTabs = [];
 let activeTabId = null;
 let cartSelectedIndex = -1;
@@ -2122,6 +2123,100 @@ async function cargarCajaPos() {
 
     } catch (err) { console.error(err); }
 }
+
+// Verificar actualizaciones de precios en tiempo real vía Polling
+function chequearPreciosNuevos() {
+    fetch('/api/verificar_precios')
+        .then(res => res.json())
+        .then(data => {
+            const ultimaActualizacionServer = new Date(data.ultima_actualizacion);
+            if (ultimaActualizacionServer > horaCargaPantalla) {
+                mostrarAlertaListaNueva();
+            }
+        })
+        .catch(err => console.log("Error al verificar precios:", err));
+}
+
+function mostrarAlertaListaNueva() {
+    if (document.getElementById("alerta-nueva-lista-precios")) return; // Evitar duplicados
+
+    const alertDiv = document.createElement("div");
+    alertDiv.id = "alerta-nueva-lista-precios";
+    alertDiv.style.position = "fixed";
+    alertDiv.style.top = "25px";
+    alertDiv.style.right = "25px";
+    alertDiv.style.zIndex = "99999";
+    alertDiv.style.maxWidth = "420px";
+    alertDiv.style.background = "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)";
+    alertDiv.style.borderLeft = "6px solid #d97706";
+    alertDiv.style.borderRadius = "16px";
+    alertDiv.style.boxShadow = "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)";
+    alertDiv.style.padding = "20px";
+    alertDiv.style.fontFamily = "'Outfit', 'Inter', sans-serif";
+    alertDiv.style.color = "#92400e";
+    alertDiv.style.display = "flex";
+    alertDiv.style.flexDirection = "column";
+    alertDiv.style.gap = "12px";
+    alertDiv.style.animation = "slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards";
+    
+    if (!document.getElementById("animacion-alerta-precios")) {
+        const style = document.createElement("style");
+        style.id = "animacion-alerta-precios";
+        style.textContent = `
+            @keyframes slideInRight {
+                0% { transform: translateX(120%); opacity: 0; }
+                100% { transform: translateX(0); opacity: 1; }
+            }
+            .btn-reload-precios {
+                background: #d97706;
+                color: white;
+                border: none;
+                padding: 10px 16px;
+                border-radius: 8px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                text-decoration: none;
+                font-size: 13.5px;
+            }
+            .btn-reload-precios:hover {
+                background: #b45309;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(217, 119, 6, 0.2);
+            }
+            .btn-reload-precios:active {
+                transform: translateY(0);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    alertDiv.innerHTML = `
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <span style="font-size: 24px; line-height: 1;">⚠️</span>
+            <div style="flex-grow: 1;">
+                <h5 style="margin: 0 0 4px 0; font-weight: 800; font-size: 16px; color: #b45309;">¡Precios actualizados!</h5>
+                <p style="margin: 0; font-size: 14px; line-height: 1.5; font-weight: 500;">
+                    ⚠️ ¡Lista nueva de precios cargada! Por favor, actualiza la pantalla (F5) para vender con los valores correctos.
+                </p>
+            </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+            <button class="btn-reload-precios" onclick="window.location.reload();">
+                <i class="bi bi-arrow-clockwise"></i> Actualizar pantalla (F5)
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(alertDiv);
+}
+
+// Ejecutar la verificación cada 30 segundos
+setInterval(chequearPreciosNuevos, 30000);
 
 // Start the app
 document.addEventListener("DOMContentLoaded", () => {
