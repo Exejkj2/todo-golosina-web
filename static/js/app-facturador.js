@@ -31,6 +31,7 @@ let editingCustId = null;
 let deudores = [];
 let clienteIdAEliminar = null; // Para el modal de eliminación personalizado
 let isProcessingVenta = false;
+let procesandoMovimiento = false;
 
 
 // Bootstrap Modal Instances: se instancian on-demand con getOrCreateInstance()
@@ -1563,33 +1564,62 @@ function setupEventListeners() {
   document.getElementById("btnFinalizarDia")?.addEventListener("click", cerrarCaja);
   document.getElementById("btnGastoTrigger")?.addEventListener("click", () => getModal('gastoModal')?.show());
   
-  document.getElementById("btnSaveGasto")?.addEventListener("click", async () => {
-    const desc = document.getElementById("gastoDesc").value.trim();
-    const monto = parseFloat(document.getElementById("gastoMonto").value) || 0;
-    const cat = document.getElementById("gastoCat").value;
-    const tipo = document.getElementById("gastoTipo").value;
+  const btnViejo = document.getElementById('btnSaveGasto');
+  if (btnViejo) {
+    // 1. Clonar para purgar cualquier evento fantasma acumulado
+    const btnNuevo = btnViejo.cloneNode(true);
+    btnViejo.replaceWith(btnNuevo);
 
-    if (!desc || monto <= 0) {
-      Swal.fire("Error", "Descripción y monto son obligatorios", "error");
-      return;
-    }
+    // 2. Asignar el evento exclusivamente vía .onclick
+    btnNuevo.onclick = async function(e) {
+      if (e) e.preventDefault();
 
-    try {
-      const res = await fetch("/api/gastos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ descripcion: desc, monto, categoria: cat, tipo })
-      });
-      const d = await res.json();
-      if (d.ok) {
-        Swal.fire({ icon: 'success', title: 'Movimiento guardado', timer: 1500, showConfirmButton: false });
-        getModal('gastoModal')?.hide();
-        document.getElementById("gastoDesc").value = "";
-        document.getElementById("gastoMonto").value = "";
-        cargarCajaPos();
+      // 3. CANDADO GLOBAL: Si ya está guardando, rebotar.
+      if (procesandoMovimiento) {
+        console.warn("Doble envío bloqueado por estado global.");
+        return;
       }
-    } catch (err) { console.error(err); }
-  });
+
+      const desc = document.getElementById("gastoDesc").value.trim();
+      const monto = parseFloat(document.getElementById("gastoMonto").value) || 0;
+      const cat = document.getElementById("gastoCat").value;
+      const tipo = document.getElementById("gastoTipo").value;
+
+      if (!desc || monto <= 0) {
+        Swal.fire("Error", "Descripción y monto son obligatorios", "error");
+        return;
+      }
+
+      procesandoMovimiento = true;
+
+      // Feedback visual de bloqueo
+      btnNuevo.disabled = true;
+      btnNuevo.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Registrando...';
+
+      try {
+        const res = await fetch("/api/gastos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ descripcion: desc, monto, categoria: cat, tipo })
+        });
+        const d = await res.json();
+        if (d.ok) {
+          Swal.fire({ icon: 'success', title: 'Movimiento guardado', timer: 1500, showConfirmButton: false });
+          getModal('gastoModal')?.hide();
+          document.getElementById("gastoDesc").value = "";
+          document.getElementById("gastoMonto").value = "";
+          cargarCajaPos();
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        // 4. LIBERAR EL CANDADO Y EL BOTÓN SIEMPRE AL FINAL
+        procesandoMovimiento = false;
+        btnNuevo.disabled = false;
+        btnNuevo.innerHTML = 'Registrar Movimiento';
+      }
+    };
+  }
 
   // Search Results Delegation
   document.getElementById("modalResults")?.addEventListener("click", (e) => {
@@ -1651,7 +1681,7 @@ function setupEventListeners() {
   if (fFin) fFin.value = hoyStr;
   // confirm sale is attached inline via cloneNode
   document.getElementById("btnGasto")?.addEventListener("click", openGastoModal);
-  document.getElementById("btnSaveGasto")?.addEventListener("click", saveGasto);
+  // btnSaveGasto is handled above via cloneNode + onclick to avoid stacking
   document.getElementById("btnSaveNewCust")?.addEventListener("click", saveNewCust);
   document.getElementById("btnConfirmarPago")?.addEventListener("click", registrarPagoCobranza);
   document.getElementById("btnConfirmarEliminar")?.addEventListener("click", ejecutarEliminacionCliente);

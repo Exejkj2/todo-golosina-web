@@ -1040,6 +1040,20 @@ def add_gasto():
     if not descripcion or not monto:
         return jsonify({"ok": False, "mensaje": "Descripción y monto son obligatorios"}), 400
     
+    from datetime import timedelta
+    tiempo_limite = hora_argentina() - timedelta(seconds=15)
+    
+    # Buscar si hay un movimiento idéntico reciente
+    mov_fantasma = Gasto.query.filter(
+        Gasto.monto == float(monto),
+        Gasto.descripcion == descripcion,
+        Gasto.tipo == data.get('tipo', 'Egreso'),
+        Gasto.fecha >= tiempo_limite
+    ).first()
+    
+    if mov_fantasma:
+        return jsonify({"ok": True, "mensaje": "Movimiento procesado (eco bloqueado)"}), 200
+    
     try:
         gasto = Gasto(
             descripcion=descripcion, 

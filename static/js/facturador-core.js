@@ -36,6 +36,7 @@ let postSaleSelectedIndex = 0;
 let editingCustId = null;
 let deudores = [];
 let isProcessingVenta = false;
+let procesandoMovimiento = false;
 
 
 // Bootstrap Modal Instances
@@ -701,10 +702,27 @@ function openGastoModal() {
 }
 
 async function saveGasto() {
+  const btnGuardar = document.getElementById('btnSaveGasto');
+  
+  // 3. CANDADO GLOBAL: Si ya está guardando, rebotar.
+  if (procesandoMovimiento) {
+    console.warn("Doble envío bloqueado por estado global.");
+    return;
+  }
+
   const desc = document.getElementById("gastoDesc").value.trim();
   const monto = document.getElementById("gastoMonto").value;
   const cat = document.getElementById("gastoCat").value;
   if (!desc || !monto) { Swal.fire("Error", "Completá descripción y monto", "error"); return; }
+  
+  procesandoMovimiento = true;
+
+  // 1. Deshabilitar para evitar doble clic
+  if (btnGuardar) {
+    btnGuardar.disabled = true;
+    btnGuardar.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Registrando...';
+  }
+
   try {
     const res = await fetch("/api/gastos", {
       method: "POST",
@@ -717,7 +735,16 @@ async function saveGasto() {
       cargarCajaPos();
       Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Gasto registrado", showConfirmButton: false, timer: 2000 });
     }
-  } catch (e) { console.error(e); }
+  } catch (e) { 
+    console.error(e); 
+  } finally {
+    // 2. Volver a habilitar el botón pase lo que pase
+    procesandoMovimiento = false;
+    if (btnGuardar) {
+      btnGuardar.disabled = false;
+      btnGuardar.innerHTML = 'Registrar Movimiento';
+    }
+  }
 }
 
 // Debt Collection
@@ -1074,7 +1101,15 @@ function setupEventListeners() {
     // handled above via inline assignment
   }
   document.getElementById("btnGasto")?.addEventListener("click", openGastoModal);
-  document.getElementById("btnSaveGasto")?.addEventListener("click", saveGasto);
+  const btnViejoGasto = document.getElementById("btnSaveGasto");
+  if (btnViejoGasto) {
+    const btnNuevoGasto = btnViejoGasto.cloneNode(true);
+    btnViejoGasto.replaceWith(btnNuevoGasto);
+    btnNuevoGasto.onclick = function(e) {
+      if (e) e.preventDefault();
+      saveGasto();
+    };
+  }
   document.getElementById("btnNewCustSimple")?.addEventListener("click", () => document.getElementById("addCustForm").classList.toggle("d-none"));
   document.getElementById("btnSaveNewCust")?.addEventListener("click", saveNewCust);
   
