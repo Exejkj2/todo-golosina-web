@@ -1,5 +1,5 @@
 import os 
-from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session
+from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session, send_from_directory, make_response
 import io
 import traceback
 from flask_cors import CORS
@@ -1779,6 +1779,16 @@ def api_reportes():
         "resumen": resumen,
         "clientes": clientes_lista
     })
+
+@app.route('/manifest.json')
+def send_manifest():
+    return send_from_directory('static', 'manifest.json')
+
+@app.route('/sw.js')
+def send_sw():
+    response = make_response(send_from_directory('static', 'sw.js'))
+    response.headers['Content-Type'] = 'application/javascript'
+    return response
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
