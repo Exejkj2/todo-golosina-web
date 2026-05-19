@@ -941,13 +941,17 @@ if (originalBtnConfirmar) {
 
       if (sumTotal < tot) { Swal.fire("Incompleto", `Faltan $${(tot - sumTotal).toLocaleString()}`, "warning"); return; }
 
+      const switchAfip = document.getElementById('toggleFacturaAfip');
+      const quiereFactura = switchAfip ? switchAfip.checked : false;
+
       const payload = {
         tipo: "Local",
         cliente_id: tab.selectedCliente.id,
         total: tot,
         items: [...tab.cart].map((i) => ({ id: i.id, qty: i.qty })),
         detalle: [...tab.cart].map((i) => ({ nombre: i.nombre, qty: i.qty, precio_unit: i.price, subtotal: i.price * i.qty })),
-        pagos: { efectivo: ef, transferencia: tr, debito: db, cc: cc }
+        pagos: { efectivo: ef, transferencia: tr, debito: db, cc: cc },
+        facturar_afip: quiereFactura
       };
 
       // 3. Vaciar el carrito global al instante
@@ -1261,6 +1265,8 @@ function resetFacturador() {
   tab.selectedCliente = { id: null, nombre: "Consumidor Final", iva: "CF", telefono: "" };
   saveTabsToLocal();
   renderCart();
+  const switchAfip = document.getElementById('toggleFacturaAfip');
+  if (switchAfip) switchAfip.checked = false;
 }
 
 // Start the app
@@ -1282,4 +1288,17 @@ if (btnWA_Historial) {
 
         window.open(`https://wa.me/${numero}?text=${mensajePreArmado}`, '_blank');
     };
+}
+
+// Listener para limpiar facturador cuando se cierra el modal de opciones post-venta
+const modalPostVenta = document.getElementById('modalOpcionesVenta');
+if (modalPostVenta) {
+    modalPostVenta.addEventListener('hidden.bs.modal', function () {
+        // Llama aquí a tu función existente de limpiar/vaciar carrito
+        resetFacturador(); 
+        
+        // Resetear switch de AFIP si existe
+        const switchAfip = document.getElementById('toggleFacturaAfip');
+        if (switchAfip) switchAfip.checked = false;
+    });
 }

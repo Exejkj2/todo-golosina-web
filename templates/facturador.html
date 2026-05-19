@@ -1046,12 +1046,20 @@
               >
                 <i class="bi bi-trash"></i> Cancelar Venta
               </button>
+              <div class="d-flex justify-content-between align-items-center mb-3 p-2 border rounded bg-light">
+                  <label class="form-check-label fw-bold text-primary mb-0" for="toggleFacturaAfip" style="font-size: 1.1rem;">
+                      <i class="bi bi-receipt"></i> Emitir Factura AFIP
+                  </label>
+                  <div class="form-check form-switch">
+                      <input class="form-check-input cursor-pointer" type="checkbox" id="toggleFacturaAfip" style="transform: scale(1.5); margin-top: 0.2rem;">
+                  </div>
+              </div>
               <button
                 id="btnOpenCobro"
-                class="btn btn-success w-100 py-5 rounded-4 fw-black fs-2 shadow-lg"
+                class="btn btn-success w-100 py-3 rounded-4 fw-black fs-2 shadow-lg"
                 style="letter-spacing: 2px"
               >
-                <i class="bi bi-wallet2 me-3"></i> COBRAR (F2)
+                <i class="bi bi-wallet2 me-3"></i> COBRAR (F12)
               </button>
             </div>
           </div>

@@ -412,6 +412,15 @@ def registrar_venta():
     if not data:
         return jsonify({"ok": False, "mensaje": "Datos inválidos"}), 400
 
+    # Capturamos la decisión del usuario (por defecto False)
+    facturar_afip = data.get('facturar_afip', False) if isinstance(data, dict) else False
+
+    # Determinar el tipo de comprobante
+    tipo_comprobante = "Factura C" if facturar_afip else "Ticket No Fiscal"
+
+    # Imprimimos en consola para verificar (Futuro: Aquí irá la llamada a afip.py)
+    print(f"🛒 Venta recibida. Total: ${data.get('total') if isinstance(data, dict) else 0.0}. Tipo: {tipo_comprobante}")
+
     # Acepta dos formatos:
     # A) Lista directa (uso original del carrito público): [{id, qty}, ...]
     # B) Objeto con cliente: {cliente_id, items:[{id,qty,name,precio_unit}], total}

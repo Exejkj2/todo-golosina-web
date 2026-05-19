@@ -1186,6 +1186,9 @@ if (originalBtnConfirmar) {
         cc += deudaCC; // Sumamos la diferencia al pago por cuenta corriente
       }
 
+      const switchAfip = document.getElementById('toggleFacturaAfip');
+      const quiereFactura = switchAfip ? switchAfip.checked : false;
+
       const payload = {
         tipo: "Local",
         cliente_id: tab.selectedCliente.id,
@@ -1200,7 +1203,8 @@ if (originalBtnConfirmar) {
         }),
         pagos: { efectivo: ef, transferencia: tr, debito: db, cc: cc },
         general_discount_perc: tab.generalDiscount || 0,
-        general_savings: montoDescuentoGral
+        general_savings: montoDescuentoGral,
+        facturar_afip: quiereFactura
       };
 
       if (!navigator.onLine) {
@@ -2200,6 +2204,9 @@ function resetFacturador() {
   saveTabsToLocal();
   renderCart();
 
+  const switchAfip = document.getElementById('toggleFacturaAfip');
+  if (switchAfip) switchAfip.checked = false;
+
   // Limpiar inputs de descuento visualmente
   const inputGD = document.getElementById("inputGeneralDiscount");
   if (inputGD) inputGD.value = "";
@@ -2428,4 +2435,17 @@ if (btnWA_Historial) {
 
         window.open(`https://wa.me/${numero}?text=${mensajePreArmado}`, '_blank');
     };
+}
+
+// Listener para limpiar facturador cuando se cierra el modal de opciones post-venta
+const modalPostVenta = document.getElementById('modalOpcionesVenta');
+if (modalPostVenta) {
+    modalPostVenta.addEventListener('hidden.bs.modal', function () {
+        // Llama aquí a tu función existente de limpiar/vaciar carrito
+        resetFacturador(); 
+        
+        // Resetear switch de AFIP si existe
+        const switchAfip = document.getElementById('toggleFacturaAfip');
+        if (switchAfip) switchAfip.checked = false;
+    });
 }
