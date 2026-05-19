@@ -1061,41 +1061,80 @@
       <!-- SECTION: VENTAS DEL DIA -->
       <div id="sectionVentas" class="section-container">
         <div class="p-4 overflow-auto">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4 class="fw-bold m-0">Historial de Ventas</h4>
-            <button id="btnUpdateVentas" class="btn btn-outline-primary">
-              <i class="bi bi-arrow-clockwise"></i> Actualizar
-            </button>
-          </div>
-          <div class="row mb-4">
-              <div class="col-md-4">
-                  <label class="small fw-bold text-muted mb-1">Desde:</label>
-                  <input type="date" id="fechaInicio" class="form-control bg-white">
+          <div class="row">
+            <!-- Columna Izquierda (Lista de Ventas y Filtros) -->
+            <div class="col-lg-6 col-md-5">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-bold m-0">Historial de Ventas</h4>
+                <button id="btnUpdateVentas" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
               </div>
-              <div class="col-md-4">
-                  <label class="small fw-bold text-muted mb-1">Hasta:</label>
-                  <input type="date" id="fechaFin" class="form-control bg-white">
+              <div class="row mb-3 g-2">
+                  <div class="col-md-6">
+                      <label class="small fw-bold text-muted mb-1">Desde:</label>
+                      <input type="date" id="fechaInicio" class="form-control bg-white form-control-sm">
+                  </div>
+                  <div class="col-md-6">
+                      <label class="small fw-bold text-muted mb-1">Hasta:</label>
+                      <input type="date" id="fechaFin" class="form-control bg-white form-control-sm">
+                  </div>
+                  <div class="col-12 mt-2">
+                      <button id="btnBuscarHistorial" class="btn btn-primary w-100 btn-sm fw-bold"><i class="bi bi-search me-2"></i> Buscar Ventas</button>
+                  </div>
               </div>
-              <div class="col-md-4 d-flex align-items-end">
-                  <button id="btnBuscarHistorial" class="btn btn-primary w-100 fw-bold"><i class="bi bi-search me-2"></i> Buscar Ventas</button>
+              <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
+                  <table class="table table-hover m-0 align-middle">
+                    <thead class="bg-dark text-white sticky-top">
+                      <tr>
+                        <th class="ps-3 py-2" style="font-size: 13px;">ID</th>
+                        <th class="py-2" style="font-size: 13px;">Hora</th>
+                        <th class="py-2" style="font-size: 13px;">Método</th>
+                        <th class="text-end pe-3 py-2" style="font-size: 13px;">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ventasDiaBody">
+                      <!-- Injected by JS -->
+                    </tbody>
+                  </table>
+                </div>
               </div>
-          </div>
-          <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-0">
-              <table class="table table-hover m-0">
-                <thead class="bg-dark text-white">
-                  <tr>
-                    <th class="ps-4">ID</th>
-                    <th>Hora</th>
-                    <th>Método</th>
-                    <th class="text-end">Total</th>
-                    <th class="text-center">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="ventasDiaBody">
-                  <!-- Injected by JS -->
-                </tbody>
-              </table>
+            </div>
+
+            <!-- Columna Derecha (Vista Previa de Ticket) -->
+            <div class="col-lg-6 col-md-7">
+              <div class="card shadow-sm sticky-top rounded-4 border-0 overflow-hidden" style="top: 20px;">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+                  <h5 class="mb-0 fw-bold"><i class="bi bi-receipt me-2"></i> Vista Previa del Ticket</h5>
+                  <div class="d-flex gap-2">
+                    <button id="btnReimprimir" class="btn btn-sm btn-primary fw-bold" disabled><i class="bi bi-printer me-1"></i> Imprimir</button>
+                    <button id="btnWAHistorialAislado" class="btn btn-sm btn-success fw-bold" disabled><i class="bi bi-whatsapp"></i></button>
+                  </div>
+                </div>
+                <div class="card-body bg-light d-flex flex-column align-items-center justify-content-center py-5">
+                  <div id="papelTicket" class="p-4 bg-white shadow-sm border" style="width: 320px; min-height: 400px; font-family: monospace; font-size: 13px; display: none; color: #000; border-radius: 4px;">
+                    <div class="text-center mb-3">
+                      <strong style="font-size: 16px; letter-spacing: 1px;">TODO GOLOSINA</strong><br>
+                      <span style="font-size: 11px; color: #555;">Alberdi 950, Aguilares</span><br>
+                      <strong style="font-size: 14px;">Ticket #<span id="tkNumero"></span></strong>
+                    </div>
+                    <div class="text-center mb-3" style="font-size: 12px; color: #333;">
+                      Fecha: <span id="tkFecha"></span>
+                    </div>
+                    <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; font-size: 12px;" class="py-2 mb-3" id="tkDetalles">
+                      <!-- Detalle de productos injected by JS -->
+                    </div>
+                    <div class="text-end fw-bold fs-5 mt-2" style="font-size: 18px; border-top: 1px solid #eee; padding-top: 10px;">
+                      TOTAL: $<span id="tkTotal"></span>
+                    </div>
+                  </div>
+                  <div id="mensajePlaceholder" class="text-muted text-center py-5">
+                    <i class="bi bi-receipt text-secondary" style="font-size: 4rem; opacity: 0.3; display: block; margin-bottom: 15px;"></i>
+                    <span>Selecciona una venta de la lista para ver el ticket.</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

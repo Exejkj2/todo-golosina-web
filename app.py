@@ -962,6 +962,76 @@ def get_ventas_hoy():
     except Exception as e:
         return jsonify({"error_interno": str(e), "detalle": traceback.format_exc()}), 500
 
+@app.route('/api/venta/<int:id>', methods=['GET'])
+def get_venta_detalle(id):
+    try:
+        venta = db.session.get(Venta, id)
+        if not venta:
+            return jsonify({"ok": False, "mensaje": "Venta no encontrada"}), 404
+        
+        import json
+        detalle = json.loads(venta.detalle_json or '[]')
+        
+        for item in detalle:
+            item['nombre'] = to_title_case(item.get('nombre', ''))
+            
+        cliente_nombre = "Consumidor Final"
+        if venta.cliente:
+            cliente_nombre = to_title_case(venta.cliente.nombre)
+            
+        return jsonify({
+            "ok": True,
+            "id": venta.id,
+            "fecha": venta.fecha.strftime('%d/%m/%Y %H:%M:%S') if hasattr(venta.fecha, 'strftime') else str(venta.fecha),
+            "metodo_pago": getattr(venta, 'metodo_pago', 'No especificado') or 'No especificado',
+            "total": venta.total or 0.0,
+            "cliente_nombre": cliente_nombre,
+            "detalle": detalle
+        }), 200
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/ventas/<int:id_venta>', methods=['GET'])
+def obtener_detalle_venta(id_venta):
+    venta = Venta.query.get_or_404(id_venta)
+    
+    items_vendidos = []
+    
+    # 1. Intentar obtener de la relación de base de datos si existe
+    if hasattr(venta, 'detalles') and venta.detalles: 
+        for detalle in venta.detalles:
+            items_vendidos.append({
+                "cantidad": detalle.cantidad,
+                "nombre": to_title_case(detalle.producto.nombre if detalle.producto else "Producto Eliminado"),
+                "precio": detalle.precio_unitario,
+                "subtotal": detalle.cantidad * detalle.precio_unitario
+            })
+            
+    # 2. Si no hay relación o está vacía, deserializar desde detalle_json
+    if not items_vendidos and hasattr(venta, 'detalle_json') and venta.detalle_json:
+        try:
+            import json
+            detalle = json.loads(venta.detalle_json or '[]')
+            for item in detalle:
+                qty = item.get('qty') or item.get('cantidad') or 1
+                precio = item.get('precio_unit') or item.get('precio_unitario') or item.get('precio') or 0.0
+                nombre = to_title_case(item.get('nombre') or "Producto")
+                items_vendidos.append({
+                    "cantidad": qty,
+                    "nombre": nombre,
+                    "precio": precio,
+                    "subtotal": qty * precio
+                })
+        except Exception:
+            pass
+            
+    return jsonify({
+        "id": venta.id,
+        "fecha": venta.fecha.strftime('%d/%m/%Y %H:%M') if (venta.fecha and hasattr(venta.fecha, 'strftime')) else "",
+        "total": venta.total,
+        "items": items_vendidos
+    }), 200
+
 @app.route('/api/gastos', methods=['POST'])
 def add_gasto():
     data = request.json or {}
@@ -1485,7 +1555,9 @@ def admin_importar():
 
 @app.route('/api/verificar_precios', methods=['GET'])
 def verificar_precios():
-    return jsonify({"ultima_actualizacion": ultima_actualizacion_precios.isoformat()}), 200
+    # Si no existe la variable, manda la hora argentina actual como default
+    ultima = globals().get('ultima_actualizacion_precios', hora_argentina())
+    return jsonify({"ultima_actualizacion": ultima.isoformat()}), 200
 
 # ─── Exportación a Excel ───────────────────────────────────────
 @app.route('/admin/exportar')

@@ -37,6 +37,7 @@ let editingCustId = null;
 let deudores = [];
 let isProcessingVenta = false;
 
+
 // Bootstrap Modal Instances
 let modalProductos, cobroModal, custModal, postSaleModal, editCustModal, gastoModal;
 
@@ -475,27 +476,184 @@ function switchSection(section, btn) {
 async function cargarVentasDia() {
   const b = document.getElementById("ventasDiaBody");
   if (!b) return;
-  b.innerHTML = '<tr><td colspan="5" class="text-center p-4">Cargando ventas...</td></tr>';
+  b.innerHTML = '<tr><td colspan="4" class="text-center p-4">Cargando ventas...</td></tr>';
+  
+  let url = "/api/ventas_hoy";
+  const fInicio = document.getElementById("fechaInicio")?.value;
+  const fFin = document.getElementById("fechaFin")?.value;
+  
+  if (fInicio && fFin) {
+      url += `?inicio=${fInicio}&fin=${fFin}`;
+  }
+  
   try {
-    const r = await fetch("/api/ventas_hoy");
+    const r = await fetch(url);
     const d = await r.json();
     if (d.ventas && d.ventas.length > 0) {
       b.innerHTML = d.ventas
         .map((v) => `
-        <tr>
-          <td class="ps-4 fw-bold">#${v.id}</td>
-          <td>${v.hora}</td>
+        <tr style="cursor: pointer;" onclick="seleccionarVenta(${v.id}, this)">
+          <td class="ps-3 fw-bold">#${v.id}</td>
+          <td>${v.hora} hs</td>
           <td><span class="badge bg-light text-dark border">${v.metodo_pago}</span></td>
-          <td class="text-end fw-bold">$${v.total.toLocaleString()}</td>
-          <td class="text-center">
-             <button class="btn btn-sm btn-outline-dark" data-action="printTicket" data-id="${v.id}"><i class="bi bi-printer"></i></button>
-          </td>
+          <td class="text-end pe-3 fw-bold">$${Number(v.total).toLocaleString()}</td>
         </tr>
       `).join("");
     } else {
-      b.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted">No hay ventas hoy</td></tr>';
+      b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No hay ventas registradas en el período seleccionado</td></tr>';
     }
-  } catch (e) { b.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-danger">Error al cargar</td></tr>'; }
+  } catch (e) { 
+    console.error(e);
+    b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-danger">Error al cargar</td></tr>'; 
+  }
+}
+
+let ventaSeleccionadaId = null;
+
+async function seleccionarVenta(id, element) {
+  if (element) {
+    document.querySelectorAll("#ventasDiaBody tr").forEach(tr => tr.classList.remove("table-active"));
+    element.classList.add("table-active");
+  }
+  
+  ventaSeleccionadaId = id;
+  
+  const msgPlaceholder = document.getElementById("mensajePlaceholder");
+  const papelTicket = document.getElementById("papelTicket");
+  const tkNumero = document.getElementById("tkNumero");
+  const tkFecha = document.getElementById("tkFecha");
+  const tkDetalles = document.getElementById("tkDetalles");
+  const tkTotal = document.getElementById("tkTotal");
+  
+  const btnReimprimir = document.getElementById("btnReimprimir");
+  const btnWA = document.getElementById("btnWAHistorialAislado");
+  
+  if (msgPlaceholder) msgPlaceholder.style.display = "none";
+  if (papelTicket) papelTicket.style.display = "block";
+  
+  if (tkNumero) tkNumero.textContent = id;
+  if (tkFecha) tkFecha.textContent = "Cargando...";
+  if (tkDetalles) tkDetalles.innerHTML = '<div class="text-center py-3 text-muted">Obteniendo detalles de venta...</div>';
+  if (tkTotal) tkTotal.textContent = "...";
+  
+  if (btnReimprimir) btnReimprimir.disabled = true;
+  if (btnWA) btnWA.disabled = true;
+  
+  fetch(`/api/ventas/${id}`)
+    .then(res => {
+        if (!res.ok) throw new Error('Error en el servidor');
+        return res.json();
+    })
+    .then(data => {
+        // Llenar cabecera y total
+        document.getElementById('tkNumero').textContent = data.id;
+        document.getElementById('tkFecha').textContent = data.fecha;
+        document.getElementById('tkTotal').textContent = data.total.toFixed(2);
+        
+        // Llenar detalles
+        const contenedorDetalles = document.getElementById('tkDetalles');
+        contenedorDetalles.innerHTML = ''; // Limpiar anteriores
+        
+        if (data.items && data.items.length > 0) {
+            data.items.forEach(item => {
+                contenedorDetalles.innerHTML += `
+                    <div class="d-flex justify-content-between" style="font-size: 0.9em;">
+                        <span>${item.cantidad}x ${item.nombre}</span>
+                        <span>$${item.subtotal.toFixed(2)}</span>
+                    </div>
+                `;
+            });
+        } else {
+            contenedorDetalles.innerHTML = '<div class="text-center text-muted">Detalle de artículos no disponible (Venta antigua)</div>';
+        }
+        
+        // Habilitar botones de acción
+        document.getElementById('btnReimprimir').disabled = false;
+        
+        // Armar texto con saltos de línea literales (\n)
+        let textoTicket = `*TODO GOLOSINA - Comprobante de Venta*\n\n`;
+        textoTicket += `Ticket #${data.id} - Fecha: ${data.fecha}\n\n`;
+
+        if (data.items && data.items.length > 0) {
+            data.items.forEach(item => {
+                textoTicket += `- ${item.cantidad}x ${item.nombre} ($${item.subtotal.toFixed(2)})\n`;
+            });
+        } else {
+            textoTicket += `- Detalle no disponible\n`;
+        }
+        textoTicket += `\n*TOTAL: $${data.total.toFixed(2)}*\n\n¡Gracias por tu compra!`;
+
+        // Seleccionar el nuevo botón, inyectarle el texto pre-codificado y habilitarlo
+        const btnWA = document.getElementById('btnWAHistorialAislado');
+        if (btnWA) {
+            btnWA.setAttribute('data-mensaje', encodeURIComponent(textoTicket));
+            btnWA.disabled = false;
+        }
+    })
+    .catch(error => {
+        document.getElementById('tkDetalles').innerHTML = `<div class="text-danger text-center">${error.message}</div>`;
+    });
+}
+
+function reimprimirTicket(id) {
+  printTicket(id);
+}
+
+async function enviarTicketWA(id) {
+  if (!id) return;
+  try {
+    const res = await fetch(`/api/ventas/${id}`);
+    const data = await res.json();
+    
+    if (data && data.id) {
+      const { value: typedPhone } = await Swal.fire({
+        title: '📲 WhatsApp del Cliente',
+        input: 'text',
+        inputLabel: 'Número de teléfono (con código de área, ej: 3865123456)',
+        inputPlaceholder: '3865123456',
+        showCancelButton: true,
+        confirmButtonColor: '#198754',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Enviar'
+      });
+      
+      if (typedPhone) {
+        let numero = typedPhone.trim();
+        if (numero.length === 10) {
+          numero = '549' + numero;
+        } else if (numero.length === 12 && numero.startsWith('54')) {
+          // Ok
+        } else if (numero.length === 13 && numero.startsWith('+54')) {
+          numero = numero.replace('+', '');
+        } else if (!numero.startsWith('54')) {
+          numero = '54' + numero;
+        }
+        
+        let textoTicket = `*TODO GOLOSINA - Comprobante de Venta* %0A%0A`;
+        textoTicket += `*Ticket #:* ${data.id}%0A`;
+        textoTicket += `*Fecha:* ${data.fecha}%0A`;
+        textoTicket += `-----------------------------------%0A`;
+        
+        if (data.items && data.items.length > 0) {
+          data.items.forEach(item => {
+            textoTicket += `- ${item.cantidad}x ${item.nombre.toUpperCase()} ($${Number(item.subtotal).toLocaleString()})%0A`;
+          });
+        }
+        
+        textoTicket += `-----------------------------------%0A`;
+        textoTicket += `*TOTAL: $${Number(data.total).toLocaleString()}*%0A%0A`;
+        textoTicket += `¡Muchas gracias por su compra! 🍭🍬`;
+        
+        const url = `https://wa.me/${numero}?text=${textoTicket}`;
+        window.open(url, '_blank');
+      }
+    } else {
+      Swal.fire('Error', 'No se pudieron cargar los detalles de la venta', 'error');
+    }
+  } catch (error) {
+    console.error("Error al enviar WhatsApp:", error);
+    Swal.fire('Error', 'Hubo un error de conexión', 'error');
+  }
 }
 
 async function cargarCajaPos() {
@@ -904,6 +1062,12 @@ function setupEventListeners() {
   document.getElementById("btnResetFacturador")?.addEventListener("click", resetFacturador);
   document.getElementById("btnOpenCobro")?.addEventListener("click", openCobro);
   document.getElementById("btnUpdateVentas")?.addEventListener("click", cargarVentasDia);
+  
+  // Maestro-Detalle Ticket action buttons
+  document.getElementById("btnReimprimir")?.addEventListener("click", () => {
+    if (ventaSeleccionadaId) reimprimirTicket(ventaSeleccionadaId);
+  });
+
   document.getElementById("btnUpdateDeudores")?.addEventListener("click", cargarDeudores);
   const btnConfirmVentaSetup = document.getElementById("btnConfirmVenta");
   if (btnConfirmVentaSetup && !btnConfirmVentaSetup.onclick) {
@@ -1066,3 +1230,21 @@ function resetFacturador() {
 
 // Start the app
 document.addEventListener("DOMContentLoaded", initApp);
+
+const btnWA_Historial = document.getElementById('btnWAHistorialAislado');
+if (btnWA_Historial) {
+    btnWA_Historial.onclick = function() {
+        const mensajePreArmado = this.getAttribute('data-mensaje');
+        if (!mensajePreArmado) return;
+
+        let numero = prompt("Ingrese el celular del cliente (Ej: 3865123456):");
+        if (!numero) return; 
+
+        numero = numero.trim();
+        if (numero.length === 10) {
+            numero = '549' + numero;
+        }
+
+        window.open(`https://wa.me/${numero}?text=${mensajePreArmado}`, '_blank');
+    };
+}
