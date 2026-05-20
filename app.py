@@ -33,26 +33,34 @@ def es_accesible_bd_nube(uri_nube):
         url = urlparse(uri_nube)
         hostname = url.hostname
         port = url.port or 5432
-        # Timeout reducido a 1 segundo para arranque local instantáneo
-        # socket.gethostbyname ayuda a fallar rápido si no hay DNS
-        socket.create_connection((socket.gethostbyname(hostname), port), timeout=1)
+        socket.create_connection((hostname, port), timeout=1)
         return True
     except (socket.timeout, socket.error, socket.gaierror):
         return False
 
-# Configuración de Base de Datos con Fallback Inteligente
+# ─── Configuración de Base de Datos con Fallback Automático ───
 uri_nube = os.environ.get('DATABASE_URL')
 if uri_nube and uri_nube.startswith('postgres://'):
     uri_nube = uri_nube.replace('postgres://', 'postgresql://', 1)
 
-if es_accesible_bd_nube(uri_nube):
-    print("🌐 Conectado a Base de Datos en la Nube (Render).")
+try:
+    # Si no hay URL o el servidor no responde en 1 segundo, saltamos al local
+    if not uri_nube or not es_accesible_bd_nube(uri_nube):
+        raise Exception("Nube no disponible")
+    
     app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
-else:
-    print("🏠 Modo Offline: Usando Base de Datos Local (SQLite).")
+    print("[BACKEND] -> Conectado a Render (Nube)")
+except Exception:
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
+    print("[BACKEND] -> ¡SIN INTERNET! Operando local con tienda.db")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Opciones de motor para evitar que el buscador se "congele" si la red cae durante el uso
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,  # Verifica si la conexión sigue viva antes de cada búsqueda
+    "pool_recycle": 300,
+}
 
 CORS(app)
 db = SQLAlchemy(app)
