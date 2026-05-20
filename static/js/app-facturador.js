@@ -43,6 +43,42 @@ function getModal(id) {
   return bootstrap.Modal.getOrCreateInstance(el);
 }
 
+// --- Network Status Handler ---
+function updateNetworkStatus(isOnline) {
+  const statusDot = document.getElementById('status-dot'); // Asumiendo que este elemento existe en el HTML
+  const offlineIndicator = document.getElementById('offline-indicator'); // Del offline-manager.js
+
+  if (statusDot) {
+    if (isOnline) {
+      statusDot.classList.remove('status-dot-offline');
+      statusDot.classList.add('status-dot-online');
+      statusDot.title = 'Conectado';
+    } else {
+      statusDot.classList.remove('status-dot-online');
+      statusDot.classList.add('status-dot-offline');
+      statusDot.title = 'Trabajando Offline';
+    }
+  }
+
+  if (offlineIndicator) {
+    if (isOnline) {
+      offlineIndicator.className = 'badge bg-success';
+      offlineIndicator.innerHTML = '<i class="bi bi-wifi"></i> Conectado';
+    } else {
+      offlineIndicator.className = 'badge bg-warning text-dark';
+      offlineIndicator.innerHTML = '<i class="bi bi-wifi-off"></i> Trabajando Offline';
+    }
+  }
+
+  // También actualizamos el switch de AFIP si existe
+  const switchAfip = document.getElementById('toggleFacturaAfip');
+  if (switchAfip) {
+    switchAfip.disabled = !isOnline; // Deshabilitar si no hay conexión
+    switchAfip.checked = isOnline ? switchAfip.checked : false; // Forzar a false si offline
+    switchAfip.closest('.form-check')?.querySelector('label')?.classList.toggle('text-muted', !isOnline);
+  }
+}
+
 /**
  * Formatea un string a Title Case (Primera letra de cada palabra en Mayúscula)
  */
@@ -65,6 +101,8 @@ function initApp() {
   cargarDashboard();
   setupEventListeners();
   verificarCaja();
+  // Verificación inicial del estado de red al cargar la aplicación
+  updateNetworkStatus(navigator.onLine);
 }
 
 // Tabs Management
