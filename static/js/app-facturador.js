@@ -2506,3 +2506,59 @@ if (modalPostVenta) {
         if (switchAfip) switchAfip.checked = false;
     });
 }
+
+// ─── Sincronización Automática con la Nube (Render) ───
+async function sincronizarDatosConNube() {
+    Swal.fire({
+        title: '📡 Sincronización',
+        text: 'Sincronizando datos locales con la nube...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    try {
+        const response = await fetch('/api/sincronizar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        
+        if (data.ok) {
+            Swal.fire({
+                icon: 'success',
+                title: '¡Sincronización Completada!',
+                text: data.mensaje || 'Los datos locales se han impactado en la nube correctamente.',
+                timer: 3500,
+                showConfirmButton: true,
+                confirmButtonColor: '#10b981'
+            }).then(() => {
+                if (typeof cargarCajaPos === 'function') cargarCajaPos();
+            });
+        } else {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Aviso de Sincronización',
+                text: data.mensaje || 'No se pudo completar toda la sincronización.',
+                confirmButtonText: 'Aceptar',
+                confirmButtonColor: '#f59e0b'
+            });
+        }
+    } catch (error) {
+        console.error('Error durante la sincronización:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Conexión',
+            text: 'Se restableció la red, pero el servidor de sincronización no está respondiendo.',
+            confirmButtonText: 'Entendido',
+            confirmButtonColor: '#ef4444'
+        });
+    }
+}
+
+window.addEventListener('online', () => {
+    sincronizarDatosConNube();
+});

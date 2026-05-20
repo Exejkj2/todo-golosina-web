@@ -1,20 +1,18 @@
 @echo off
 title Servidor Todo Golosina - LOCAL
+cd /d "%~dp0"
+
 echo ======================================================
 echo   INICIANDO SISTEMA DE FACTURACION LOCAL (OFFLINE)
 echo ======================================================
-cd /d "%~dp0"
 
-if not exist venv (
-    echo [!] Entorno virtual no detectado. Por favor, crea uno con: python -m venv venv
-    pause
-    exit
-)
+echo [*] Activando entorno virtual local...
+call venv\Scripts\activate
 
-echo [*] Abriendo Facturador en el navegador...
-start http://127.0.0.1:5000/facturador
+echo [*] Abriendo Facturador en Chrome...
+start chrome "http://127.0.0.1:5000/facturador"
 
 echo [*] Iniciando servidor Flask...
-call venv\Scripts\activate
 python app.py
+
 pause

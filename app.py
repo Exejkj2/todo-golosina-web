@@ -38,84 +38,29 @@ def es_accesible_bd_nube(uri_nube):
     except (socket.timeout, socket.error, socket.gaierror):
         return False
 
-# ─── Configuración de Base de Datos con Deteiciónnde Entorno nde Entorao  de Entorao Automática ───
 # ─── Configuración de Base de Datos con Detección de Entorno Automática ───
 uri_nube = os.environ.get('DATABASE_URL')
-if uri_nube and uri_nube.startswith('postgres://'):)))
+if uri_nube and uri_nube.startswith('postgres://'):
+    uri_nube = uri_nube.replace('postgres://', 'postgresql://', 1)
 
 # Detectar si estamos en el entorno de Render (producción)
-is_render_production = os.environ.get('RENDER' == 'true'
+is_render_production = os.environ.get('RENDER') == 'true'
 
-# Detectar si estamos en el entorno de Render (producción)
-is_rif is_render_production:
-        enEn Render, seempreri_tentamps usarrldcDATABASE_tio de Render.
-        # Sinn  está=d finida,se. un erron de configuración en Renrer, pero pana.getrompe(, ca'moR a SQLite.
-        if not uri_nube:
-            raise ExceEtiND("DATABASE_URL no ERfinida' ==entorno de'Rrnder.")
-        app.confiu['SQLALCHEMY_DATABASE_URI'] = uri_nebe
-        pri't("[BACKEND] -> Conectao a PostgreSQL en Render (Nube)")
-    else:
-        # Si n estamos en Renderaumimos entorno loc.
-        # Intentamos conecar a un DB reta si DATABASE_URL está definida y es acceible,
-       # y no punta a ocalhost( u sería un error de configuración para una DB remota).
-    urlparse(uri_ube).hsname in['localhost', '127.0.0.1'] or not 
-# Detect    ar si estamos en DATABASE_URL remotantoraccesible o configurana oncorrectamente dara enter o nocal.er (producción)
-is_r        enEn Render, seempreri_tentamps usarrldcDATABASE_tio de Render.
-            # Sinn  está=d finida,se. unPostgreSQL en  erron de confi # Se mantiene el log solicitado para conexión remotaguración en Renrer, pero pana.getrompe(, ca'moR a SQLite.
-        if not u as er
-    # Si cualquier intento de conexión remota falla, caemos a la base de datos local.
-    i_nube:
-            raise ExceEtiND("DATABASE_URL no ERfinida' ==entorno de'Rrnder.")
-        app.confiu['SQLALCHEMY_DATABASE_URI'] = uri_nebe
-        pri't("[BACKEND] -> Conectao a PostgreSQL en Render (Nube)")
-    else:
-        # Si n estamos en Renderaumimos entorno loc.
-        # Intentamos conecar a un DB reta si DATABASE_URL está definida y es acceible,
-       # y no punta a ocalhost( u sería un error de configuración para una DB remota).
-        uri_nube = uri_nubeurlparse(uri_.ube).hrsename inp['localhost', '127.0.0.1'] or not lace('postgres://', 'postgresql://', 1)
-    DATABASE_URL rmotaaccesible o configuraa ncorrectamente ara entro ocal.
-# De        teEn Render, stempreairtentam s usarsl sDATABASE_tam de Render.
-            # Sions está definida, ee unPostgreSQL en  lrro  de confn # Se mantiene el log solicitado para conexión remotaguración en Renter, pero parano drompee, ca moR a SQLite.
-        if not u as er
-    # Si cualquier intento de conexión remota falla, caemos a la base de datos local.
-    i_nube:
-            raise Exceetind("DATABASE_URL no erfinida (prentorno dedRcnder.")
-        app.confic['SQLALCHEMY_DATABASE_URI'] = uri_nibe
-        priót("[BACKEND] -> Conectano a PostgreSQL en Render (Nube)")
-    else:
-        # Si n) estamos en Renderaumimos entorno loc.
-        # Intentamos conecar a un DB reta si DATABASE_URL está definida y es acceible,
-       # y no punta a ocalhost( u sería un error de configuración para una DB remota).
-    is_render_production = urlparse(uri_oube).hss.name ine['localhost', '127.0.0.1'] or not nviron.get('RENDER') == 'true'
-    DATABASE_URL rmotaaccesible o configuraa ncorrectamente ara entro ocal.
-try:    # Si no hay URL o el servidor no responde en 1 segundo, saltamos al local
-        if not uri_nube or not es_accesiPostgreSQL en ble_bd_nube(uri # Se mantiene el log solicitado para conexión remota_nube):
-        raise Ex as ec
-    # Si cualquier intento de conexión remota falla, caemos a la base de datos local.
-    eption("Nube no disponible")
+try:
     if is_render_production:
-        # En Render, siempre intentamos usar la DATABASE_URL de Render.
-        # Si no está definida, es un error de configuración en Render, pero para no romper, caemos a SQLite.
         if not uri_nube:
             raise Exception("DATABASE_URL no definida en entorno de Render.")
         app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
         print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube)")
     else:
-        # Si no estamos en Render, asumimos entorno local.
-        # Intentamos conectar a una DB remota si DATABASE_URL está definida y es accesible,
-        # y no apunta a localhost (lo cual sería un error de configuración para una DB remota).
+        # Modo híbrido local: intentar conectar a base de datos de Render si está disponible
         if not uri_nube or urlparse(uri_nube).hostname in ['localhost', '127.0.0.1'] or not es_accesible_bd_nube(uri_nube):
-            raise Exception("DATABASE_URL remota no accesible o configurada incorrectamente para entorno local.")
+            raise Exception("DATABASE_URL remota no accesible o no configurada para el entorno local.")
         app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
-        print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube)") # Se mantiene el log solicitado para conexión remota
+        print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube)")
 except Exception as e:
-    # Si cualquier intento de conexión remota falla, caemos a la base de datos local.
-    
-    app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
-    print("[BACKEND] -> Conectado a Render (Nube)")
-except Exception:
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
-    print("[BACKEND] -> ¡SIN INTERNET! Operando local con tienda.db")
+    print(f"[BACKEND] -> ¡SIN INTERNET! Operando local con tienda.db (Detalle: {e})")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -127,6 +72,9 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 
 CORS(app)
 db = SQLAlchemy(app)
+
+def es_offline():
+    return 'sqlite' in app.config.get('SQLALCHEMY_DATABASE_URI', '')
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -177,6 +125,9 @@ class Producto(db.Model):
     cantidad_minima_descuento = db.Column(db.Integer, nullable=True)
     porcentaje_descuento_volumen = db.Column(db.Float, nullable=True)
 
+    sincronizado = db.Column(db.Boolean, default=True, nullable=False)
+    ultima_actualizacion = db.Column(db.DateTime, default=hora_argentina, onupdate=hora_argentina)
+
     def __init__(self, **kwargs):
         super(Producto, self).__init__(**kwargs)
 
@@ -205,7 +156,9 @@ class Producto(db.Model):
             'codigo_barra': self.codigo_barra or '',
             'descuento_volumen_activo': self.descuento_volumen_activo,
             'cantidad_minima_descuento': self.cantidad_minima_descuento,
-            'porcentaje_descuento_volumen': self.porcentaje_descuento_volumen
+            'porcentaje_descuento_volumen': self.porcentaje_descuento_volumen,
+            'sincronizado': self.sincronizado,
+            'ultima_actualizacion': self.ultima_actualizacion.isoformat() if self.ultima_actualizacion else None
         }
 
 @login_manager.user_loader
@@ -260,6 +213,8 @@ class Venta(db.Model):
     pago_debito = db.Column(db.Float, default=0.0)
     pago_cc = db.Column(db.Float, default=0.0)
     entregado = db.Column(db.Float, default=0.0)
+    sincronizado = db.Column(db.Boolean, default=True, nullable=False)
+    ultima_actualizacion = db.Column(db.DateTime, default=hora_argentina, onupdate=hora_argentina)
 
     def __init__(self, **kwargs):
         super(Venta, self).__init__(**kwargs)
@@ -609,8 +564,9 @@ def registrar_venta():
             pago_transferencia=p_tr,
             pago_debito=p_db,
             pago_cc=p_cc,
-            fecha=hora_argentina()
-            # Nota: Si afip_ok es False, cae y cae_vto quedan nulos/vacíos en la BD local
+            fecha=hora_argentina(),
+            sincronizado=not es_offline(),
+            ultima_actualizacion=hora_argentina()
         )
         db.session.add(venta)
         db.session.commit()
@@ -627,6 +583,244 @@ def to_title_case(text):
         return ""
     import re
     return re.sub(r"\b\w", lambda m: m.group(0).upper(), text.lower())
+
+@app.route('/api/sincronizar', methods=['POST', 'GET'])
+def api_sincronizar():
+    uri_nube = os.environ.get('DATABASE_URL')
+    if not uri_nube:
+        return jsonify({"ok": False, "mensaje": "DATABASE_URL no configurada en el servidor"}), 400
+        
+    clean_uri_nube = uri_nube
+    if clean_uri_nube.startswith('postgres://'):
+        clean_uri_nube = clean_uri_nube.replace('postgres://', 'postgresql://', 1)
+        
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        
+        # 1. Conectar a ambas bases de datos de forma explícita
+        engine_local = create_engine(f'sqlite:///{DB_PATH}')
+        SessionLocal = sessionmaker(bind=engine_local)
+        session_local = SessionLocal()
+        
+        engine_nube = create_engine(clean_uri_nube, connect_args={'connect_timeout': 3})
+        SessionNube = sessionmaker(bind=engine_nube)
+        session_nube = SessionNube()
+        
+        # Verificar la conexión con Render
+        session_nube.execute(text("SELECT 1"))
+        
+        # 2. Paso 1 (Subida): Productos modificados localmente a la nube
+        productos_local_no_sinc = session_local.query(Producto).filter(
+            (Producto.sincronizado == False) | (Producto.sincronizado == 0)
+        ).all()
+        
+        for p_local in productos_local_no_sinc:
+            p_nube = session_nube.query(Producto).filter(Producto.id == p_local.id).first()
+            subir_cambio = True
+            
+            if p_nube:
+                t_local = p_local.ultima_actualizacion.replace(tzinfo=None) if p_local.ultima_actualizacion else datetime.min
+                t_nube = p_nube.ultima_actualizacion.replace(tzinfo=None) if p_nube.ultima_actualizacion else datetime.min
+                
+                if t_nube > t_local:
+                    subir_cambio = False
+                    print(f"[SYNC] Producto ID {p_local.id} '{p_local.nombre}' omitido para subir: Nube es más reciente.")
+            
+            if subir_cambio:
+                if not p_nube:
+                    p_nube = Producto(
+                        id=p_local.id,
+                        nombre=p_local.nombre,
+                        descripcion=p_local.descripcion,
+                        precio_lista_1=p_local.precio_lista_1,
+                        precio_lista_2=p_local.precio_lista_2,
+                        precio_lista_3=p_local.precio_lista_3,
+                        precio_anterior=p_local.precio_anterior,
+                        imagen=p_local.imagen,
+                        imagen_url=p_local.imagen_url,
+                        categoria_id=p_local.categoria_id,
+                        stock=p_local.stock,
+                        activo=p_local.activo,
+                        favorito=p_local.favorito,
+                        permitir_sin_stock=p_local.permitir_sin_stock,
+                        ventas_totales=p_local.ventas_totales,
+                        codigo_barra=p_local.codigo_barra,
+                        descuento_volumen_activo=p_local.descuento_volumen_activo,
+                        cantidad_minima_descuento=p_local.cantidad_minima_descuento,
+                        porcentaje_descuento_volumen=p_local.porcentaje_descuento_volumen,
+                        sincronizado=True,
+                        ultima_actualizacion=p_local.ultima_actualizacion
+                    )
+                    session_nube.add(p_nube)
+                else:
+                    p_nube.nombre = p_local.nombre
+                    p_nube.descripcion = p_local.descripcion
+                    p_nube.precio_lista_1 = p_local.precio_lista_1
+                    p_nube.precio_lista_2 = p_local.precio_lista_2
+                    p_nube.precio_lista_3 = p_local.precio_lista_3
+                    p_nube.precio_anterior = p_local.precio_anterior
+                    p_nube.imagen = p_local.imagen
+                    p_nube.imagen_url = p_local.imagen_url
+                    p_nube.categoria_id = p_local.categoria_id
+                    p_nube.stock = p_local.stock
+                    p_nube.activo = p_local.activo
+                    p_nube.favorito = p_local.favorito
+                    p_nube.permitir_sin_stock = p_local.permitir_sin_stock
+                    p_nube.ventas_totales = p_local.ventas_totales
+                    p_nube.codigo_barra = p_local.codigo_barra
+                    p_nube.descuento_volumen_activo = p_local.descuento_volumen_activo
+                    p_nube.cantidad_minima_descuento = p_local.cantidad_minima_descuento
+                    p_nube.porcentaje_descuento_volumen = p_local.porcentaje_descuento_volumen
+                    p_nube.sincronizado = True
+                    p_nube.ultima_actualizacion = p_local.ultima_actualizacion
+            
+            p_local.sincronizado = True
+            
+        session_nube.commit()
+        session_local.commit()
+        
+        # Reiniciar secuencias de seriales de IDs en Postgres (Productos)
+        try:
+            session_nube.execute(text("SELECT setval(pg_get_serial_sequence('\"Productos\"', 'id'), COALESCE(MAX(id), 1)) FROM \"Productos\""))
+            session_nube.commit()
+        except Exception as seq_err:
+            session_nube.rollback()
+            print(f"[SYNC] No se pudo reiniciar secuencia de Productos: {seq_err}")
+            
+        # 3. Paso 1b (Subida): Ventas locales no sincronizadas a la nube
+        ventas_local_no_sinc = session_local.query(Venta).filter(
+            (Venta.sincronizado == False) | (Venta.sincronizado == 0)
+        ).order_by(Venta.id.asc()).all()
+        
+        for v_local in ventas_local_no_sinc:
+            v_nube = session_nube.query(Venta).filter(Venta.id == v_local.id).first()
+            if not v_nube:
+                v_nube = Venta(
+                    id=v_local.id,
+                    cliente_id=v_local.cliente_id,
+                    fecha=v_local.fecha,
+                    total=v_local.total,
+                    detalle_json=v_local.detalle_json,
+                    lista_precios=v_local.lista_precios,
+                    tipo=v_local.tipo,
+                    metodo_pago=v_local.metodo_pago,
+                    pago_efectivo=v_local.pago_efectivo,
+                    pago_transferencia=v_local.pago_transferencia,
+                    pago_debito=v_local.pago_debito,
+                    pago_cc=v_local.pago_cc,
+                    entregado=v_local.entregado,
+                    sincronizado=True,
+                    ultima_actualizacion=v_local.ultima_actualizacion
+                )
+                session_nube.add(v_nube)
+                
+            v_local.sincronizado = True
+            
+        session_nube.commit()
+        session_local.commit()
+        
+        # Reiniciar secuencias de seriales de IDs en Postgres (Ventas)
+        try:
+            session_nube.execute(text("SELECT setval(pg_get_serial_sequence('ventas', 'id'), COALESCE(MAX(id), 1)) FROM ventas"))
+            session_nube.commit()
+        except Exception as seq_err:
+            session_nube.rollback()
+            print(f"[SYNC] No se pudo reiniciar secuencia de Ventas: {seq_err}")
+            
+        # 4. Paso 2 (Bajada): Sincronizar categorías primero
+        categorias_nube = session_nube.query(Categoria).all()
+        for cat_nube in categorias_nube:
+            cat_local = session_local.query(Categoria).filter(Categoria.id == cat_nube.id).first()
+            if not cat_local:
+                cat_local = Categoria(id=cat_nube.id, nombre=cat_nube.nombre)
+                session_local.add(cat_local)
+            else:
+                cat_local.nombre = cat_nube.nombre
+        session_local.commit()
+        
+        # Obtener el tiempo de la última sincronización local
+        res = session_local.query(db.func.max(Producto.ultima_actualizacion)).filter(
+            (Producto.sincronizado == True) | (Producto.sincronizado == 1)
+        ).scalar()
+        max_local_time = res if res else datetime.min
+        
+        # 5. Paso 2b (Bajada): Productos nuevos/actualizados en la nube a SQLite
+        productos_nube_nuevos = session_nube.query(Producto).filter(
+            Producto.ultima_actualizacion > max_local_time
+        ).all()
+        
+        for p_nube in productos_nube_nuevos:
+            p_local = session_local.query(Producto).filter(Producto.id == p_nube.id).first()
+            t_nube = p_nube.ultima_actualizacion.replace(tzinfo=None) if p_nube.ultima_actualizacion else datetime.min
+            actualizar_local = True
+            
+            if p_local:
+                t_local = p_local.ultima_actualizacion.replace(tzinfo=None) if p_local.ultima_actualizacion else datetime.min
+                if t_local > t_nube:
+                    actualizar_local = False
+                    print(f"[SYNC] Producto ID {p_nube.id} '{p_nube.nombre}' omitido para bajar: Local es más reciente.")
+            
+            if actualizar_local:
+                if not p_local:
+                    p_local = Producto(
+                        id=p_nube.id,
+                        nombre=p_nube.nombre,
+                        descripcion=p_nube.descripcion,
+                        precio_lista_1=p_nube.precio_lista_1,
+                        precio_lista_2=p_nube.precio_lista_2,
+                        precio_lista_3=p_nube.precio_lista_3,
+                        precio_anterior=p_nube.precio_anterior,
+                        imagen=p_nube.imagen,
+                        imagen_url=p_nube.imagen_url,
+                        categoria_id=p_nube.categoria_id,
+                        stock=p_nube.stock,
+                        activo=p_nube.activo,
+                        favorito=p_nube.favorito,
+                        permitir_sin_stock=p_nube.permitir_sin_stock,
+                        ventas_totales=p_nube.ventas_totales,
+                        codigo_barra=p_nube.codigo_barra,
+                        descuento_volumen_activo=p_nube.descuento_volumen_activo,
+                        cantidad_minima_descuento=p_nube.cantidad_minima_descuento,
+                        porcentaje_descuento_volumen=p_nube.porcentaje_descuento_volumen,
+                        sincronizado=True,
+                        ultima_actualizacion=t_nube
+                    )
+                    session_local.add(p_local)
+                else:
+                    p_local.nombre = p_nube.nombre
+                    p_local.descripcion = p_nube.descripcion
+                    p_local.precio_lista_1 = p_nube.precio_lista_1
+                    p_local.precio_lista_2 = p_nube.precio_lista_2
+                    p_local.precio_lista_3 = p_nube.precio_lista_3
+                    p_local.precio_anterior = p_nube.precio_anterior
+                    p_local.imagen = p_nube.imagen
+                    p_local.imagen_url = p_nube.imagen_url
+                    p_local.categoria_id = p_nube.categoria_id
+                    p_local.stock = p_nube.stock
+                    p_local.activo = p_nube.activo
+                    p_local.favorito = p_nube.favorito
+                    p_local.permitir_sin_stock = p_nube.permitir_sin_stock
+                    p_local.ventas_totales = p_nube.ventas_totales
+                    p_local.codigo_barra = p_nube.codigo_barra
+                    p_local.descuento_volumen_activo = p_nube.descuento_volumen_activo
+                    p_local.cantidad_minima_descuento = p_nube.cantidad_minima_descuento
+                    p_local.porcentaje_descuento_volumen = p_nube.porcentaje_descuento_volumen
+                    p_local.sincronizado = True
+                    p_local.ultima_actualizacion = t_nube
+                    
+        session_local.commit()
+        return jsonify({"ok": True, "mensaje": "Sincronización bidireccional completada con éxito"}), 200
+        
+    except Exception as e:
+        import traceback
+        print(f"[SYNC FATAL ERROR] {e}\n{traceback.format_exc()}")
+        return jsonify({"ok": False, "mensaje": f"Error de sincronización: {str(e)}"}), 500
+    finally:
+        if 'session_local' in locals():
+            session_local.close()
+        if 'session_nube' in locals():
+            session_nube.close()
 
 @app.route('/imprimir_ticket/')
 @app.route('/imprimir_ticket/<int:id>')
@@ -1360,7 +1554,9 @@ def admin_add_product():
         codigo_barra=codigo_barra,
         descuento_volumen_activo=descuento_volumen_activo,
         cantidad_minima_descuento=cantidad_minima_descuento,
-        porcentaje_descuento_volumen=porcentaje_descuento_volumen
+        porcentaje_descuento_volumen=porcentaje_descuento_volumen,
+        sincronizado=not es_offline(),
+        ultima_actualizacion=hora_argentina()
     )
     db.session.add(nuevo)
     db.session.commit()
@@ -1444,6 +1640,8 @@ def admin_edit_product(id):
         except ValueError:
             producto.precio_lista_3 = producto.precio_lista_1
 
+        producto.sincronizado = not es_offline()
+        producto.ultima_actualizacion = hora_argentina()
         db.session.commit()
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -1464,6 +1662,8 @@ def admin_delete_product(id):
     producto = db.session.get(Producto, id)
     if producto:
         producto.activo = 0 # Soft delete
+        producto.sincronizado = not es_offline()
+        producto.ultima_actualizacion = hora_argentina()
         db.session.commit()
         flash('Producto eliminado.', 'warning')
     return redirect(url_for('admin_dashboard'))
@@ -1626,6 +1826,8 @@ def admin_importar():
                 
             # Actualización en la Base de Datos
             prod.precio_lista_1 = precio_final
+            prod.sincronizado = not es_offline()
+            prod.ultima_actualizacion = hora_argentina()
             if prod.id: # Si el producto ya existe en la BD
                 print(f"Actualizado: {prod.nombre} -> ${precio_final}")
             
@@ -1766,6 +1968,19 @@ def setup_database():
             db.session.commit()
         except Exception:
             db.session.rollback()
+
+        # Agregar columnas de sincronización en Productos de manera segura
+        try:
+            db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN sincronizado BOOLEAN DEFAULT TRUE;'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        try:
+            db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN ultima_actualizacion TIMESTAMP;'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         
         # Columnas nuevas para Clientes (MIGRACIÓN PASO A PASO)
         columnas_clientes = [
@@ -1787,7 +2002,9 @@ def setup_database():
             ('pago_efectivo', 'FLOAT DEFAULT 0.0'),
             ('pago_transferencia', 'FLOAT DEFAULT 0.0'),
             ('pago_debito', 'FLOAT DEFAULT 0.0'),
-            ('pago_cc', 'FLOAT DEFAULT 0.0')
+            ('pago_cc', 'FLOAT DEFAULT 0.0'),
+            ('sincronizado', 'BOOLEAN DEFAULT TRUE'),
+            ('ultima_actualizacion', 'TIMESTAMP')
         ]
         for col, tip in columnas_ventas:
             try:
