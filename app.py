@@ -29,13 +29,48 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 def es_accesible_bd_nube(uri_nube):
     if not uri_nube: return False
+    
+    # 1. Comprobación ultra-rápida de red física (sin DNS) a una IP fija (Cloudflare DNS)
+    # Esto falla inmediatamente en microsegundos si el cable de red o Wi-Fi está apagado.
     try:
-        url = urlparse(uri_nube)
-        hostname = url.hostname
-        port = url.port or 5432
-        socket.create_connection((hostname, port), timeout=1)
+        socket.setdefaulttimeout(1.0)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(("1.1.1.1", 53))
+        s.close()
+    except Exception:
+        print("[DETECTADO] Red física desconectada. Evitando bloqueos de DNS.")
+        return False
+
+    # 2. Resolución de DNS en un hilo secundario con un timeout de 1.5 segundos
+    # para evitar que el gethostbyname síncrono de Windows congele el servidor Flask.
+    import threading
+    url = urlparse(uri_nube)
+    hostname = url.hostname
+    port = url.port or 5432
+    if not hostname: return False
+    
+    dns_res = [None]
+    def lookup():
+        try:
+            dns_res[0] = socket.gethostbyname(hostname)
+        except Exception:
+            pass
+            
+    t = threading.Thread(target=lookup)
+    t.daemon = True
+    t.start()
+    t.join(timeout=1.5)
+    
+    if not dns_res[0]:
+        print(f"[CONEXION] No se pudo resolver el host de la nube: {hostname}")
+        return False
+        
+    # 3. Comprobación rápida de conexión TCP al puerto
+    try:
+        socket.create_connection((dns_res[0], port), timeout=1.5)
         return True
-    except (socket.timeout, socket.error, socket.gaierror):
+    except Exception as e:
+        print(f"[CONEXION] Falló conexión TCP al host {dns_res[0]}:{port}: {e}")
         return False
 
 # ─── Configuración de Base de Datos con Detección de Entorno Automática ───
@@ -51,24 +86,39 @@ try:
         if not uri_nube:
             raise Exception("DATABASE_URL no definida en entorno de Render.")
         app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            "pool_pre_ping": True,
+            "pool_recycle": 300,
+            "connect_args": {
+                "connect_timeout": 3  # Timeout estricto de conexión de 3 segundos para Postgres
+            }
+        }
         print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube)")
     else:
-        # Modo híbrido local: intentar conectar a base de datos de Render si está disponible
+        # Modo híbrido local: intentar conectar a base de datos de Render si está disponible de forma rápida
         if not uri_nube or urlparse(uri_nube).hostname in ['localhost', '127.0.0.1'] or not es_accesible_bd_nube(uri_nube):
             raise Exception("DATABASE_URL remota no accesible o no configurada para el entorno local.")
+        
         app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            "pool_pre_ping": True,
+            "pool_recycle": 300,
+            "connect_args": {
+                "connect_timeout": 3  # Timeout estricto de conexión de 3 segundos para Postgres
+            }
+        }
         print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube)")
 except Exception as e:
+    # Asegurar fallback absoluto a SQLite
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "connect_args": {
+            "timeout": 15  # SQLite busy_timeout de 15 segundos
+        }
+    }
     print(f"[BACKEND] -> ¡SIN INTERNET! Operando local con tienda.db (Detalle: {e})")
-
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Opciones de motor para evitar que el buscador se "congele" si la red cae durante el uso
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_pre_ping": True,  # Verifica si la conexión sigue viva antes de cada búsqueda
-    "pool_recycle": 300,
-}
 
 CORS(app)
 db = SQLAlchemy(app)
@@ -358,6 +408,8 @@ def add_no_cache_headers(response):
 # ─── API REST (Para el Frontend) ─────────────────────────────
 @app.route('/api/productos', methods=['GET'])
 def get_productos():
+    if es_offline():
+        print("[SERVIDO LOCAL] -> Ejecutando consulta en tienda.db offline (api/productos)")
     categoria_nombre = request.args.get('categoria', '').strip()
     buscar    = request.args.get('buscar', '').strip()
     orden     = request.args.get('orden', 'id')
@@ -386,6 +438,8 @@ def get_productos():
 
 @app.route('/buscar_productos')
 def buscar_productos():
+    if es_offline():
+        print("[SERVIDO LOCAL] -> Ejecutando consulta en tienda.db offline (buscar_productos)")
     q = request.args.get('q', '').strip()
     if not q:
         return jsonify({"productos": []})
@@ -402,6 +456,8 @@ def buscar_productos():
 
 @app.route('/buscar_por_codigo/<codigo>')
 def buscar_por_codigo(codigo):
+    if es_offline():
+        print(f"[SERVIDO LOCAL] -> Buscando código '{codigo}' en tienda.db offline (buscar_por_codigo)")
     codigo = codigo.strip()
     
     # Búsqueda multi-variante (coma-separated barcodes)
@@ -436,6 +492,8 @@ def buscar_por_codigo(codigo):
 
 @app.route('/api/productos/<int:producto_id>', methods=['GET'])
 def get_producto(producto_id):
+    if es_offline():
+        print(f"[SERVIDO LOCAL] -> Consultando producto ID {producto_id} en tienda.db offline (get_producto)")
     producto = Producto.query.filter_by(id=producto_id, activo=1).first()
     if not producto:
         abort(404, description="Producto no encontrado")
