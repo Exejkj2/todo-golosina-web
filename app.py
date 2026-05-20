@@ -406,6 +406,10 @@ def add_no_cache_headers(response):
     return response
 
 # ─── API REST (Para el Frontend) ─────────────────────────────
+@app.route('/api/estado_conexion', methods=['GET'])
+def estado_conexion():
+    return jsonify({"online": not es_offline()})
+
 @app.route('/api/productos', methods=['GET'])
 def get_productos():
     if es_offline():

@@ -45,18 +45,27 @@ function getModal(id) {
 
 // --- Network Status Handler ---
 function updateNetworkStatus(isOnline) {
-  const statusDot = document.getElementById('status-dot'); // Asumiendo que este elemento existe en el HTML
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
   const offlineIndicator = document.getElementById('offline-indicator'); // Del offline-manager.js
 
   if (statusDot) {
     if (isOnline) {
       statusDot.classList.remove('status-dot-offline');
-      statusDot.classList.add('status-dot-online');
+      statusDot.style.backgroundColor = '#198754'; // Verde
       statusDot.title = 'Conectado';
     } else {
-      statusDot.classList.remove('status-dot-online');
       statusDot.classList.add('status-dot-offline');
+      statusDot.style.removeProperty('background-color'); // Deja actuar al estilo .status-dot-offline (rojo parpadeante)
       statusDot.title = 'Trabajando Offline';
+    }
+  }
+
+  if (statusText) {
+    if (isOnline) {
+      statusText.innerHTML = 'EN LÍNEA (NUBE)';
+    } else {
+      statusText.innerHTML = '<b>MODO OFFLINE (LOCAL)</b>';
     }
   }
 
@@ -73,9 +82,14 @@ function updateNetworkStatus(isOnline) {
   // También actualizamos el switch de AFIP si existe
   const switchAfip = document.getElementById('toggleFacturaAfip');
   if (switchAfip) {
-    switchAfip.disabled = !isOnline; // Deshabilitar si no hay conexión
-    switchAfip.checked = isOnline ? switchAfip.checked : false; // Forzar a false si offline
-    switchAfip.closest('.form-check')?.querySelector('label')?.classList.toggle('text-muted', !isOnline);
+    if (!isOnline) {
+      switchAfip.checked = false;
+      switchAfip.disabled = true;
+      switchAfip.closest('.form-check')?.querySelector('label')?.classList.add('text-muted');
+    } else {
+      switchAfip.disabled = false;
+      switchAfip.closest('.form-check')?.querySelector('label')?.classList.remove('text-muted');
+    }
   }
 }
 
@@ -1582,20 +1596,31 @@ function setupEventListeners() {
   window.addEventListener("keydown", handleGlobalShortcuts);
 
   // Control de Estado de Red (Eventos y Heartbeat)
-  window.addEventListener('online', () => updateNetworkStatus(true));
+  window.addEventListener('online', () => checkRealConnection());
   window.addEventListener('offline', () => updateNetworkStatus(false));
   
-  setInterval(async () => {
+  async function checkRealConnection() {
+    if (!navigator.onLine) {
+      updateNetworkStatus(false);
+      return;
+    }
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
-      await fetch('/api/caja/estado', { method: 'HEAD', signal: controller.signal, cache: 'no-store' });
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch('/api/estado_conexion', { signal: controller.signal, cache: 'no-store' });
       clearTimeout(timeoutId);
-      updateNetworkStatus(true);
+      const data = await res.json();
+      updateNetworkStatus(!!data.online);
     } catch (e) {
       updateNetworkStatus(false);
     }
-  }, 10000);
+  }
+
+  // Verificación inicial de red física y lógica al cargar
+  checkRealConnection();
+  
+  // Re-verificar cada 10 segundos
+  setInterval(checkRealConnection, 10000);
 
   // 🧲 IMÁN DE FOCO: Retornar al lector al cerrar cualquier modal
   document.addEventListener("hidden.bs.modal", () => {
@@ -2209,7 +2234,11 @@ async function handleSearchInput(e) {
   }
 
   try {
-    const r = await fetch(`/buscar_productos?q=${encodeURIComponent(q)}`);
+    const isOffline = !navigator.onLine || document.getElementById('status-dot')?.classList.contains('status-dot-offline');
+    const fetchUrl = isOffline 
+      ? `/api/productos?buscar=${encodeURIComponent(q)}` 
+      : `/buscar_productos?q=${encodeURIComponent(q)}`;
+    const r = await fetch(fetchUrl);
     const data = await r.json();
     resultsBody.innerHTML = "";
     if (data.productos && data.productos.length > 0) {
