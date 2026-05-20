@@ -38,15 +38,78 @@ def es_accesible_bd_nube(uri_nube):
     except (socket.timeout, socket.error, socket.gaierror):
         return False
 
-# ─── Configuración de Base de Datos con Fallback Automático ───
+# ─── Configuración de Base de Datos con Deteiciónnde Entorno nde Entorao  de Entorao Automática ───
+# ─── Configuración de Base de Datos con Detección de Entorno Automática ───
 uri_nube = os.environ.get('DATABASE_URL')
-if uri_nube and uri_nube.startswith('postgres://'):
-    uri_nube = uri_nube.replace('postgres://', 'postgresql://', 1)
+if uri_nube and uri_nube.startswith('postgres://'):)))
 
-try:
-    # Si no hay URL o el servidor no responde en 1 segundo, saltamos al local
-    if not uri_nube or not es_accesible_bd_nube(uri_nube):
-        raise Exception("Nube no disponible")
+# Detectar si estamos en el entorno de Render (producción)
+is_render_production = os.environ.get('RENDER' == 'true'
+
+# Detectar si estamos en el entorno de Render (producción)
+is_rif is_render_production:
+        enEn Render, seempreri_tentamps usarrldcDATABASE_tio de Render.
+        # Sinn  está=d finida,se. un erron de configuración en Renrer, pero pana.getrompe(, ca'moR a SQLite.
+        if not uri_nube:
+            raise ExceEtiND("DATABASE_URL no ERfinida' ==entorno de'Rrnder.")
+        app.confiu['SQLALCHEMY_DATABASE_URI'] = uri_nebe
+        pri't("[BACKEND] -> Conectao a PostgreSQL en Render (Nube)")
+    else:
+        # Si n estamos en Renderaumimos entorno loc.
+        # Intentamos conecar a un DB reta si DATABASE_URL está definida y es acceible,
+       # y no punta a ocalhost( u sería un error de configuración para una DB remota).
+    urlparse(uri_ube).hsname in['localhost', '127.0.0.1'] or not 
+# Detect    ar si estamos en DATABASE_URL remotantoraccesible o configurana oncorrectamente dara enter o nocal.er (producción)
+is_r        enEn Render, seempreri_tentamps usarrldcDATABASE_tio de Render.
+            # Sinn  está=d finida,se. unPostgreSQL en  erron de confi # Se mantiene el log solicitado para conexión remotaguración en Renrer, pero pana.getrompe(, ca'moR a SQLite.
+        if not u as er
+    # Si cualquier intento de conexión remota falla, caemos a la base de datos local.
+    i_nube:
+            raise ExceEtiND("DATABASE_URL no ERfinida' ==entorno de'Rrnder.")
+        app.confiu['SQLALCHEMY_DATABASE_URI'] = uri_nebe
+        pri't("[BACKEND] -> Conectao a PostgreSQL en Render (Nube)")
+    else:
+        # Si n estamos en Renderaumimos entorno loc.
+        # Intentamos conecar a un DB reta si DATABASE_URL está definida y es acceible,
+       # y no punta a ocalhost( u sería un error de configuración para una DB remota).
+        uri_nube = uri_nubeurlparse(uri_.ube).hrsename inp['localhost', '127.0.0.1'] or not lace('postgres://', 'postgresql://', 1)
+    DATABASE_URL rmotaaccesible o configuraa ncorrectamente ara entro ocal.
+# De        teEn Render, stempreairtentam s usarsl sDATABASE_tam de Render.
+            # Sions está definida, ee unPostgreSQL en  lrro  de confn # Se mantiene el log solicitado para conexión remotaguración en Renter, pero parano drompee, ca moR a SQLite.
+        if not u as er
+    # Si cualquier intento de conexión remota falla, caemos a la base de datos local.
+    i_nube:
+            raise Exceetind("DATABASE_URL no erfinida (prentorno dedRcnder.")
+        app.confic['SQLALCHEMY_DATABASE_URI'] = uri_nibe
+        priót("[BACKEND] -> Conectano a PostgreSQL en Render (Nube)")
+    else:
+        # Si n) estamos en Renderaumimos entorno loc.
+        # Intentamos conecar a un DB reta si DATABASE_URL está definida y es acceible,
+       # y no punta a ocalhost( u sería un error de configuración para una DB remota).
+    is_render_production = urlparse(uri_oube).hss.name ine['localhost', '127.0.0.1'] or not nviron.get('RENDER') == 'true'
+    DATABASE_URL rmotaaccesible o configuraa ncorrectamente ara entro ocal.
+try:    # Si no hay URL o el servidor no responde en 1 segundo, saltamos al local
+        if not uri_nube or not es_accesiPostgreSQL en ble_bd_nube(uri # Se mantiene el log solicitado para conexión remota_nube):
+        raise Ex as ec
+    # Si cualquier intento de conexión remota falla, caemos a la base de datos local.
+    eption("Nube no disponible")
+    if is_render_production:
+        # En Render, siempre intentamos usar la DATABASE_URL de Render.
+        # Si no está definida, es un error de configuración en Render, pero para no romper, caemos a SQLite.
+        if not uri_nube:
+            raise Exception("DATABASE_URL no definida en entorno de Render.")
+        app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
+        print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube)")
+    else:
+        # Si no estamos en Render, asumimos entorno local.
+        # Intentamos conectar a una DB remota si DATABASE_URL está definida y es accesible,
+        # y no apunta a localhost (lo cual sería un error de configuración para una DB remota).
+        if not uri_nube or urlparse(uri_nube).hostname in ['localhost', '127.0.0.1'] or not es_accesible_bd_nube(uri_nube):
+            raise Exception("DATABASE_URL remota no accesible o configurada incorrectamente para entorno local.")
+        app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
+        print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube)") # Se mantiene el log solicitado para conexión remota
+except Exception as e:
+    # Si cualquier intento de conexión remota falla, caemos a la base de datos local.
     
     app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
     print("[BACKEND] -> Conectado a Render (Nube)")
