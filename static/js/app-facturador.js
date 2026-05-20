@@ -468,6 +468,7 @@ function updateClock() {
 }
 
 async function fetchWeather() {
+  if (!navigator.onLine) return; // No intentar si no hay internet
   try {
     const res = await fetch("https://wttr.in/Aguilares,Tucuman?format=j1");
     const data = await res.json();
@@ -1846,7 +1847,7 @@ function setupEventListeners() {
         scannerInput.value = "";
         if (!code) return;
         try {
-          const res = await fetch(`/buscar_por_codigo/${encodeURIComponent(code)}`);
+          const res = await fetch("/buscar_por_codigo/" + encodeURIComponent(code));
           const data = await res.json();
           if (data.ok && data.producto) {
             addItem(data.producto, 1);

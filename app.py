@@ -33,10 +33,11 @@ def es_accesible_bd_nube(uri_nube):
         url = urlparse(uri_nube)
         hostname = url.hostname
         port = url.port or 5432
-        # Timeout de 2 segundos para no demorar el arranque local
-        socket.create_connection((hostname, port), timeout=2)
+        # Timeout reducido a 1 segundo para arranque local instantáneo
+        # socket.gethostbyname ayuda a fallar rápido si no hay DNS
+        socket.create_connection((socket.gethostbyname(hostname), port), timeout=1)
         return True
-    except (socket.timeout, socket.error):
+    except (socket.timeout, socket.error, socket.gaierror):
         return False
 
 # Configuración de Base de Datos con Fallback Inteligente
