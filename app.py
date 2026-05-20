@@ -11,6 +11,8 @@ import pandas as pd
 from fpdf import FPDF
 from datetime import datetime, time, date, timedelta
 import json
+import socket
+from urllib.parse import urlparse
 
 # --- Configuración de Zona Horaria (Argentina UTC-3: Naive approach) ---
 def hora_argentina():
@@ -25,12 +27,30 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'todo_golosina_secreto_super_seguro'
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-# Configuración de Base de Datos (PostgreSQL en Render / SQLite local)
-uri = os.environ.get('DATABASE_URL')
-if uri and uri.startswith('postgres://'):
-    uri = uri.replace('postgres://', 'postgresql://', 1)
+def es_accesible_bd_nube(uri_nube):
+    if not uri_nube: return False
+    try:
+        url = urlparse(uri_nube)
+        hostname = url.hostname
+        port = url.port or 5432
+        # Timeout de 2 segundos para no demorar el arranque local
+        socket.create_connection((hostname, port), timeout=2)
+        return True
+    except (socket.timeout, socket.error):
+        return False
 
-app.config['SQLALCHEMY_DATABASE_URI'] = uri or f'sqlite:///{DB_PATH}'
+# Configuración de Base de Datos con Fallback Inteligente
+uri_nube = os.environ.get('DATABASE_URL')
+if uri_nube and uri_nube.startswith('postgres://'):
+    uri_nube = uri_nube.replace('postgres://', 'postgresql://', 1)
+
+if es_accesible_bd_nube(uri_nube):
+    print("🌐 Conectado a Base de Datos en la Nube (Render).")
+    app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
+else:
+    print("🏠 Modo Offline: Usando Base de Datos Local (SQLite).")
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 CORS(app)
@@ -415,12 +435,23 @@ def registrar_venta():
     # Capturamos la decisión del usuario (por defecto False)
     facturar_afip = data.get('facturar_afip', False) if isinstance(data, dict) else False
 
-    # Determinar el tipo de comprobante
-    tipo_comprobante = "Factura C" if facturar_afip else "Ticket No Fiscal"
+    afip_ok = False
+    mensaje_afip = ""
 
-    # Imprimimos en consola para verificar (Futuro: Aquí irá la llamada a afip.py)
-    print(f"🛒 Venta recibida. Total: ${data.get('total') if isinstance(data, dict) else 0.0}. Tipo: {tipo_comprobante}")
+    if facturar_afip:
+        try:
+            # Simulación de llamada a AFIP (Aquí iría afip.py)
+            # Si no hay internet, esto lanzará una excepción por timeout
+            print("📡 Intentando conectar con servidores de AFIP...")
+            # check_afip_status() ...
+            afip_ok = True
+        except Exception as e:
+            print(f"⚠️ Error de conexión AFIP: {e}")
+            afip_ok = False
+            mensaje_afip = " (Modo Offline: Pendiente de CAE)"
 
+    tipo_comprobante = "Factura C" if afip_ok else "Ticket No Fiscal"
+    
     # Acepta dos formatos:
     # A) Lista directa (uso original del carrito público): [{id, qty}, ...]
     # B) Objeto con cliente: {cliente_id, items:[{id,qty,name,precio_unit}], total}
@@ -507,6 +538,7 @@ def registrar_venta():
             pago_debito=p_db,
             pago_cc=p_cc,
             fecha=hora_argentina()
+            # Nota: Si afip_ok es False, cae y cae_vto quedan nulos/vacíos en la BD local
         )
         db.session.add(venta)
         db.session.commit()
@@ -514,7 +546,7 @@ def registrar_venta():
     else:
         db.session.commit()
 
-    return jsonify({"ok": True, "mensaje": "Venta registrada con éxito", "venta_id": venta_id})
+    return jsonify({"ok": True, "mensaje": f"Venta registrada con éxito{mensaje_afip}", "venta_id": venta_id})
 
 # ─── Rutas del Frontend (La Vidriera) ────────────────────────
 # ─── Utilidades ────────────────────────────────────────────────────────

@@ -1187,7 +1187,9 @@ if (originalBtnConfirmar) {
       }
 
       const switchAfip = document.getElementById('toggleFacturaAfip');
-      const quiereFactura = switchAfip ? switchAfip.checked : false;
+      // Seguridad: Si el indicador está en rojo (clase offline), forzamos quiereFactura a false
+      const isActuallyOffline = document.getElementById('status-dot')?.classList.contains('status-dot-offline');
+      const quiereFactura = (switchAfip && !isActuallyOffline) ? switchAfip.checked : false;
 
       const payload = {
         tipo: "Local",
@@ -1539,6 +1541,22 @@ function setupEventListeners() {
 
   // Global Keydown
   window.addEventListener("keydown", handleGlobalShortcuts);
+
+  // Control de Estado de Red (Eventos y Heartbeat)
+  window.addEventListener('online', () => updateNetworkStatus(true));
+  window.addEventListener('offline', () => updateNetworkStatus(false));
+  
+  setInterval(async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      await fetch('/api/caja/estado', { method: 'HEAD', signal: controller.signal, cache: 'no-store' });
+      clearTimeout(timeoutId);
+      updateNetworkStatus(true);
+    } catch (e) {
+      updateNetworkStatus(false);
+    }
+  }, 10000);
 
   // 🧲 IMÁN DE FOCO: Retornar al lector al cerrar cualquier modal
   document.addEventListener("hidden.bs.modal", () => {
