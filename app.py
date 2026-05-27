@@ -1523,11 +1523,13 @@ def login():
 @login_required
 def admin_dashboard():
     try:
-        search = request.args.get('q')
+        search = request.args.get('q', '').strip()
         query = Producto.query.filter_by(activo=1)
         if search:
             query = query.filter(Producto.nombre.ilike(f'%{search}%'))
-        productos = query.order_by(Producto.id.desc()).limit(50).all()
+            productos = query.order_by(Producto.id.desc()).limit(100).all()
+        else:
+            productos = query.order_by(Producto.id.desc()).limit(50).all()
         categorias = Categoria.query.all()
         return render_template('admin.html', productos=productos, categorias=categorias, search=search)
     except Exception as e:

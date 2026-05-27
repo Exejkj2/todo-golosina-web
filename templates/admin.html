@@ -1119,6 +1119,200 @@
       document.querySelectorAll('.modal[id^="editModal"]').forEach(modal => {
         modal.addEventListener('shown.bs.modal', function() {
           const productId = this.id.replace('editModal', '');
+      // --- Manejo de Envío de Formulario con AJAX (Senior UX) ---
+      const addForm = document.querySelector('#addModal form');
+      if (addForm) {
+        addForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          
+          // Primero aplicamos el Capitalize que ya estaba
+          const nombreInput = this.querySelector('input[name="nombre"]');
+          if (nombreInput) {
+            nombreInput.value = toTitleCase(nombreInput.value.trim());
+          }
+
+          const formData = new FormData(this);
+          const errorContainer = document.getElementById('error-container-add');
+          const errorAlert = errorContainer.querySelector('.alert');
+
+          try {
+            const response = await fetch(this.action, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+              }
+            });
+
+            if (response.ok) {
+              // Si todo bien, recargamos para ver el nuevo producto
+              window.location.reload();
+            } else {
+              const data = await response.json();
+              if (data.error) {
+                errorAlert.textContent = data.error;
+                errorContainer.style.display = 'block';
+                // Scroll al error si es necesario
+                errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }
+          } catch (err) {
+            console.error('Error al guardar producto:', err);
+            errorAlert.textContent = 'Ocurrió un error inesperado al guardar el producto.';
+            errorContainer.style.display = 'block';
+          }
+        });
+      }
+
+      // Limpiar errores cuando se cierra o abre el modal
+      if (addModalEl) {
+        addModalEl.addEventListener('hidden.bs.modal', function() {
+          const errorContainer = document.getElementById('error-container-add');
+          if (errorContainer) errorContainer.style.display = 'none';
+        });
+      }
+
+      // --- Manejo de Envío de Formulario de EDICIÓN con AJAX ---
+      document.querySelectorAll('form[action*="/admin/producto/edit/"]').forEach(editForm => {
+        editForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          
+          const nombreInput = this.querySelector('input[name="nombre"]');
+          if (nombreInput) {
+            nombreInput.value = toTitleCase(nombreInput.value.trim());
+          }
+
+          const formData = new FormData(this);
+          const modal = this.closest('.modal');
+          const productId = modal.id.replace('editModal', '');
+          const errorContainer = document.getElementById('error-container-edit-' + productId);
+          const errorAlert = errorContainer ? errorContainer.querySelector('.alert') : null;
+
+          try {
+            const response = await fetch(this.action, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+              }
+            });
+
+            if (response.ok) {
+              window.location.reload();
+            } else {
+              const data = await response.json();
+              if (data.error && errorAlert) {
+                errorAlert.textContent = data.error;
+                errorContainer.style.display = 'block';
+                errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }
+          } catch (err) {
+            console.error('Error al editar producto:', err);
+            if (errorAlert) {
+              errorAlert.textContent = 'Ocurrió un error inesperado al editar.';
+              errorContainer.style.display = 'block';
+            }
+          }
+        });
+      });
+
+      // Limpiar errores en modales de edición al cerrarse
+      document.querySelectorAll('.modal[id^="editModal"]').forEach(m => {
+        m.addEventListener('hidden.bs.modal', function() {
+          const productId = this.id.replace('editModal', '');
+          const errorContainer = document.getElementById('error-container-edit-' + productId);
+          if (errorContainer) errorContainer.style.display = 'none';
+        });
+      });
+      // --- Lógica de Tags para Códigos de Barras (Scanner UX) ---
+      function setupBarcodeManager(inputId, hiddenId, containerId) {
+        const inputEl = document.getElementById(inputId);
+        const hiddenEl = document.getElementById(hiddenId);
+        const containerEl = document.getElementById(containerId);
+        
+        if (!inputEl || !hiddenEl || !containerEl) return;
+
+        let codigosArray = hiddenEl.value ? hiddenEl.value.split(',').filter(c => c.trim()) : [];
+
+        function renderizarCodigos() {
+          containerEl.innerHTML = '';
+          codigosArray.forEach((codigo, index) => {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-primary d-flex align-items-center gap-2 px-3 py-2 rounded-pill';
+            badge.style.fontSize = '0.85rem';
+            badge.innerHTML = `
+              ${codigo}
+              <i class="bi bi-x-circle-fill cursor-pointer" style="cursor:pointer;" onclick="window.removeBarcode('${hiddenId}', ${index})"></i>
+            `;
+            containerEl.appendChild(badge);
+          });
+          hiddenEl.value = codigosArray.join(',');
+        }
+
+        // Exponer la función de remoción globalmente para que el onclick funcione
+        window.removeBarcode = function(hId, idx) {
+          // Buscamos el hidden correspondiente y actualizamos su array
+          const hEl = document.getElementById(hId);
+          if (!hEl) return;
+          let arr = hEl.value.split(',').filter(c => c.trim());
+          arr.splice(idx, 1);
+          hEl.value = arr.join(',');
+          // Re-renderizamos usando el contenedor correspondiente
+          const cId = hId.includes('edit') ? hId.replace('hidden', 'input').replace('edit_codigo_barra_input_', 'edit_contenedor_codigos_') : 'add_contenedor_codigos';
+          // Como necesitamos una forma de volver a llamar renderizarCodigos, 
+          // simplificamos re-inicializando o disparando un evento.
+          // Por simplicidad en este entorno, llamamos a una versión que busque el contenedor.
+          const currentContainer = hId.includes('edit') 
+            ? document.getElementById('edit_contenedor_codigos_' + hId.split('_').pop())
+            : document.getElementById('add_contenedor_codigos');
+          
+          if (currentContainer) {
+            currentContainer.innerHTML = '';
+            arr.forEach((c, i) => {
+              const b = document.createElement('span');
+              b.className = 'badge bg-primary d-flex align-items-center gap-2 px-3 py-2 rounded-pill';
+              b.style.fontSize = '0.85rem';
+              b.innerHTML = `${c} <i class="bi bi-x-circle-fill cursor-pointer" style="cursor:pointer;" onclick="window.removeBarcode('${hId}', ${i})"></i>`;
+              currentContainer.appendChild(b);
+            });
+          }
+        };
+
+        inputEl.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault(); // BLOQUEO CRÍTICO: Evitar envío de formulario
+            
+            const val = this.value.trim();
+            if (val && !codigosArray.includes(val) && codigosArray.length < 10) {
+              codigosArray.push(val);
+              this.value = '';
+              renderizarCodigos();
+            } else if (val) {
+              this.value = ''; // Limpiar si ya existe o límite alcanzado
+            }
+          }
+        });
+
+        // Inicializar vista
+        renderizarCodigos();
+      }
+
+      // Inicializar para el modal de Alta
+      const addModal = document.getElementById('addModal');
+      if (addModal) {
+        addModal.addEventListener('shown.bs.modal', function() {
+          setupBarcodeManager('add_codigo_barra_input', 'add_codigo_barra_hidden', 'add_contenedor_codigos');
+          // UX: El usuario prefiere tipear primero el nombre antes de escanear
+          const nameInput = document.getElementById('add_nombre');
+          if (nameInput) nameInput.focus();
+        });
+      }
+
+      // Inicializar para todos los modales de Edición (cuando se abren)
+      document.querySelectorAll('.modal[id^="editModal"]').forEach(modal => {
+        modal.addEventListener('shown.bs.modal', function() {
+          const productId = this.id.replace('editModal', '');
           setupBarcodeManager(
             `edit_codigo_barra_input_${productId}`,
             `edit_codigo_barra_hidden_${productId}`,
@@ -1128,63 +1322,48 @@
         });
       });
 
-      // Bloqueo Global de Enter en formularios para evitar envíos accidentales
+      // Bloqueo Global de Enter en formularios (excepto el form de búsqueda)
       document.querySelectorAll('form').forEach(form => {
+        // Excluir el formulario de búsqueda del admin para que Enter pueda enviar al backend
+        if (form.id === 'form_busqueda_admin' || (form.querySelector('#buscador_admin'))) return;
         form.addEventListener('keydown', function(e) {
           if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-            // Si no estamos en el input de códigos (que ya tiene su propio preventDefault), 
-            // también bloqueamos aquí para mayor seguridad.
             if (!e.target.classList.contains('barcode-tag-input')) {
               e.preventDefault();
             }
           }
         });
       });
-      // --- Live Search (Filtrado en tiempo real) con Navegación por Teclado ---
+
+      // --- Live Search + Navegación por Teclado + Búsqueda Backend ---
       let filasVisibles = [];
       let indiceSeleccionado = -1;
 
       function resaltarFilaSeleccionada() {
-        // Quitar clase de todas las filas
         document.querySelectorAll('#tabla_productos tbody tr').forEach(f => f.classList.remove('table-active'));
-        
         if (indiceSeleccionado >= 0 && filasVisibles[indiceSeleccionado]) {
           const fila = filasVisibles[indiceSeleccionado];
           fila.classList.add('table-active');
-          // Scroll suave para que la fila sea visible si queda fuera de rango
           fila.scrollIntoView({ block: 'nearest' });
         }
       }
 
       const inputBuscador = document.getElementById('buscador_admin');
       if (inputBuscador) {
+        // Filtrado visual instantáneo sobre las filas ya cargadas
         inputBuscador.addEventListener('input', function(e) {
           const termino = e.target.value.toLowerCase();
           const filas = document.querySelectorAll('#tabla_productos tbody tr');
-          
           filas.forEach(fila => {
-            // Limpiar selección de todas las filas al filtrar
             fila.classList.remove('table-active');
-
-            // Filtramos por el contenido de texto de la fila (Nombre y Código están aquí)
-            const textoFila = fila.textContent.toLowerCase();
-            
-            if (textoFila.includes(termino)) {
-              fila.style.display = '';
-            } else {
-              fila.style.display = 'none';
-            }
+            fila.style.display = fila.textContent.toLowerCase().includes(termino) ? '' : 'none';
           });
-
-          // Resetear estado del buscador
           indiceSeleccionado = -1;
           filasVisibles = Array.from(filas).filter(f => f.style.display === '');
         });
 
-        // Navegación con Teclado (Flechas y Enter)
+        // Navegación con flechas + Enter inteligente
         inputBuscador.addEventListener('keydown', function(e) {
-          if (filasVisibles.length === 0) return;
-
           if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (indiceSeleccionado < filasVisibles.length - 1) {
@@ -1198,32 +1377,22 @@
               resaltarFilaSeleccionada();
             }
           } else if (e.key === 'Enter') {
-            e.preventDefault();
-            
-            let filaAEditar = null;
-
-            if (filasVisibles.length === 1) {
-              // Lógica 1 (Lector): Si el escaneo filtró una única fila, la abrimos
-              filaAEditar = filasVisibles[0];
-            } else if (indiceSeleccionado >= 0 && filasVisibles[indiceSeleccionado]) {
-              // Lógica 2 (Teclado): Si hay navegación activa, abrimos la resaltada
-              filaAEditar = filasVisibles[indiceSeleccionado];
+            // Prioridad 1: fila seleccionada con flechas → abrir modal
+            if (indiceSeleccionado >= 0 && filasVisibles[indiceSeleccionado]) {
+              e.preventDefault();
+              const btn = filasVisibles[indiceSeleccionado].querySelector('button[data-bs-target^="#editModal"]');
+              if (btn) btn.click();
+            // Prioridad 2: exactamente 1 fila visible sin navegación → abrir modal
+            } else if (filasVisibles.length === 1 && indiceSeleccionado < 0) {
+              e.preventDefault();
+              const btn = filasVisibles[0].querySelector('button[data-bs-target^="#editModal"]');
+              if (btn) btn.click();
             }
-
-            if (filaAEditar) {
-              const btnEditar = filaAEditar.querySelector('button[data-bs-target^="#editModal"]');
-              if (btnEditar) btnEditar.click();
-            }
+            // Prioridad 3: sin coincidencia única → dejar que el form envíe GET /admin?q=...
           }
         });
-
-        // Prevenir el envío del formulario al presionar Enter
-        const searchForm = inputBuscador.closest('form');
-        if (searchForm) {
-          searchForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-          });
-        }
+        // No se bloquea el submit: botón "Buscar" y Enter (sin fila única seleccionada)
+        // envían la petición GET al backend correctamente.
       }
 
       // --- Manejo de Importación Masiva con Reporte AJAX ---
@@ -1231,12 +1400,10 @@
       if (formImportar) {
         formImportar.addEventListener('submit', async function(e) {
           e.preventDefault();
-          
           const btn = this.querySelector('button[type="submit"]');
           const originalText = btn.innerHTML;
           btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
           btn.disabled = true;
-
           try {
             const formData = new FormData(this);
             const response = await fetch(this.action, {
@@ -1244,11 +1411,8 @@
               body: formData,
               headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
-            
             const data = await response.json();
-            
             if (response.ok) {
-              // El usuario solicita mostrar el reporte del servidor
               alert(data.mensaje);
               window.location.reload();
             } else {
