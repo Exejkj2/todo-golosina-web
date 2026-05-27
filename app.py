@@ -75,6 +75,10 @@ def es_accesible_bd_nube(uri_nube):
 
 # ─── Configuración de Base de Datos con Detección de Entorno Automática ───
 uri_nube = os.environ.get('DATABASE_URL')
+# Reemplazar por la conexión a Supabase si no está configurada o si apunta al antiguo host de Render
+if not uri_nube or "render.com" in uri_nube or "supabase.com" not in uri_nube:
+    uri_nube = 'postgresql://postgres.qrrvunhqlzwlcibfoesm:36799463Exe@aws-1-sa-east-1.pooler.supabase.com:5432/postgres'
+
 if uri_nube and uri_nube.startswith('postgres://'):
     uri_nube = uri_nube.replace('postgres://', 'postgresql://', 1)
 
@@ -324,84 +328,8 @@ class CajaDiaria(db.Model):
 # ─── INICIALIZACIÓN CRÍTICA (Render/Gunicorn compatible) ──────
 with app.app_context():
     db.create_all()
-    # Migración PostgreSQL para Render: Agregar columna descuento si no existe
-    try:
-        db.session.execute(text('ALTER TABLE clientes ADD COLUMN descuento FLOAT DEFAULT 0;'))
-        db.session.commit()
-        print("Columna 'descuento' agregada con éxito a 'clientes'.")
-    except Exception as e:
-        db.session.rollback()
-        print(f"Migración omitida (probablemente la columna ya existe): {e}")
-
-    # Migración PostgreSQL para Render: Agregar columna tipo en ventas si no existe
-    try:
-        db.session.execute(text("ALTER TABLE ventas ADD COLUMN tipo VARCHAR(50) DEFAULT 'local';"))
-        db.session.commit()
-        print("Columna 'tipo' agregada con éxito a 'ventas'.")
-    except Exception as e:
-        db.session.rollback()
-        print(f"Migración de ventas omitida (probablemente la columna ya existe): {e}")
-
-
     print("Base de datos y tablas inicializadas correctamente.")
 
-# Rutina de migración automática
-def migrate_db():
-    with app.app_context():
-        # Columnas para 'ventas'
-        ventas_cols = {
-            'metodo_pago': 'VARCHAR(100)',
-            'pago_efectivo': 'FLOAT DEFAULT 0.0',
-            'pago_transferencia': 'FLOAT DEFAULT 0.0',
-            'pago_debito': 'FLOAT DEFAULT 0.0',
-            'pago_cc': 'FLOAT DEFAULT 0.0',
-            'entregado': 'FLOAT DEFAULT 0.0',
-            'lista_precios': 'INTEGER DEFAULT 1',
-            'tipo': 'VARCHAR(20) DEFAULT "Local"',
-            'subtotal': 'FLOAT DEFAULT 0.0',
-            'descuento': 'FLOAT DEFAULT 0.0'
-        }
-        
-        # Intentar con y sin comillas para máxima compatibilidad
-        for table in ['ventas', '"ventas"']:
-            for col, type_ in ventas_cols.items():
-                try:
-                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
-
-        # Columnas para 'clientes'
-        clientes_cols = {
-            'cuit': 'VARCHAR(20)',
-            'telefono': 'VARCHAR(50)',
-            'direccion': 'VARCHAR(200)',
-            'condicion_iva': 'VARCHAR(50) DEFAULT "Consumidor Final"',
-            'descuento_fijo': 'FLOAT DEFAULT 0.0',
-            'descuento': 'FLOAT DEFAULT 0.0',
-            'limite_credito': 'FLOAT DEFAULT 0.0',
-            'saldo': 'FLOAT DEFAULT 0.0'
-        }
-        for table in ['clientes', '"clientes"']:
-            for col, type_ in clientes_cols.items():
-                try:
-                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
-        # Columnas para 'gastos'
-        gastos_cols = {
-            'tipo': 'VARCHAR(20) DEFAULT "Egreso"'
-        }
-        for table in ['gastos', '"gastos"']:
-            for col, type_ in gastos_cols.items():
-                try:
-                    db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {type_}"))
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
-
-migrate_db()
 
 @app.after_request
 def add_no_cache_headers(response):
@@ -415,17 +343,16 @@ def add_no_cache_headers(response):
 def estado_conexion():
     return jsonify({"online": not es_offline()})
 
-# ─── RUTA TEMPORAL DE MIGRACIÓN (Eliminar después de usar) ────
-@app.route('/forzar-migracion-db')
-def forzar_migracion_db():
+# ─── INICIALIZACIÓN TOTAL DE SUPABASE ───
+@app.route('/inicializar-todo-supabase')
+def inicializar_todo_supabase():
     try:
-        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS sincronizado BOOLEAN DEFAULT TRUE;'))
-        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP;'))
-        db.session.commit()
-        return "<h1>&#10004; ¡Sincronización forzada con SQLAlchemy Exitosa!</h1><p>Columnas 'sincronizado' y 'ultima_actualizacion' verificadas/creadas en la tabla Productos.</p><p><b>IMPORTANTE:</b> Elimina esta ruta del código después de confirmar que todo funciona.</p>", 200
+        db.drop_all()
+        db.create_all()
+        return "<h1>¡GOLAZO! Base de datos de Supabase inicializada y tablas creadas.</h1>", 200
     except Exception as e:
         db.session.rollback()
-        return f"<h1>Error al inyectar: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
+        return f"<h1>Error al inicializar Supabase: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
 
 
 @app.route('/api/productos', methods=['GET'])
