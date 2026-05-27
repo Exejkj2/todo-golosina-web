@@ -339,29 +339,6 @@ with app.app_context():
         db.session.rollback()
         print(f"Migración de ventas omitida (probablemente la columna ya existe): {e}")
 
-    # Migración PostgreSQL para Render: Agregar columnas a "Productos"
-    # Usa psycopg2 raw con AUTOCOMMIT para evitar el envenenamiento de transacción.
-    if not es_offline():
-        import psycopg2
-        _pg_uri = app.config['SQLALCHEMY_DATABASE_URI']
-        _pg_conn = None
-        try:
-            _pg_conn = psycopg2.connect(_pg_uri, connect_timeout=5)
-            _pg_conn.autocommit = True
-            _pg_cursor = _pg_conn.cursor()
-            _pg_cursor.execute('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS sincronizado BOOLEAN DEFAULT TRUE;')
-            print("[MIGRACIÓN] -> Columna 'sincronizado' verificada/creada en \"Productos\"")
-            _pg_cursor.execute('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP;')
-            print("[MIGRACIÓN] -> Columna 'ultima_actualizacion' verificada/creada en \"Productos\"")
-            _pg_cursor.close()
-            print("[RENDER] -> Estructura de base de datos verificada y actualizada correctamente")
-        except Exception as _pg_err:
-            print(f"[MIGRACIÓN] -> Error durante migración PostgreSQL: {_pg_err}")
-        finally:
-            if _pg_conn:
-                _pg_conn.close()
-    else:
-        print("[MIGRACIÓN] -> SQLite detectado, omitiendo migración PostgreSQL")
 
     print("Base de datos y tablas inicializadas correctamente.")
 
