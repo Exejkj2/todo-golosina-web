@@ -921,11 +921,19 @@ def check_admin_auth():
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    if current_user.is_authenticated or session.get('admin_autenticado'):
+        return redirect('/admin')
+
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         if username == 'admin' and password == 'admin123':
             session['admin_autenticado'] = True
+            
+            user = Usuario.query.filter_by(username='admin').first()
+            if user:
+                login_user(user)
+                
             return redirect('/admin')
         else:
             return render_template('index.html', error='Credenciales incorrectas')
