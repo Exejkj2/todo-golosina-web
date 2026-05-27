@@ -339,26 +339,29 @@ with app.app_context():
         db.session.rollback()
         print(f"Migración de ventas omitida (probablemente la columna ya existe): {e}")
 
-    # Migración PostgreSQL para Render: Agregar columnas a "Productos" (blindaje individual por columna)
-    # Usa conexión raw del engine para que un error en una columna no aborte la otra.
-    _migr_engine = db.engine
-    _migr_columnas = [
-        ('sincronizado', 'ALTER TABLE "Productos" ADD COLUMN sincronizado BOOLEAN DEFAULT TRUE;'),
-        ('ultima_actualizacion', 'ALTER TABLE "Productos" ADD COLUMN ultima_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;'),
-    ]
-    for _col_name, _col_sql in _migr_columnas:
+    # Migración PostgreSQL para Render: Agregar columnas a "Productos"
+    # Usa psycopg2 raw con AUTOCOMMIT para evitar el envenenamiento de transacción.
+    if not es_offline():
+        import psycopg2
+        _pg_uri = app.config['SQLALCHEMY_DATABASE_URI']
+        _pg_conn = None
         try:
-            with _migr_engine.connect() as _conn:
-                _conn.execute(text(_col_sql))
-                _conn.commit()
-            print(f"[MIGRACIÓN] -> Columna '{_col_name}' creada exitosamente en \"Productos\"")
-        except Exception as _migr_err:
-            _err_msg = str(_migr_err).lower()
-            if 'already exists' in _err_msg or 'duplicatecolumn' in _err_msg or 'duplicate column' in _err_msg:
-                print(f"[MIGRACIÓN] -> La columna '{_col_name}' ya existía, continuando sin romper el servidor")
-            else:
-                print(f"[MIGRACIÓN] -> Error inesperado al agregar '{_col_name}': {_migr_err}")
-    print("[RENDER] -> Estructura de base de datos verificada y actualizada correctamente")
+            _pg_conn = psycopg2.connect(_pg_uri, connect_timeout=5)
+            _pg_conn.autocommit = True
+            _pg_cursor = _pg_conn.cursor()
+            _pg_cursor.execute('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS sincronizado BOOLEAN DEFAULT TRUE;')
+            print("[MIGRACIÓN] -> Columna 'sincronizado' verificada/creada en \"Productos\"")
+            _pg_cursor.execute('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP;')
+            print("[MIGRACIÓN] -> Columna 'ultima_actualizacion' verificada/creada en \"Productos\"")
+            _pg_cursor.close()
+            print("[RENDER] -> Estructura de base de datos verificada y actualizada correctamente")
+        except Exception as _pg_err:
+            print(f"[MIGRACIÓN] -> Error durante migración PostgreSQL: {_pg_err}")
+        finally:
+            if _pg_conn:
+                _pg_conn.close()
+    else:
+        print("[MIGRACIÓN] -> SQLite detectado, omitiendo migración PostgreSQL")
 
     print("Base de datos y tablas inicializadas correctamente.")
 
@@ -1546,17 +1549,13 @@ def login():
 @app.route('/admin')
 @login_required
 def admin_dashboard():
-    try:
-        search = request.args.get('q')
-        query = Producto.query.filter_by(activo=1)
-        if search:
-            query = query.filter(Producto.nombre.ilike(f'%{search}%'))
-        productos = query.order_by(Producto.id.desc()).all()
-        categorias = Categoria.query.all()
-        return render_template('admin.html', productos=productos, categorias=categorias, search=search)
-    except Exception as e:
-        import traceback
-        return f"<h1>Error en Admin: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
+    search = request.args.get('q')
+    query = Producto.query.filter_by(activo=1)
+    if search:
+        query = query.filter(Producto.nombre.ilike(f'%{search}%'))
+    productos = query.order_by(Producto.id.desc()).all()
+    categorias = Categoria.query.all()
+    return render_template('admin.html', productos=productos, categorias=categorias, search=search)
 
 @app.route('/admin/producto/add', methods=['POST'])
 @login_required
