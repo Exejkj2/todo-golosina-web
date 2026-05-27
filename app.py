@@ -339,15 +339,26 @@ with app.app_context():
         db.session.rollback()
         print(f"Migración de ventas omitida (probablemente la columna ya existe): {e}")
 
-    # Migración PostgreSQL para Render: Agregar columnas sincronizado y ultima_actualizacion a "Productos" si no existen
-    try:
-        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS sincronizado BOOLEAN DEFAULT TRUE;'))
-        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;'))
-        db.session.commit()
-        print("[RENDER] -> Estructura de base de datos verificada y actualizada correctamente")
-    except Exception as e:
-        db.session.rollback()
-        print(f"[RENDER] -> Advertencia durante la migración de base de datos: {e}")
+    # Migración PostgreSQL para Render: Agregar columnas a "Productos" (blindaje individual por columna)
+    # Usa conexión raw del engine para que un error en una columna no aborte la otra.
+    _migr_engine = db.engine
+    _migr_columnas = [
+        ('sincronizado', 'ALTER TABLE "Productos" ADD COLUMN sincronizado BOOLEAN DEFAULT TRUE;'),
+        ('ultima_actualizacion', 'ALTER TABLE "Productos" ADD COLUMN ultima_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;'),
+    ]
+    for _col_name, _col_sql in _migr_columnas:
+        try:
+            with _migr_engine.connect() as _conn:
+                _conn.execute(text(_col_sql))
+                _conn.commit()
+            print(f"[MIGRACIÓN] -> Columna '{_col_name}' creada exitosamente en \"Productos\"")
+        except Exception as _migr_err:
+            _err_msg = str(_migr_err).lower()
+            if 'already exists' in _err_msg or 'duplicatecolumn' in _err_msg or 'duplicate column' in _err_msg:
+                print(f"[MIGRACIÓN] -> La columna '{_col_name}' ya existía, continuando sin romper el servidor")
+            else:
+                print(f"[MIGRACIÓN] -> Error inesperado al agregar '{_col_name}': {_migr_err}")
+    print("[RENDER] -> Estructura de base de datos verificada y actualizada correctamente")
 
     print("Base de datos y tablas inicializadas correctamente.")
 
