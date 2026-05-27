@@ -1435,6 +1435,36 @@ def get_ventas_cliente(cliente_id):
 
 
 # ─── Panel de Administración ──────────────────────────────────
+
+@app.route('/api/buscar_productos', methods=['GET'])
+def api_buscar_productos():
+    if not session.get('admin_autenticado') and not session.get('facturador_auth'):
+        return jsonify({"ok": False, "error": "No autenticado"}), 401
+    
+    q = request.args.get('q', '').strip()
+    if not q:
+        return jsonify({"ok": True, "productos": []})
+        
+    productos = Producto.query.filter(
+        Producto.activo == 1,
+        (Producto.nombre.ilike(f'%{q}%')) | (Producto.codigo_barra.ilike(f'%{q}%'))
+    ).order_by(Producto.nombre.asc()).limit(30).all()
+    
+    return jsonify({
+        "ok": True,
+        "productos": [
+            {
+                "id": p.id,
+                "nombre": p.nombre,
+                "codigo_barra": p.codigo_barra,
+                "precio_lista_1": p.precio_lista_1,
+                "stock": p.stock,
+                "categoria_nombre": p.categoria_rel.nombre if p.categoria_rel else "S/C"
+            } for p in productos
+        ]
+    })
+
+
 @app.route('/admin')
 def admin_dashboard():
     if not session.get('admin_autenticado'): return redirect('/')

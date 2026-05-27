@@ -193,8 +193,8 @@
 
         <!-- Toolbar Buscador y Exportar -->
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <form method="GET" action="{{ url_for('admin_dashboard') }}" class="d-flex gap-2" style="max-width: 450px; width: 100%;">
-            <input type="text" id="buscador_admin" name="q" class="form-control bg-white" placeholder="Buscar por nombre o código de barra..." value="{{ search or '' }}" />
+          <form id="ajaxSearchFormAdmin" class="d-flex gap-2" style="max-width: 450px; width: 100%;">
+            <input type="text" id="buscador_admin" name="q" autocomplete="off" class="form-control bg-white" placeholder="Buscar por nombre o código de barra..." value="{{ search or '' }}" />
             <button type="submit" class="btn btn-secondary px-3"><i class="bi bi-search"></i> Buscar</button>
             {% if search %}
             <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary" title="Limpiar búsqueda"><i class="bi bi-x-lg"></i></a>
