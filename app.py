@@ -212,8 +212,6 @@ class Producto(db.Model):
             'ultima_actualizacion': self.ultima_actualizacion.isoformat() if self.ultima_actualizacion else None
         }
 
-    return db.session.get(Usuario, int(user_id))
-
 # ─── Modelos de Clientes y Ventas ───────────────────────────────────────
 class Cliente(db.Model):
     __tablename__ = 'clientes'
@@ -923,9 +921,6 @@ def index():
         if username == 'admin' and password == 'admin123':
             session['admin_autenticado'] = True
             
-            user = Usuario.query.filter_by(username='admin').first()
-            if user:
-                
             return redirect('/admin')
         else:
             return render_template('index.html', error='Credenciales incorrectas')
