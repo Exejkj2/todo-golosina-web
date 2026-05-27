@@ -25,6 +25,7 @@ ultima_actualizacion_precios = hora_argentina()
 DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tienda.db')
 
 app = Flask(__name__)
+app.secret_key = 'llave_secreta_todo_golosinas_2026'
 app.config['SECRET_KEY'] = 'todo_golosina_secreto_super_seguro'
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
