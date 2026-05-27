@@ -75,7 +75,7 @@ def es_accesible_bd_nube(uri_nube):
 
 # ─── Configuración de Base de Datos con Detección de Entorno Automática ───
 uri_nube = os.environ.get('DATABASE_URL')
-# Reemplazar por la conexión a Supabase si no está configurada o si apunta al antiguo host de Render
+# Reemplazar por la conexión a Supabase (Contraseña verificada y actualizada)
 if not uri_nube or "render.com" in uri_nube or "supabase.com" not in uri_nube:
     uri_nube = 'postgresql://postgres.qrrvunhqlzwlcibfoesm:36799463Exe@aws-1-sa-east-1.pooler.supabase.com:5432/postgres'
 
