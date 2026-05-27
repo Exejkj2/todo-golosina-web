@@ -1,0 +1,625 @@
+  1: 
+  --> 0
+  2:       // Script para previsualizar imagen en Agregar
+  --> 0
+  3:       const addUrlInput = document.getElementById("addImgUrl");
+  --> 0
+  4:       const addImgPreview = document.getElementById("addImgPreview");
+  --> 0
+  5:       addUrlInput.addEventListener("input", function () {
+  6:         if (this.value) {
+  7:           addImgPreview.src = this.value;
+  8:           addImgPreview.style.display = "inline-block";
+  9:         } else {
+ 10:           addImgPreview.style.display = "none";
+ 11:         }
+ 12:       });
+  --> 0
+ 13: 
+  --> 0
+ 14:       // Script para previsualizar imágenes en Editar
+  --> 0
+ 15:       document.querySelectorAll(".edit-img-input").forEach((input) => {
+ 16:         input.addEventListener("input", function () {
+ 17:           const imgContainer = this.nextElementSibling;
+ 18:           const img = imgContainer.querySelector("img");
+ 19:           if (this.value) {
+ 20:             img.src = this.value;
+ 21:             img.style.display = "inline-block";
+ 22:           } else {
+ 23:             img.style.display = "none";
+ 24:           }
+ 25:         });
+ 26:       });
+  --> 0
+ 27: 
+  --> 0
+ 28:       // ─── UX: mostrar/ocultar campos de descuento por volumen ───
+  --> 0
+ 29:       function toggleDescuentoFields(containerId, checkbox) {
+ 30:         const container = document.getElementById(containerId);
+ 31:         if (!container) return;
+ 32:         container.style.display = checkbox.checked ? 'block' : 'none';
+ 33:       }
+  --> 0
+ 34: 
+  --> 0
+ 35:       /**
+  --> 0
+ 36:        * Formatea un string a Title Case (Primera letra de cada palabra en Mayúscula)
+  --> 0
+ 37:        */
+  --> 0
+ 38:       function toTitleCase(str) {
+ 39:         if (!str) return "";
+ 40:         return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+ 41:       }
+  --> 0
+ 42: 
+  --> 0
+ 43:       // Aplicar Capitalize a los nombres de productos antes de enviar
+  --> 0
+ 44:       document.querySelectorAll('form').forEach(form => {
+ 45:         form.addEventListener('submit', function() {
+ 46:           const nombreInput = this.querySelector('input[name="nombre"]');
+ 47:           if (nombreInput) {
+ 48:             nombreInput.value = toTitleCase(nombreInput.value.trim());
+ 49:           }
+ 50:         });
+ 51:       });
+  --> 0
+ 52: 
+  --> 0
+ 53:       // --- Atajo de teclado F4 para Nuevo Producto ---
+  --> 0
+ 54:       document.addEventListener('keydown', function(e) {
+ 55:         if (e.key === 'F4') {
+ 56:           e.preventDefault();
+ 57:           // Intentamos clickear el botón para aprovechar el data-bs-toggle si ya está inicializado, 
+ 58:           // o usamos la API de Bootstrap.
+ 59:           const btn = document.getElementById('btnNuevoProducto');
+ 60:           if (btn) btn.click();
+ 61:         }
+ 62:       });
+  --> 0
+ 63: 
+  --> 0
+ 64:       // --- Auto-focus Inteligente (UX) ---
+  --> 0
+ 65:       const addModalEl = document.getElementById('addModal');
+  --> 0
+ 66:       if (addModalEl) {
+ 67:         addModalEl.addEventListener('shown.bs.modal', function () {
+ 68:           // El usuario prefiere el foco en el Nombre
+ 69:           const nameInput = document.getElementById('add_nombre');
+ 70:           if (nameInput) {
+ 71:             nameInput.focus();
+ 72:           }
+ 73:         });
+ 74:       }
+  --> 0
+ 75: 
+  --> 0
+ 76:       // --- Manejo de Envío de Formulario con AJAX (Senior UX) ---
+  --> 0
+ 77:       const addForm = document.querySelector('#addModal form');
+  --> 0
+ 78:       if (addForm) {
+ 79:         addForm.addEventListener('submit', async function(e) {
+ 80:           e.preventDefault();
+ 81:           
+ 82:           // Primero aplicamos el Capitalize que ya estaba
+ 83:           const nombreInput = this.querySelector('input[name="nombre"]');
+ 84:           if (nombreInput) {
+ 85:             nombreInput.value = toTitleCase(nombreInput.value.trim());
+ 86:           }
+ 87: 
+ 88:           const formData = new FormData(this);
+ 89:           const errorContainer = document.getElementById('error-container-add');
+ 90:           const errorAlert = errorContainer.querySelector('.alert');
+ 91: 
+ 92:           try {
+ 93:             const response = await fetch(this.action, {
+ 94:               method: 'POST',
+ 95:               body: formData,
+ 96:               headers: {
+ 97:                 'X-Requested-With': 'XMLHttpRequest'
+ 98:               }
+ 99:             });
+100: 
+101:             if (response.ok) {
+102:               // Si todo bien, recargamos para ver el nuevo producto
+103:               window.location.reload();
+104:             } else {
+105:               const data = await response.json();
+106:               if (data.error) {
+107:                 errorAlert.textContent = data.error;
+108:                 errorContainer.style.display = 'block';
+109:                 // Scroll al error si es necesario
+110:                 errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+111:               }
+112:             }
+113:           } catch (err) {
+114:             console.error('Error al guardar producto:', err);
+115:             errorAlert.textContent = 'Ocurrió un error inesperado al guardar el producto.';
+116:             errorContainer.style.display = 'block';
+117:           }
+118:         });
+119:       }
+  --> 0
+120: 
+  --> 0
+121:       // Limpiar errores cuando se cierra o abre el modal
+  --> 0
+122:       if (addModalEl) {
+123:         addModalEl.addEventListener('hidden.bs.modal', function() {
+124:           const errorContainer = document.getElementById('error-container-add');
+125:           if (errorContainer) errorContainer.style.display = 'none';
+126:         });
+127:       }
+  --> 0
+128: 
+  --> 0
+129:       // --- Manejo de Envío de Formulario de EDICIÓN con AJAX ---
+  --> 0
+130:       document.querySelectorAll('form[action*="/admin/producto/edit/"]').forEach(editForm => {
+131:         editForm.addEventListener('submit', async function(e) {
+132:           e.preventDefault();
+133:           
+134:           const nombreInput = this.querySelector('input[name="nombre"]');
+135:           if (nombreInput) {
+136:             nombreInput.value = toTitleCase(nombreInput.value.trim());
+137:           }
+138: 
+139:           const formData = new FormData(this);
+140:           const modal = this.closest('.modal');
+141:           const productId = modal.id.replace('editModal', '');
+142:           const errorContainer = document.getElementById('error-container-edit-' + productId);
+143:           const errorAlert = errorContainer ? errorContainer.querySelector('.alert') : null;
+144: 
+145:           try {
+146:             const response = await fetch(this.action, {
+147:               method: 'POST',
+148:               body: formData,
+149:               headers: {
+150:                 'X-Requested-With': 'XMLHttpRequest'
+151:               }
+152:             });
+153: 
+154:             if (response.ok) {
+155:               window.location.reload();
+156:             } else {
+157:               const data = await response.json();
+158:               if (data.error && errorAlert) {
+159:                 errorAlert.textContent = data.error;
+160:                 errorContainer.style.display = 'block';
+161:                 errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+162:               }
+163:             }
+164:           } catch (err) {
+165:             console.error('Error al editar producto:', err);
+166:             if (errorAlert) {
+167:               errorAlert.textContent = 'Ocurrió un error inesperado al editar.';
+168:               errorContainer.style.display = 'block';
+169:             }
+170:           }
+171:         });
+172:       });
+  --> 0
+173: 
+  --> 0
+174:       // Limpiar errores en modales de edición al cerrarse
+  --> 0
+175:       document.querySelectorAll('.modal[id^="editModal"]').forEach(m => {
+176:         m.addEventListener('hidden.bs.modal', function() {
+177:           const productId = this.id.replace('editModal', '');
+178:           const errorContainer = document.getElementById('error-container-edit-' + productId);
+179:           if (errorContainer) errorContainer.style.display = 'none';
+180:         });
+181:       });
+  --> 0
+182:       // --- Lógica de Tags para Códigos de Barras (Scanner UX) ---
+  --> 0
+183:       function setupBarcodeManager(inputId, hiddenId, containerId) {
+184:         const inputEl = document.getElementById(inputId);
+185:         const hiddenEl = document.getElementById(hiddenId);
+186:         const containerEl = document.getElementById(containerId);
+187:         
+188:         if (!inputEl || !hiddenEl || !containerEl) return;
+189: 
+190:         let codigosArray = hiddenEl.value ? hiddenEl.value.split(',').filter(c => c.trim()) : [];
+191: 
+192:         function renderizarCodigos() {
+193:           containerEl.innerHTML = '';
+194:           codigosArray.forEach((codigo, index) => {
+195:             const badge = document.createElement('span');
+196:             badge.className = 'badge bg-primary d-flex align-items-center gap-2 px-3 py-2 rounded-pill';
+197:             badge.style.fontSize = '0.85rem';
+198:             badge.innerHTML = `
+199:               ${codigo}
+200:               <i class="bi bi-x-circle-fill cursor-pointer" style="cursor:pointer;" onclick="window.removeBarcode('${hiddenId}', ${index})"></i>
+201:             `;
+202:             containerEl.appendChild(badge);
+203:           });
+204:           hiddenEl.value = codigosArray.join(',');
+205:         }
+206: 
+207:         // Exponer la función de remoción globalmente para que el onclick funcione
+208:         window.removeBarcode = function(hId, idx) {
+209:           // Buscamos el hidden correspondiente y actualizamos su array
+210:           const hEl = document.getElementById(hId);
+211:           if (!hEl) return;
+212:           let arr = hEl.value.split(',').filter(c => c.trim());
+213:           arr.splice(idx, 1);
+214:           hEl.value = arr.join(',');
+215:           // Re-renderizamos usando el contenedor correspondiente
+216:           const cId = hId.includes('edit') ? hId.replace('hidden', 'input').replace('edit_codigo_barra_input_', 'edit_contenedor_codigos_') : 'add_contenedor_codigos';
+217:           // Como necesitamos una forma de volver a llamar renderizarCodigos, 
+218:           // simplificamos re-inicializando o disparando un evento.
+219:           // Por simplicidad en este entorno, llamamos a una versión que busque el contenedor.
+220:           const currentContainer = hId.includes('edit') 
+221:             ? document.getElementById('edit_contenedor_codigos_' + hId.split('_').pop())
+222:             : document.getElementById('add_contenedor_codigos');
+223:           
+224:           if (currentContainer) {
+225:             currentContainer.innerHTML = '';
+226:             arr.forEach((c, i) => {
+227:               const b = document.createElement('span');
+228:               b.className = 'badge bg-primary d-flex align-items-center gap-2 px-3 py-2 rounded-pill';
+229:               b.style.fontSize = '0.85rem';
+230:               b.innerHTML = `${c} <i class="bi bi-x-circle-fill cursor-pointer" style="cursor:pointer;" onclick="window.removeBarcode('${hId}', ${i})"></i>`;
+231:               currentContainer.appendChild(b);
+232:             });
+233:           }
+234:         };
+235: 
+236:         inputEl.addEventListener('keydown', function(e) {
+237:           if (e.key === 'Enter') {
+238:             e.preventDefault(); // BLOQUEO CRÍTICO: Evitar envío de formulario
+239:             
+240:             const val = this.value.trim();
+241:             if (val && !codigosArray.includes(val) && codigosArray.length < 10) {
+242:               codigosArray.push(val);
+243:               this.value = '';
+244:               renderizarCodigos();
+245:             } else if (val) {
+246:               this.value = ''; // Limpiar si ya existe o límite alcanzado
+247:             }
+248:           }
+249:         });
+250: 
+251:         // Inicializar vista
+252:         renderizarCodigos();
+253:       }
+  --> 0
+254: 
+  --> 0
+255:       // Inicializar para el modal de Alta
+  --> 0
+256:       const addModal = document.getElementById('addModal');
+  --> 0
+257:       if (addModal) {
+258:         addModal.addEventListener('shown.bs.modal', function() {
+259:           setupBarcodeManager('add_codigo_barra_input', 'add_codigo_barra_hidden', 'add_contenedor_codigos');
+260:           // UX: El usuario prefiere tipear primero el nombre antes de escanear
+261:           const nameInput = document.getElementById('add_nombre');
+262:           if (nameInput) nameInput.focus();
+263:         });
+264:       }
+  --> 0
+265: 
+  --> 0
+266:       // Inicializar para todos los modales de Edición (cuando se abren)
+  --> 0
+267:       document.querySelectorAll('.modal[id^="editModal"]').forEach(modal => {
+268:         modal.addEventListener('shown.bs.modal', function() {
+269:           const productId = this.id.replace('editModal', '');
+270:       // --- Manejo de Envío de Formulario con AJAX (Senior UX) ---
+271:       const addForm = document.querySelector('#addModal form');
+272:       if (addForm) {
+273:         addForm.addEventListener('submit', async function(e) {
+274:           e.preventDefault();
+275:           
+276:           // Primero aplicamos el Capitalize que ya estaba
+277:           const nombreInput = this.querySelector('input[name="nombre"]');
+278:           if (nombreInput) {
+279:             nombreInput.value = toTitleCase(nombreInput.value.trim());
+280:           }
+281: 
+282:           const formData = new FormData(this);
+283:           const errorContainer = document.getElementById('error-container-add');
+284:           const errorAlert = errorContainer.querySelector('.alert');
+285: 
+286:           try {
+287:             const response = await fetch(this.action, {
+288:               method: 'POST',
+289:               body: formData,
+290:               headers: {
+291:                 'X-Requested-With': 'XMLHttpRequest'
+292:               }
+293:             });
+294: 
+295:             if (response.ok) {
+296:               // Si todo bien, recargamos para ver el nuevo producto
+297:               window.location.reload();
+298:             } else {
+299:               const data = await response.json();
+300:               if (data.error) {
+301:                 errorAlert.textContent = data.error;
+302:                 errorContainer.style.display = 'block';
+303:                 // Scroll al error si es necesario
+304:                 errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+305:               }
+306:             }
+307:           } catch (err) {
+308:             console.error('Error al guardar producto:', err);
+309:             errorAlert.textContent = 'Ocurrió un error inesperado al guardar el producto.';
+310:             errorContainer.style.display = 'block';
+311:           }
+312:         });
+313:       }
+314: 
+315:       // Limpiar errores cuando se cierra o abre el modal
+316:       if (addModalEl) {
+317:         addModalEl.addEventListener('hidden.bs.modal', function() {
+318:           const errorContainer = document.getElementById('error-container-add');
+319:           if (errorContainer) errorContainer.style.display = 'none';
+320:         });
+321:       }
+322: 
+323:       // --- Manejo de Envío de Formulario de EDICIÓN con AJAX ---
+324:       document.querySelectorAll('form[action*="/admin/producto/edit/"]').forEach(editForm => {
+325:         editForm.addEventListener('submit', async function(e) {
+326:           e.preventDefault();
+327:           
+328:           const nombreInput = this.querySelector('input[name="nombre"]');
+329:           if (nombreInput) {
+330:             nombreInput.value = toTitleCase(nombreInput.value.trim());
+331:           }
+332: 
+333:           const formData = new FormData(this);
+334:           const modal = this.closest('.modal');
+335:           const productId = modal.id.replace('editModal', '');
+336:           const errorContainer = document.getElementById('error-container-edit-' + productId);
+337:           const errorAlert = errorContainer ? errorContainer.querySelector('.alert') : null;
+338: 
+339:           try {
+340:             const response = await fetch(this.action, {
+341:               method: 'POST',
+342:               body: formData,
+343:               headers: {
+344:                 'X-Requested-With': 'XMLHttpRequest'
+345:               }
+346:             });
+347: 
+348:             if (response.ok) {
+349:               window.location.reload();
+350:             } else {
+351:               const data = await response.json();
+352:               if (data.error && errorAlert) {
+353:                 errorAlert.textContent = data.error;
+354:                 errorContainer.style.display = 'block';
+355:                 errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+356:               }
+357:             }
+358:           } catch (err) {
+359:             console.error('Error al editar producto:', err);
+360:             if (errorAlert) {
+361:               errorAlert.textContent = 'Ocurrió un error inesperado al editar.';
+362:               errorContainer.style.display = 'block';
+363:             }
+364:           }
+365:         });
+366:       });
+367: 
+368:       // Limpiar errores en modales de edición al cerrarse
+369:       document.querySelectorAll('.modal[id^="editModal"]').forEach(m => {
+370:         m.addEventListener('hidden.bs.modal', function() {
+371:           const productId = this.id.replace('editModal', '');
+372:           const errorContainer = document.getElementById('error-container-edit-' + productId);
+373:           if (errorContainer) errorContainer.style.display = 'none';
+374:         });
+375:       });
+376:       // --- Lógica de Tags para Códigos de Barras (Scanner UX) ---
+377:       function setupBarcodeManager(inputId, hiddenId, containerId) {
+378:         const inputEl = document.getElementById(inputId);
+379:         const hiddenEl = document.getElementById(hiddenId);
+380:         const containerEl = document.getElementById(containerId);
+381:         
+382:         if (!inputEl || !hiddenEl || !containerEl) return;
+383: 
+384:         let codigosArray = hiddenEl.value ? hiddenEl.value.split(',').filter(c => c.trim()) : [];
+385: 
+386:         function renderizarCodigos() {
+387:           containerEl.innerHTML = '';
+388:           codigosArray.forEach((codigo, index) => {
+389:             const badge = document.createElement('span');
+390:             badge.className = 'badge bg-primary d-flex align-items-center gap-2 px-3 py-2 rounded-pill';
+391:             badge.style.fontSize = '0.85rem';
+392:             badge.innerHTML = `
+393:               ${codigo}
+394:               <i class="bi bi-x-circle-fill cursor-pointer" style="cursor:pointer;" onclick="window.removeBarcode('${hiddenId}', ${index})"></i>
+395:             `;
+396:             containerEl.appendChild(badge);
+397:           });
+398:           hiddenEl.value = codigosArray.join(',');
+399:         }
+400: 
+401:         // Exponer la función de remoción globalmente para que el onclick funcione
+402:         window.removeBarcode = function(hId, idx) {
+403:           // Buscamos el hidden correspondiente y actualizamos su array
+404:           const hEl = document.getElementById(hId);
+405:           if (!hEl) return;
+406:           let arr = hEl.value.split(',').filter(c => c.trim());
+407:           arr.splice(idx, 1);
+408:           hEl.value = arr.join(',');
+409:           // Re-renderizamos usando el contenedor correspondiente
+410:           const cId = hId.includes('edit') ? hId.replace('hidden', 'input').replace('edit_codigo_barra_input_', 'edit_contenedor_codigos_') : 'add_contenedor_codigos';
+411:           // Como necesitamos una forma de volver a llamar renderizarCodigos, 
+412:           // simplificamos re-inicializando o disparando un evento.
+413:           // Por simplicidad en este entorno, llamamos a una versión que busque el contenedor.
+414:           const currentContainer = hId.includes('edit') 
+415:             ? document.getElementById('edit_contenedor_codigos_' + hId.split('_').pop())
+416:             : document.getElementById('add_contenedor_codigos');
+417:           
+418:           if (currentContainer) {
+419:             currentContainer.innerHTML = '';
+420:             arr.forEach((c, i) => {
+421:               const b = document.createElement('span');
+422:               b.className = 'badge bg-primary d-flex align-items-center gap-2 px-3 py-2 rounded-pill';
+423:               b.style.fontSize = '0.85rem';
+424:               b.innerHTML = `${c} <i class="bi bi-x-circle-fill cursor-pointer" style="cursor:pointer;" onclick="window.removeBarcode('${hId}', ${i})"></i>`;
+425:               currentContainer.appendChild(b);
+426:             });
+427:           }
+428:         };
+429: 
+430:         inputEl.addEventListener('keydown', function(e) {
+431:           if (e.key === 'Enter') {
+432:             e.preventDefault(); // BLOQUEO CRÍTICO: Evitar envío de formulario
+433:             
+434:             const val = this.value.trim();
+435:             if (val && !codigosArray.includes(val) && codigosArray.length < 10) {
+436:               codigosArray.push(val);
+437:               this.value = '';
+438:               renderizarCodigos();
+439:             } else if (val) {
+440:               this.value = ''; // Limpiar si ya existe o límite alcanzado
+441:             }
+442:           }
+443:         });
+444: 
+445:         // Inicializar vista
+446:         renderizarCodigos();
+447:       }
+448: 
+449:       // Inicializar para el modal de Alta
+450:       const addModal = document.getElementById('addModal');
+451:       if (addModal) {
+452:         addModal.addEventListener('shown.bs.modal', function() {
+453:           setupBarcodeManager('add_codigo_barra_input', 'add_codigo_barra_hidden', 'add_contenedor_codigos');
+454:           // UX: El usuario prefiere tipear primero el nombre antes de escanear
+455:           const nameInput = document.getElementById('add_nombre');
+456:           if (nameInput) nameInput.focus();
+457:         });
+458:       }
+459: 
+460:       // Inicializar para todos los modales de Edición (cuando se abren)
+461:       document.querySelectorAll('.modal[id^="editModal"]').forEach(modal => {
+462:         modal.addEventListener('shown.bs.modal', function() {
+463:           const productId = this.id.replace('editModal', '');
+464:           setupBarcodeManager(
+465:             `edit_codigo_barra_input_${productId}`,
+466:             `edit_codigo_barra_hidden_${productId}`,
+467:             `edit_contenedor_codigos_${productId}`
+468:           );
+469:           document.getElementById(`edit_codigo_barra_input_${productId}`).focus();
+470:         });
+471:       });
+472: 
+473:       // Bloqueo Global de Enter en formularios (excepto el form de búsqueda)
+474:       document.querySelectorAll('form').forEach(form => {
+475:         // Excluir el formulario de búsqueda del admin para que Enter pueda enviar al backend
+476:         if (form.id === 'form_busqueda_admin' || (form.querySelector('#buscador_admin'))) return;
+477:         form.addEventListener('keydown', function(e) {
+478:           if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+479:             if (!e.target.classList.contains('barcode-tag-input')) {
+480:               e.preventDefault();
+481:             }
+482:           }
+483:         });
+484:       });
+485: 
+486:       // --- Live Search + Navegación por Teclado + Búsqueda Backend ---
+487:       let filasVisibles = [];
+488:       let indiceSeleccionado = -1;
+489: 
+490:       function resaltarFilaSeleccionada() {
+491:         document.querySelectorAll('#tabla_productos tbody tr').forEach(f => f.classList.remove('table-active'));
+492:         if (indiceSeleccionado >= 0 && filasVisibles[indiceSeleccionado]) {
+493:           const fila = filasVisibles[indiceSeleccionado];
+494:           fila.classList.add('table-active');
+495:           fila.scrollIntoView({ block: 'nearest' });
+496:         }
+497:       }
+498: 
+499:       const inputBuscador = document.getElementById('buscador_admin');
+500:       if (inputBuscador) {
+501:         // Filtrado visual instantáneo sobre las filas ya cargadas
+502:         inputBuscador.addEventListener('input', function(e) {
+503:           const termino = e.target.value.toLowerCase();
+504:           const filas = document.querySelectorAll('#tabla_productos tbody tr');
+505:           filas.forEach(fila => {
+506:             fila.classList.remove('table-active');
+507:             fila.style.display = fila.textContent.toLowerCase().includes(termino) ? '' : 'none';
+508:           });
+509:           indiceSeleccionado = -1;
+510:           filasVisibles = Array.from(filas).filter(f => f.style.display === '');
+511:         });
+512: 
+513:         // Navegación con flechas + Enter inteligente
+514:         inputBuscador.addEventListener('keydown', function(e) {
+515:           if (e.key === 'ArrowDown') {
+516:             e.preventDefault();
+517:             if (indiceSeleccionado < filasVisibles.length - 1) {
+518:               indiceSeleccionado++;
+519:               resaltarFilaSeleccionada();
+520:             }
+521:           } else if (e.key === 'ArrowUp') {
+522:             e.preventDefault();
+523:             if (indiceSeleccionado > 0) {
+524:               indiceSeleccionado--;
+525:               resaltarFilaSeleccionada();
+526:             }
+527:           } else if (e.key === 'Enter') {
+528:             // Prioridad 1: fila seleccionada con flechas → abrir modal
+529:             if (indiceSeleccionado >= 0 && filasVisibles[indiceSeleccionado]) {
+530:               e.preventDefault();
+531:               const btn = filasVisibles[indiceSeleccionado].querySelector('button[data-bs-target^="#editModal"]');
+532:               if (btn) btn.click();
+533:             // Prioridad 2: exactamente 1 fila visible sin navegación → abrir modal
+534:             } else if (filasVisibles.length === 1 && indiceSeleccionado < 0) {
+535:               e.preventDefault();
+536:               const btn = filasVisibles[0].querySelector('button[data-bs-target^="#editModal"]');
+537:               if (btn) btn.click();
+538:             }
+539:             // Prioridad 3: sin coincidencia única → dejar que el form envíe GET /admin?q=...
+540:           }
+541:         });
+542:         // No se bloquea el submit: botón "Buscar" y Enter (sin fila única seleccionada)
+543:         // envían la petición GET al backend correctamente.
+544:       }
+545: 
+546:       // --- Manejo de Importación Masiva con Reporte AJAX ---
+547:       const formImportar = document.getElementById('formImportarExcel');
+548:       if (formImportar) {
+549:         formImportar.addEventListener('submit', async function(e) {
+550:           e.preventDefault();
+551:           const btn = this.querySelector('button[type="submit"]');
+552:           const originalText = btn.innerHTML;
+553:           btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+554:           btn.disabled = true;
+555:           try {
+556:             const formData = new FormData(this);
+557:             const response = await fetch(this.action, {
+558:               method: 'POST',
+559:               body: formData,
+560:               headers: { 'X-Requested-With': 'XMLHttpRequest' }
+561:             });
+562:             const data = await response.json();
+563:             if (response.ok) {
+564:               alert(data.mensaje);
+565:               window.location.reload();
+566:             } else {
+567:               alert('Error: ' + (data.error || 'Ocurrió un error en el servidor.'));
+568:             }
+569:           } catch (err) {
+570:             console.error('Error en importación:', err);
+571:             alert('Error crítico de conexión al procesar el archivo.');
+572:           } finally {
+573:             btn.innerHTML = originalText;
+574:             btn.disabled = false;
+575:           }
+576:         });
+577:       }
+578:     
