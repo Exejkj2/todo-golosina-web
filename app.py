@@ -911,12 +911,37 @@ def endpoint_imprimir_ticket(id=None):
     except Exception as e:
         return f"Error al generar el ticket: {str(e)}", 500
 
-@app.route('/')
+@app.before_request
+def check_admin_auth():
+    if request.path.startswith('/admin') or request.path.startswith('/facturador'):
+        # Ignorar rutas estáticas o el login-facturador por si quedan restos (opcional, pero la lógica pide redirigir)
+        if not session.get('admin_autenticado'):
+            return redirect('/')
+
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    """Raíz del sistema: redirige al login del panel de administración."""
-    if current_user.is_authenticated:
-        return redirect(url_for('admin_dashboard'))
-    return redirect(url_for('login'))
+    """Login Unificado del sistema."""
+    if request.method == 'POST':
+        usuario = request.form.get('usuario', '').strip()
+        clave = request.form.get('clave', '').strip()
+        
+        if usuario == 'admin' and clave == 'admin123':
+            session['admin_autenticado'] = True
+            session['facturador_auth'] = True
+            
+            # Autenticar en flask_login para mantener compatibilidad
+            user = Usuario.query.filter_by(username='admin').first()
+            if user:
+                login_user(user)
+                
+            return redirect('/facturador')
+        else:
+            return render_template('login_unificado.html', error='Credenciales Incorrectas')
+            
+    if session.get('admin_autenticado') or current_user.is_authenticated:
+        return redirect('/facturador')
+        
+    return render_template('login_unificado.html', error=None)
 
 
 
