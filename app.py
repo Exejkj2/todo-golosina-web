@@ -1546,13 +1546,17 @@ def login():
 @app.route('/admin')
 @login_required
 def admin_dashboard():
-    search = request.args.get('q')
-    query = Producto.query.filter_by(activo=1)
-    if search:
-        query = query.filter(Producto.nombre.ilike(f'%{search}%'))
-    productos = query.order_by(Producto.id.desc()).all()
-    categorias = Categoria.query.all()
-    return render_template('admin.html', productos=productos, categorias=categorias, search=search)
+    try:
+        search = request.args.get('q')
+        query = Producto.query.filter_by(activo=1)
+        if search:
+            query = query.filter(Producto.nombre.ilike(f'%{search}%'))
+        productos = query.order_by(Producto.id.desc()).all()
+        categorias = Categoria.query.all()
+        return render_template('admin.html', productos=productos, categorias=categorias, search=search)
+    except Exception as e:
+        import traceback
+        return f"<h1>Error en Admin: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
 
 @app.route('/admin/producto/add', methods=['POST'])
 @login_required
