@@ -418,26 +418,14 @@ def estado_conexion():
 # ─── RUTA TEMPORAL DE MIGRACIÓN (Eliminar después de usar) ────
 @app.route('/forzar-migracion-db')
 def forzar_migracion_db():
-    import psycopg2
-    database_url = os.environ.get('DATABASE_URL')
-    if not database_url:
-        return "<h1>Error: DATABASE_URL no configurada en el entorno.</h1>", 500
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    conn = None
     try:
-        conn = psycopg2.connect(database_url, connect_timeout=10)
-        conn.autocommit = True
-        cursor = conn.cursor()
-        cursor.execute('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS sincronizado BOOLEAN DEFAULT TRUE;')
-        cursor.execute('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP;')
-        cursor.close()
-        return "<h1>&#10004; ¡Base de datos inyectada con éxito! Ya puedes usar el panel.</h1><p>Columnas 'sincronizado' y 'ultima_actualizacion' verificadas/creadas en la tabla Productos.</p><p><b>IMPORTANTE:</b> Elimina esta ruta del código después de confirmar que todo funciona.</p>", 200
+        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS sincronizado BOOLEAN DEFAULT TRUE;'))
+        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP;'))
+        db.session.commit()
+        return "<h1>&#10004; ¡Sincronización forzada con SQLAlchemy Exitosa!</h1><p>Columnas 'sincronizado' y 'ultima_actualizacion' verificadas/creadas en la tabla Productos.</p><p><b>IMPORTANTE:</b> Elimina esta ruta del código después de confirmar que todo funciona.</p>", 200
     except Exception as e:
-        return f"<h1>Error al inyectar: {str(e)}</h1>", 500
-    finally:
-        if conn:
-            conn.close()
+        db.session.rollback()
+        return f"<h1>Error al inyectar: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
 
 
 @app.route('/api/productos', methods=['GET'])
