@@ -1032,9 +1032,7 @@ def descargar_factura(venta_id):
 @app.route('/logout')
 def logout():
     session.pop('admin_autenticado', None)
-    session.clear()
-    flash("Sesión cerrada correctamente.", "info")
-    return redirect(url_for('index'))
+    return redirect('/')
 
 @app.route('/api/clientes/<int:id>', methods=['DELETE'])
 def delete_cliente(id):
