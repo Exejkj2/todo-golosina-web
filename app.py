@@ -395,6 +395,19 @@ def importar_csv():
         return f"<h1>Error al importar: {str(e)}</h1>", 500
 
 
+@app.route('/optimizar-db')
+def optimizar_db():
+    try:
+        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_nombre ON "Productos" (nombre);'))
+        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_codigo_barra ON "Productos" (codigo_barra);'))
+        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_activo ON "Productos" (activo);'))
+        db.session.commit()
+        return "<h1>¡Turbo Activado! Índices creados en Supabase.</h1>", 200
+    except Exception as e:
+        db.session.rollback()
+        return f"<h1>Error al crear índices: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
+
+
 @app.route('/api/productos', methods=['GET'])
 def get_productos():
     if es_offline():
@@ -422,7 +435,7 @@ def get_productos():
     else:
         query = query.order_by(Producto.id.desc())
 
-    productos = query.all()
+    productos = query.limit(50).all()
     return jsonify({"productos": [p.to_dict() for p in productos]})
 
 @app.route('/buscar_productos')
@@ -900,7 +913,7 @@ def endpoint_imprimir_ticket(id=None):
 
 @app.route('/')
 def index():
-    destacados = Producto.query.filter_by(favorito=True, activo=1).all()
+    destacados = Producto.query.filter_by(favorito=True, activo=1).limit(20).all()
     return render_template('index.html', destacados=destacados)
 
 @app.route('/dashboard')
@@ -1463,7 +1476,7 @@ def get_ventas_cliente(cliente_id):
 
 @app.route('/productos')
 def productos():
-    productos = Producto.query.filter_by(activo=1).order_by(Producto.id.desc()).all()
+    productos = Producto.query.filter_by(activo=1).order_by(Producto.id.desc()).limit(50).all()
     return render_template('productos.html', productos=productos)
 
 @app.route('/producto/<int:id>')
@@ -1514,7 +1527,7 @@ def admin_dashboard():
         query = Producto.query.filter_by(activo=1)
         if search:
             query = query.filter(Producto.nombre.ilike(f'%{search}%'))
-        productos = query.order_by(Producto.id.desc()).all()
+        productos = query.order_by(Producto.id.desc()).limit(50).all()
         categorias = Categoria.query.all()
         return render_template('admin.html', productos=productos, categorias=categorias, search=search)
     except Exception as e:
