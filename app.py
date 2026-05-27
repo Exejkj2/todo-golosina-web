@@ -618,7 +618,7 @@ def registrar_venta():
             total=total_venta,
             detalle_json=_json.dumps(detalle, ensure_ascii=False),
             lista_precios=lista_sel,
-            tipo=data.get('tipo', 'Preventa'),
+            tipo=data.get('tipo', 'local'),
             metodo_pago=data.get('metodo_pago', 'Varios'),
             pago_efectivo=p_ef,
             pago_transferencia=p_tr,
@@ -913,37 +913,12 @@ def endpoint_imprimir_ticket(id=None):
 
 @app.route('/')
 def index():
-    destacados = Producto.query.filter_by(favorito=True, activo=1).limit(20).all()
-    return render_template('index.html', destacados=destacados)
+    """Raíz del sistema: redirige al login del panel de administración."""
+    if current_user.is_authenticated:
+        return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('login'))
 
-@app.route('/dashboard')
-@login_required
-def dashboard_admin():
-    return redirect(url_for('admin_dashboard'))
 
-# ─── Preventa: protección por contraseña ──────────────────────
-PREVENTA_PASSWORD = 'todo2026'
-
-@app.route('/preventa/login', methods=['GET', 'POST'])
-def preventa_login():
-    if request.method == 'POST':
-        clave = request.form.get('clave', '').strip()
-        if clave == PREVENTA_PASSWORD:
-            session['preventa_auth'] = True
-            return redirect('/preventa')
-        return render_template('preventa_login.html', error='Contraseña incorrecta')
-    return render_template('preventa_login.html', error=None)
-
-@app.route('/preventa')
-def preventa():
-    if not session.get('preventa_auth'):
-        return redirect('/preventa/login')
-    try:
-        # Prueba de conexión simple
-        Producto.query.first()
-        return render_template('preventa.html')
-    except Exception as e:
-        return f"<h1>Error de Base de Datos</h1><p>{str(e)}</p><hr><p>Verificá si las columnas precio_lista_1/2/3 existen en la tabla 'Productos'.</p>"
 
 # ─── Facturador: protección por usuario/contraseña ────────────────
 FACTU_USER = 'factu'
@@ -1474,33 +1449,8 @@ def get_ventas_cliente(cliente_id):
         } for v in ventas]
     })
 
-@app.route('/productos')
-def productos():
-    productos = Producto.query.filter_by(activo=1).order_by(Producto.id.desc()).limit(50).all()
-    return render_template('productos.html', productos=productos)
 
-@app.route('/producto/<int:id>')
-def producto_detalle(id):
-    producto = db.session.get(Producto, id)
-    if not producto or producto.activo == 0:
-        from flask import abort
-        abort(404)
-    relacionados = []
-    if producto.categoria_id:
-        relacionados = Producto.query.filter(
-            Producto.categoria_id == producto.categoria_id, 
-            Producto.id != producto.id,
-            Producto.activo == 1
-        ).order_by(db.func.random()).limit(4).all()
-    return render_template('detalle.html', producto=producto, relacionados=relacionados)
-
-
-
-@app.route('/contacto')
-def contacto():
-    return render_template('contacto.html')
-
-# ─── Panel de Administración ─────────────────────────────────
+# ─── Panel de Administración ──────────────────────────────────
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -2017,12 +1967,6 @@ def admin_estadisticas():
     )
 
 # ─── Configuración inicial de Base de Datos ──────────────────
-@app.route('/api/finalizar-pedido', methods=['POST'])
-def finalizar_pedido():
-    return jsonify({
-        "ok": True, 
-        "mensaje": "Pedido recibido con éxito. ¡Gracias por tu compra!"
-    })
 
 from sqlalchemy import text
 
