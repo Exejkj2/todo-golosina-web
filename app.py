@@ -25,7 +25,7 @@ ultima_actualizacion_precios = hora_argentina()
 DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tienda.db')
 
 app = Flask(__name__)
-app.secret_key = 'llave_secreta_todo_golosinas_2026'
+app.secret_key = 'llave_secreta_admin_2026'
 app.config['SECRET_KEY'] = 'todo_golosina_secreto_super_seguro'
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
@@ -921,56 +921,21 @@ def check_admin_auth():
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    """Login Unificado del sistema."""
     if request.method == 'POST':
-        usuario = request.form.get('usuario', '').strip()
-        clave = request.form.get('clave', '').strip()
-        
-        if usuario == 'admin' and clave == 'admin123':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if username == 'admin' and password == 'admin123':
             session['admin_autenticado'] = True
-            session['facturador_auth'] = True
-            
-            # Autenticar en flask_login para mantener compatibilidad
-            user = Usuario.query.filter_by(username='admin').first()
-            if user:
-                login_user(user)
-                
-            return redirect('/facturador')
+            return redirect('/admin')
         else:
-            return render_template('login_unificado.html', error='Credenciales Incorrectas')
-            
-    if session.get('admin_autenticado') or current_user.is_authenticated:
-        return redirect('/facturador')
-        
-    return render_template('login_unificado.html', error=None)
-
-
-
-# ─── Facturador: protección por usuario/contraseña ────────────────
-FACTU_USER = 'factu'
-FACTU_PASS = 'factu2026'
-
-@app.route('/login-facturador', methods=['GET', 'POST'])
-def facturador_login():
-    if request.method == 'POST':
-        user = request.form.get('usuario', '').strip()
-        clave = request.form.get('clave', '').strip()
-        if user == FACTU_USER and clave == FACTU_PASS:
-            session['facturador_auth'] = True
-            return redirect('/facturador')
-        return render_template('facturador_login.html', error='Usuario o contraseña incorrectos')
-    return render_template('facturador_login.html', error=None)
+            return render_template('index.html', error='Credenciales incorrectas')
+    return render_template('index.html')
 
 @app.route('/facturador')
 def facturador():
-    if not session.get('facturador_auth'):
-        return redirect('/login-facturador')
+    if not session.get('admin_autenticado'):
+        return redirect('/')
     return render_template('facturador.html')
-
-@app.route('/logout-facturador')
-def logout_facturador():
-    session.pop('facturador_auth', None)
-    return redirect('/')
 
 @app.route('/ticket/<int:venta_id>')
 def endpoint_ticket_legacy(venta_id):
