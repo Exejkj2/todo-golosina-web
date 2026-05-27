@@ -354,6 +354,19 @@ def inicializar_todo_supabase():
         db.session.rollback()
         return f"<h1>Error al inicializar Supabase: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
 
+# ─── RUTA TEMPORAL DE MIGRACIÓN ───
+@app.route('/forzar-migracion-db')
+def forzar_migracion_db():
+    try:
+        from sqlalchemy import text
+        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS sincronizado BOOLEAN DEFAULT TRUE;'))
+        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP;'))
+        db.session.commit()
+        return "<h1>¡Sincronización forzada con SQLAlchemy Exitosa!</h1>", 200
+    except Exception as e:
+        db.session.rollback()
+        return f"<h1>Error al inyectar: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
+
 
 @app.route('/api/productos', methods=['GET'])
 def get_productos():
