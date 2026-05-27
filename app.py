@@ -338,6 +338,17 @@ with app.app_context():
     except Exception as e:
         db.session.rollback()
         print(f"Migración de ventas omitida (probablemente la columna ya existe): {e}")
+
+    # Migración PostgreSQL para Render: Agregar columnas sincronizado y ultima_actualizacion a "Productos" si no existen
+    try:
+        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS sincronizado BOOLEAN DEFAULT TRUE;'))
+        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;'))
+        db.session.commit()
+        print("[RENDER] -> Estructura de base de datos verificada y actualizada correctamente")
+    except Exception as e:
+        db.session.rollback()
+        print(f"[RENDER] -> Advertencia durante la migración de base de datos: {e}")
+
     print("Base de datos y tablas inicializadas correctamente.")
 
 # Rutina de migración automática
