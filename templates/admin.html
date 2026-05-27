@@ -194,7 +194,7 @@
         <!-- Toolbar Buscador y Exportar -->
         <div class="d-flex justify-content-between align-items-center mb-3">
           <form method="GET" action="{{ url_for('admin_dashboard') }}" class="d-flex gap-2" style="max-width: 450px; width: 100%;">
-            <input type="text" id="buscador_admin" name="q" class="form-control bg-white" placeholder="Buscar producto por nombre..." value="{{ search or '' }}" />
+            <input type="text" id="buscador_admin" name="q" class="form-control bg-white" placeholder="Buscar por nombre o código de barra..." value="{{ search or '' }}" />
             <button type="submit" class="btn btn-secondary px-3"><i class="bi bi-search"></i> Buscar</button>
             {% if search %}
             <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary" title="Limpiar búsqueda"><i class="bi bi-x-lg"></i></a>
@@ -222,7 +222,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {% for p in productos %}
+                  {% for p in productos.items %}
                   <tr>
                     <td class="ps-4 text-muted">#{{ p.id }}</td>
                     <td>
@@ -348,7 +348,52 @@
       </div>
     </div>
 
-    {% for p in productos %}
+    <!-- Paginación -->
+    {% if productos.pages > 1 %}
+    <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top bg-white rounded-bottom-3 mt-0">
+      <span class="text-muted small">
+        Página <strong>{{ productos.page }}</strong> de <strong>{{ productos.pages }}</strong>
+        &nbsp;·&nbsp; {{ productos.total }} productos{% if q %} encontrados para "<strong>{{ q }}</strong>"{% endif %}
+      </span>
+      <div class="d-flex gap-2">
+        {% if productos.has_prev %}
+        <a href="{{ url_for('admin_dashboard', q=q, page=productos.prev_num) }}"
+           class="btn btn-outline-secondary btn-sm px-3">
+          <i class="bi bi-chevron-left"></i> Anterior
+        </a>
+        {% else %}
+        <button class="btn btn-outline-secondary btn-sm px-3" disabled>
+          <i class="bi bi-chevron-left"></i> Anterior
+        </button>
+        {% endif %}
+
+        {# Botones de página numérica (ventana de ±2 páginas) #}
+        {% for num in productos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+          {% if num %}
+            <a href="{{ url_for('admin_dashboard', q=q, page=num) }}"
+               class="btn btn-sm {% if num == productos.page %}btn-pink{% else %}btn-outline-secondary{% endif %} px-3">
+              {{ num }}
+            </a>
+          {% else %}
+            <span class="btn btn-sm btn-outline-secondary px-2 disabled">…</span>
+          {% endif %}
+        {% endfor %}
+
+        {% if productos.has_next %}
+        <a href="{{ url_for('admin_dashboard', q=q, page=productos.next_num) }}"
+           class="btn btn-outline-secondary btn-sm px-3">
+          Siguiente <i class="bi bi-chevron-right"></i>
+        </a>
+        {% else %}
+        <button class="btn btn-outline-secondary btn-sm px-3" disabled>
+          Siguiente <i class="bi bi-chevron-right"></i>
+        </button>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% for p in productos.items %}
 <!-- Edit Modal -->
                   <div
                     class="modal fade"

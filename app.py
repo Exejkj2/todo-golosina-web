@@ -1523,15 +1523,19 @@ def login():
 @login_required
 def admin_dashboard():
     try:
-        search = request.args.get('q', '').strip()
-        query = Producto.query.filter_by(activo=1)
-        if search:
-            query = query.filter(Producto.nombre.ilike(f'%{search}%'))
-            productos = query.order_by(Producto.id.desc()).limit(100).all()
-        else:
-            productos = query.order_by(Producto.id.desc()).limit(50).all()
+        q    = request.args.get('q', '').strip()
+        page = request.args.get('page', 1, type=int)
+        base = Producto.query.filter_by(activo=1)
+        if q:
+            base = base.filter(
+                or_(
+                    Producto.nombre.ilike(f'%{q}%'),
+                    Producto.codigo_barra.ilike(f'%{q}%')
+                )
+            )
+        productos  = base.order_by(Producto.id.desc()).paginate(page=page, per_page=50, error_out=False)
         categorias = Categoria.query.all()
-        return render_template('admin.html', productos=productos, categorias=categorias, search=search)
+        return render_template('admin.html', productos=productos, categorias=categorias, search=q, q=q)
     except Exception as e:
         return f"<h1>Error Oculto: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
 
