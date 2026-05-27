@@ -12,6 +12,7 @@ from fpdf import FPDF
 from datetime import datetime, time, date, timedelta
 import json
 import socket
+import csv
 from urllib.parse import urlparse
 
 # --- Configuración de Zona Horaria (Argentina UTC-3: Naive approach) ---
@@ -356,6 +357,42 @@ def forzar_migracion_db():
     except Exception as e:
         db.session.rollback()
         return f"<h1>Error al inyectar: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
+
+
+@app.route('/importar-csv')
+def importar_csv():
+    try:
+        csv_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'lista_productos.csv')
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f, delimiter=';')
+            for row in reader:
+                nombre = row.get('Nombre', '').strip()
+                if not nombre:
+                    continue
+                
+                try:
+                    p1_str = row.get('Lista 1', '').replace('$', '').replace(',', '.').strip()
+                    precio_lista_1 = float(p1_str) if p1_str else 0.0
+                except ValueError:
+                    precio_lista_1 = 0.0
+                    
+                codigo_barra = row.get('Cod. Barra', '').strip()
+                
+                producto = Producto(
+                    nombre=nombre,
+                    precio_lista_1=precio_lista_1,
+                    codigo_barra=codigo_barra,
+                    activo=1,
+                    stock=0,
+                    sincronizado=True
+                )
+                db.session.add(producto)
+        
+        db.session.commit()
+        return "<h1>¡Importación Exitosa! Productos cargados en Supabase.</h1>", 200
+    except Exception as e:
+        db.session.rollback()
+        return f"<h1>Error al importar: {str(e)}</h1>", 500
 
 
 @app.route('/api/productos', methods=['GET'])
