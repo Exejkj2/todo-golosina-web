@@ -5,7 +5,6 @@ import traceback
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text, or_
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
 from fpdf import FPDF
@@ -132,13 +131,9 @@ db = SQLAlchemy(app)
 def es_offline():
     return 'sqlite' in app.config.get('SQLALCHEMY_DATABASE_URI', '')
 
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'index'
-login_manager.login_message = "Por favor, inicia sesión para acceder al panel."
 
 # ─── Modelos SQLAlchemy ───────────────────────────────────────
-class Usuario(UserMixin, db.Model):
+class Usuario(db.Model):
     __tablename__ = 'Usuarios'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
@@ -217,8 +212,6 @@ class Producto(db.Model):
             'ultima_actualizacion': self.ultima_actualizacion.isoformat() if self.ultima_actualizacion else None
         }
 
-@login_manager.user_loader
-def load_user(user_id):
     return db.session.get(Usuario, int(user_id))
 
 # ─── Modelos de Clientes y Ventas ───────────────────────────────────────
@@ -921,7 +914,7 @@ def check_admin_auth():
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    if current_user.is_authenticated or session.get('admin_autenticado'):
+    if session.get('admin_autenticado'):
         return redirect('/admin')
 
     if request.method == 'POST':
@@ -932,7 +925,6 @@ def index():
             
             user = Usuario.query.filter_by(username='admin').first()
             if user:
-                login_user(user)
                 
             return redirect('/admin')
         else:
@@ -1044,7 +1036,7 @@ def descargar_factura(venta_id):
 
 @app.route('/logout')
 def logout():
-    logout_user()
+    session.pop('admin_autenticado', None)
     session.clear()
     flash("Sesión cerrada correctamente.", "info")
     return redirect(url_for('index'))
@@ -1451,8 +1443,8 @@ def get_ventas_cliente(cliente_id):
 
 # ─── Panel de Administración ──────────────────────────────────
 @app.route('/admin')
-@login_required
 def admin_dashboard():
+    if not session.get('admin_autenticado'): return redirect('/')
     try:
         q    = request.args.get('q', '').strip()
         page = request.args.get('page', 1, type=int)
@@ -1471,8 +1463,8 @@ def admin_dashboard():
         return f"<h1>Error Oculto: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
 
 @app.route('/admin/producto/add', methods=['POST'])
-@login_required
 def admin_add_product():
+    if not session.get('admin_autenticado'): return redirect('/')
     nombre = request.form.get('nombre')
     
     precio_str = request.form.get('precio', '0').strip().replace(',', '.')
@@ -1564,8 +1556,8 @@ def admin_add_product():
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/producto/edit/<int:id>', methods=['POST'])
-@login_required
 def admin_edit_product(id):
+    if not session.get('admin_autenticado'): return redirect('/')
     producto = db.session.get(Producto, id)
     if not producto:
         flash('Producto no encontrado.', 'danger')
@@ -1657,8 +1649,8 @@ def admin_edit_product(id):
         return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/producto/delete/<int:id>', methods=['POST'])
-@login_required
 def admin_delete_product(id):
+    if not session.get('admin_autenticado'): return redirect('/')
     producto = db.session.get(Producto, id)
     if producto:
         producto.activo = 0 # Soft delete
@@ -1670,14 +1662,14 @@ def admin_delete_product(id):
 
 # ─── CRUD de Categorías ──────────────────────────────────────
 @app.route('/admin/categorias')
-@login_required
 def admin_categorias():
+    if not session.get('admin_autenticado'): return redirect('/')
     categorias = Categoria.query.all()
     return render_template('admin_categorias.html', categorias=categorias)
 
 @app.route('/admin/categoria/add', methods=['POST'])
-@login_required
 def admin_add_categoria():
+    if not session.get('admin_autenticado'): return redirect('/')
     nombre = request.form.get('nombre')
     if nombre:
         nueva = Categoria(nombre=nombre)
@@ -1691,8 +1683,8 @@ def admin_add_categoria():
     return redirect(url_for('admin_categorias'))
 
 @app.route('/admin/categoria/edit/<int:id>', methods=['POST'])
-@login_required
 def admin_edit_categoria(id):
+    if not session.get('admin_autenticado'): return redirect('/')
     categoria = db.session.get(Categoria, id)
     nombre = request.form.get('nombre')
     if categoria and nombre:
@@ -1706,8 +1698,8 @@ def admin_edit_categoria(id):
     return redirect(url_for('admin_categorias'))
 
 @app.route('/admin/categoria/delete/<int:id>', methods=['POST'])
-@login_required
 def admin_delete_categoria(id):
+    if not session.get('admin_autenticado'): return redirect('/')
     categoria = db.session.get(Categoria, id)
     if categoria:
         if Producto.query.filter_by(categoria_id=categoria.id, activo=1).first():
@@ -1720,8 +1712,8 @@ def admin_delete_categoria(id):
 
 # ─── Importación Masiva ──────────────────────────────────────
 @app.route('/admin/importar', methods=['POST'])
-@login_required
 def admin_importar():
+    if not session.get('admin_autenticado'): return redirect('/')
     if 'excel_file' not in request.files:
         flash('No se subió ningún archivo.', 'danger')
         return redirect(url_for('admin_dashboard'))
@@ -1890,8 +1882,8 @@ def verificar_precios():
 
 # ─── Exportación a Excel ───────────────────────────────────────
 @app.route('/admin/exportar')
-@login_required
 def admin_exportar():
+    if not session.get('admin_autenticado'): return redirect('/')
     productos = Producto.query.all()
     data = []
     for p in productos:
@@ -1924,8 +1916,8 @@ def admin_exportar():
 
 # ─── Estadísticas de Ventas ──────────────────────────────────
 @app.route('/admin/estadisticas')
-@login_required
 def admin_estadisticas():
+    if not session.get('admin_autenticado'): return redirect('/')
     top_vendidos = Producto.query.filter_by(activo=1).order_by(Producto.ventas_totales.desc()).limit(5).all()
     peor_vendidos = Producto.query.filter_by(activo=1).order_by(Producto.ventas_totales.asc()).limit(5).all()
     
