@@ -343,16 +343,6 @@ def add_no_cache_headers(response):
 def estado_conexion():
     return jsonify({"online": not es_offline()})
 
-# ─── INICIALIZACIÓN TOTAL DE SUPABASE ───
-@app.route('/inicializar-todo-supabase')
-def inicializar_todo_supabase():
-    try:
-        db.drop_all()
-        db.create_all()
-        return "<h1>¡GOLAZO! Base de datos de Supabase inicializada y tablas creadas.</h1>", 200
-    except Exception as e:
-        db.session.rollback()
-        return f"<h1>Error al inicializar Supabase: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
 
 # ─── RUTA TEMPORAL DE MIGRACIÓN ───
 @app.route('/forzar-migracion-db')
