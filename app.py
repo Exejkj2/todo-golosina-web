@@ -134,7 +134,7 @@ def es_offline():
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'index'
 login_manager.login_message = "Por favor, inicia sesión para acceder al panel."
 
 # ─── Modelos SQLAlchemy ───────────────────────────────────────
@@ -1442,24 +1442,6 @@ def get_ventas_cliente(cliente_id):
 
 
 # ─── Panel de Administración ──────────────────────────────────
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('admin_dashboard'))
-
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        user = Usuario.query.filter_by(username=username).first()
-
-        if user and check_password_hash(user.password_hash, password):
-            login_user(user)
-            return redirect(url_for('admin_dashboard'))
-        else:
-            flash('Usuario o contraseña incorrectos.', 'danger')
-
-    return render_template('login.html')
-
 @app.route('/admin')
 @login_required
 def admin_dashboard():
@@ -2040,7 +2022,7 @@ setup_database()
 @app.route('/reportes')
 def reportes_view():
     if not session.get('facturador_auth'):
-        return redirect('/login-facturador')
+        return redirect('/')
     return render_template('reportes.html')
 
 @app.route('/api/reportes', methods=['GET'])
