@@ -450,6 +450,24 @@ def get_productos():
     productos = query.limit(50).all()
     return jsonify({"productos": [p.to_dict() for p in productos]})
 
+@app.route('/api/productos/catalogo_completo', methods=['GET'])
+@login_requerido
+def catalogo_completo():
+    productos = Producto.query.filter_by(activo=1).order_by(Producto.nombre.asc()).all()
+    return jsonify({
+        "productos": [
+            {
+                "id": p.id,
+                "nombre": p.nombre,
+                "precio_lista_1": p.precio_lista_1,
+                "precio_lista_2": p.precio_lista_2 or p.precio_lista_1,
+                "precio_lista_3": p.precio_lista_3 or p.precio_lista_1,
+                "stock": p.stock,
+                "categoria": p.categoria_rel.nombre if p.categoria_rel else "General"
+            } for p in productos
+        ]
+    })
+
 @app.route('/buscar_productos')
 @login_requerido
 def buscar_productos():

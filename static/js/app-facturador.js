@@ -33,6 +33,26 @@ let clienteIdAEliminar = null; // Para el modal de eliminación personalizado
 let isProcessingVenta = false;
 let procesandoMovimiento = false;
 
+window.catalogoProductos = [];
+window.cargandoCatalogo = false;
+
+async function cargarCatalogoEnMemoria() {
+  if (window.catalogoProductos.length > 0 || window.cargandoCatalogo) return;
+  window.cargandoCatalogo = true;
+  try {
+    const r = await fetch('/api/productos/catalogo_completo');
+    const data = await r.json();
+    if (data.productos) {
+      window.catalogoProductos = data.productos;
+      console.log(`Catálogo cargado en memoria: ${window.catalogoProductos.length} productos.`);
+    }
+  } catch (err) {
+    console.error("Error al cargar el catálogo en memoria:", err);
+  } finally {
+    window.cargandoCatalogo = false;
+  }
+}
+
 
 // Bootstrap Modal Instances: se instancian on-demand con getOrCreateInstance()
 
@@ -108,6 +128,7 @@ function initApp() {
 
   try { initTabs(); } catch(e) { console.error("Error initTabs:", e); }
   try { loadAllClientes(); } catch(e) { console.error("Error loadAllClientes:", e); }
+  try { cargarCatalogoEnMemoria(); } catch(e) { console.error("Error cargarCatalogoEnMemoria:", e); }
 
   updateClock();
   setInterval(updateClock, 1000);
@@ -1314,10 +1335,13 @@ if (originalBtnConfirmar) {
 }
 
 // Product Search Modal
-function abrirModalProductos() {
+async function abrirModalProductos() {
   selectedProd = null;
   searchSelectedIndex = -1;
   currentSearchResults = [];
+  
+  cargarCatalogoEnMemoria();
+
   const dialog = document.querySelector("#searchModal .modal-dialog");
   if (dialog) {
     dialog.classList.add("modal-xl");
@@ -1333,6 +1357,24 @@ function abrirModalProductos() {
     mS.value = "";
     getModal('searchModal')?.show();
     setTimeout(() => mS.focus(), 500);
+  }
+
+  if (window.catalogoProductos && window.catalogoProductos.length > 0) {
+    renderizarResultadosLocales(window.catalogoProductos.slice(0, 100));
+  } else {
+    if (results) {
+      results.innerHTML = '<tr><td colspan="5" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando catálogo...</td></tr>';
+    }
+    try {
+      await cargarCatalogoEnMemoria();
+      if (window.catalogoProductos && window.catalogoProductos.length > 0) {
+        renderizarResultadosLocales(window.catalogoProductos.slice(0, 100));
+      } else {
+        if (results) results.innerHTML = '<tr><td colspan="5" class="text-center p-4">No se pudo cargar el catálogo.</td></tr>';
+      }
+    } catch(err) {
+      if (results) results.innerHTML = '<tr><td colspan="5" class="text-center p-4">Error al cargar el catálogo.</td></tr>';
+    }
   }
 }
 
@@ -1712,7 +1754,16 @@ function setupEventListeners() {
     const row = e.target.closest("tr");
     if (row && currentSearchResults.length > 0) {
       const index = Array.from(row.parentNode.children).indexOf(row);
-      if (index >= 0) askQty(currentSearchResults[index]);
+      if (index >= 0) {
+        const p = currentSearchResults[index];
+        addItem(p, 1);
+        const mS = document.getElementById("modalSearchIn");
+        if (mS) {
+          mS.value = "";
+          renderizarResultadosLocales(window.catalogoProductos.slice(0, 100));
+          mS.focus();
+        }
+      }
     }
   });
 
@@ -2050,7 +2101,14 @@ function handleGlobalShortcuts(e) {
       } else if (e.key === "Enter") {
         e.preventDefault();
         if (searchSelectedIndex >= 0 && currentSearchResults[searchSelectedIndex]) {
-          askQty(currentSearchResults[searchSelectedIndex]);
+          const p = currentSearchResults[searchSelectedIndex];
+          addItem(p, 1);
+          const mS = document.getElementById("modalSearchIn");
+          if (mS) {
+            mS.value = "";
+            renderizarResultadosLocales(window.catalogoProductos.slice(0, 100));
+            mS.focus();
+          }
         }
       }
     }
@@ -2220,47 +2278,52 @@ function handleGlobalShortcuts(e) {
   }
 }
 
-async function handleSearchInput(e) {
-  const q = e.target.value.trim();
+function renderizarResultadosLocales(productos) {
   const resultsBody = document.getElementById("modalResults");
   if (!resultsBody) return;
   
-  searchSelectedIndex = -1;
-  currentSearchResults = [];
+  resultsBody.innerHTML = "";
+  currentSearchResults = productos;
   
-  if (q.length < 2) { 
-    resultsBody.innerHTML = ""; 
-    return; 
+  if (productos.length > 0) {
+    searchSelectedIndex = 0;
+    productos.forEach((p, i) => {
+      const tr = document.createElement("tr");
+      tr.style.cursor = "pointer";
+      if (i === searchSelectedIndex) { 
+        tr.classList.add("table-active", "fila-seleccionada"); 
+        tr.style.backgroundColor = "#e2e8f0"; 
+      }
+      tr.innerHTML = `
+        <td><strong>${p.nombre}</strong><br><small>${p.categoria || "General"}</small></td>
+        <td class="text-center"><span class="badge ${p.stock > 0 ? "bg-success" : "bg-danger"}">${p.stock}</span></td>
+        <td class="text-end fw-bold">$${p.precio_lista_1.toLocaleString()}</td>
+        <td class="text-end text-muted small">$${p.precio_lista_2.toLocaleString()}</td>
+        <td class="text-end text-muted small">$${p.precio_lista_3.toLocaleString()}</td>
+      `;
+      resultsBody.appendChild(tr);
+    });
+  } else {
+    resultsBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">No encontrado</td></tr>';
   }
+}
 
-  try {
-    const isOffline = !navigator.onLine || document.getElementById('status-dot')?.classList.contains('status-dot-offline');
-    const fetchUrl = isOffline 
-      ? `/api/productos?buscar=${encodeURIComponent(q)}` 
-      : `/buscar_productos?q=${encodeURIComponent(q)}`;
-    const r = await fetch(fetchUrl);
-    const data = await r.json();
-    resultsBody.innerHTML = "";
-    if (data.productos && data.productos.length > 0) {
-      currentSearchResults = data.productos;
-      searchSelectedIndex = 0;
-      data.productos.forEach((p, i) => {
-        const tr = document.createElement("tr");
-        tr.style.cursor = "pointer";
-        if (i === 0) { tr.classList.add("table-active"); tr.style.backgroundColor = "#e2e8f0"; }
-        tr.innerHTML = `
-          <td><strong>${p.nombre}</strong><br><small>${p.categoria || "General"}</small></td>
-          <td class="text-center"><span class="badge ${p.stock > 0 ? "bg-success" : "bg-danger"}">${p.stock}</span></td>
-          <td class="text-end fw-bold">$${p.precio_lista_1.toLocaleString()}</td>
-          <td class="text-end text-muted small">$${p.precio_lista_2.toLocaleString()}</td>
-          <td class="text-end text-muted small">$${p.precio_lista_3.toLocaleString()}</td>
-        `;
-        resultsBody.appendChild(tr);
-      });
-    } else { 
-      resultsBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">No encontrado</td></tr>'; 
-    }
-  } catch (err) { console.error(err); }
+async function handleSearchInput(e) {
+  const q = e.target.value.trim().toLowerCase();
+  
+  if (q.length === 0) {
+    renderizarResultadosLocales(window.catalogoProductos.slice(0, 100));
+    return;
+  }
+  
+  const terminos = q.split(/\s+/);
+  const filtrados = window.catalogoProductos.filter(p => {
+    const nombreLower = p.nombre.toLowerCase();
+    const catLower = (p.categoria || "General").toLowerCase();
+    return terminos.every(t => nombreLower.includes(t) || catLower.includes(t));
+  });
+  
+  renderizarResultadosLocales(filtrados.slice(0, 100));
 }
 
 function updatePostOptions() {
