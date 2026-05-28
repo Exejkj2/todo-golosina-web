@@ -9,9 +9,12 @@ from sqlalchemy import text, or_
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
 from fpdf import FPDF
-from datetime import datetime, time, date, timedelta
+from datetime import datetime, date, timedelta
 import json
 import socket
+import time
+
+intentos_login = {}
 import csv
 from urllib.parse import urlparse
 
@@ -938,18 +941,30 @@ def check_admin_auth():
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    ip_cliente = request.remote_addr
     if session.get('admin_autenticado'):
         return redirect('/admin')
 
     if request.method == 'POST':
+        registro = intentos_login.get(ip_cliente)
+        if registro and registro['intentos'] >= 5:
+            tiempo_transcurrido = time.time() - registro['ultimo_intento']
+            if tiempo_transcurrido < 900:
+                return render_template('index.html', error="Demasiados intentos fallidos. Por favor, espere 15 minutos."), 429
+
         username = request.form.get('username')
         password = request.form.get('password')
         usuario = Usuario.query.filter_by(username=username).first()
         if usuario and check_password_hash(usuario.password_hash, password):
             session['admin_autenticado'] = True
             session.permanent = True
+            intentos_login.pop(ip_cliente, None)
             return redirect('/admin')
         else:
+            registro = intentos_login.get(ip_cliente, {'intentos': 0, 'ultimo_intento': 0})
+            registro['intentos'] += 1
+            registro['ultimo_intento'] = time.time()
+            intentos_login[ip_cliente] = registro
             return render_template('index.html', error='Credenciales incorrectas')
     return render_template('index.html')
 
@@ -1292,7 +1307,7 @@ def get_ventas_hoy():
             if caja:
                 inicio_rango = caja.fecha_apertura
             else:
-                inicio_rango = datetime.combine(date.today(), time.min)
+                inicio_rango = datetime.combine(date.today(), datetime.time.min)
 
             ventas = Venta.query.filter(Venta.fecha >= inicio_rango).order_by(Venta.fecha.desc()).all()
             gastos = Gasto.query.filter(Gasto.fecha >= inicio_rango).all()
