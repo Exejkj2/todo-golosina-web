@@ -27,6 +27,7 @@ DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tienda.db')
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'clave-local-segura')
 app.config['SECRET_KEY'] = app.secret_key
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 def es_accesible_bd_nube(uri_nube):
@@ -946,7 +947,7 @@ def index():
         usuario = Usuario.query.filter_by(username=username).first()
         if usuario and check_password_hash(usuario.password_hash, password):
             session['admin_autenticado'] = True
-            
+            session.permanent = True
             return redirect('/admin')
         else:
             return render_template('index.html', error='Credenciales incorrectas')
