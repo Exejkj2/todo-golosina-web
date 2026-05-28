@@ -1344,8 +1344,8 @@ async function abrirModalProductos() {
 
   const dialog = document.querySelector("#searchModal .modal-dialog");
   if (dialog) {
-    dialog.classList.add("modal-xl");
-    dialog.style.maxWidth = "";
+    dialog.classList.remove("modal-xl");
+    dialog.style.maxWidth = "550px";
   }
   document.getElementById("stepSearch")?.classList.remove("d-none");
   document.getElementById("stepQty")?.classList.add("d-none");
@@ -2279,7 +2279,7 @@ function renderizarResultadosLocales(productos) {
         tr.style.backgroundColor = "#e2e8f0"; 
       }
       tr.innerHTML = `
-        <td style="text-transform: capitalize;"><strong>${p.nombre}</strong></td>
+        <td style="text-transform: capitalize; font-size: 14px;"><strong>${p.nombre}</strong></td>
         <td class="text-end fw-bold pe-4">$${p.precio_lista_1.toLocaleString()}</td>
       `;
       resultsBody.appendChild(tr);
