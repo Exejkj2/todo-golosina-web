@@ -6,5 +6,9 @@ instance/
 database/tienda.db
 tienda.db
 *.db
+*.sqlite
+*.sqlite3
 *.log
 .vscode/
+routes.txt
+all_urls.txt
