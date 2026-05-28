@@ -130,6 +130,18 @@ db = SQLAlchemy(app)
 def es_offline():
     return 'sqlite' in app.config.get('SQLALCHEMY_DATABASE_URI', '')
 
+def login_requerido(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin_autenticado'):
+            # Si es una consulta interna a la API, rechaza con JSON
+            if request.path.startswith('/api/'):
+                return jsonify({'ok': False, 'mensaje': 'Acceso denegado. Inicie sesión.'}), 401
+            # Si intenta entrar a una pantalla, lo devuelve al login
+            return redirect('/')
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 # ─── Modelos SQLAlchemy ───────────────────────────────────────
 class Usuario(db.Model):
@@ -915,15 +927,6 @@ def endpoint_imprimir_ticket(id=None):
         return f"Error al generar el ticket: {str(e)}", 500
 
 
-def login_requerido(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('admin_autenticado'):
-            if request.path.startswith('/api/'):
-                return jsonify({'ok': False, 'error': 'No autenticado'}), 401
-            return redirect('/')
-        return f(*args, **kwargs)
-    return decorated_function
 
 @app.before_request
 def check_admin_auth():
