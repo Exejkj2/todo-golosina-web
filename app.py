@@ -463,6 +463,7 @@ def catalogo_completo():
                 "precio_lista_2": p.precio_lista_2 or p.precio_lista_1,
                 "precio_lista_3": p.precio_lista_3 or p.precio_lista_1,
                 "stock": p.stock,
+                "codigo_barra": p.codigo_barra,
                 "categoria": p.categoria_rel.nombre if p.categoria_rel else "General"
             } for p in productos
         ]

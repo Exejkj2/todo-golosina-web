@@ -1951,31 +1951,33 @@ function setupEventListeners() {
         const code = scannerInput.value.trim();
         scannerInput.value = "";
         if (!code) return;
-        try {
-          const res = await fetch("/buscar_por_codigo/" + encodeURIComponent(code));
-          const data = await res.json();
-          if (data.ok && data.producto) {
-            addItem(data.producto, 1);
-            document.body.style.backgroundColor = "#dcfce7";
-            setTimeout(() => (document.body.style.backgroundColor = ""), 200);
-          } else {
-            // Producto no encontrado
-            document.body.style.backgroundColor = "#fee2e2";
-            setTimeout(() => (document.body.style.backgroundColor = ""), 300);
-            
-            Swal.fire({
-              icon: 'error',
-              title: '❌ Código no encontrado',
-              text: `El código "${code}" no existe en el inventario.`,
-              confirmButtonText: 'Aceptar',
-              confirmButtonColor: '#ef4444'
-            }).then(() => {
-                scannerInput.focus();
-            });
-          }
-        } catch (err) { 
-            console.error(err); 
-            scannerInput.focus();
+        
+        // Búsqueda local instantánea a la velocidad de la luz en memoria
+        const producto = window.catalogoProductos.find(p => {
+          if (!p.codigo_barra) return false;
+          // Soporta múltiples códigos de barra separados por coma
+          return p.codigo_barra.split(',').map(c => c.trim()).includes(code);
+        });
+
+        if (producto) {
+          addItem(producto, 1);
+          document.body.style.backgroundColor = "#dcfce7";
+          setTimeout(() => (document.body.style.backgroundColor = ""), 200);
+          scannerInput.focus();
+        } else {
+          // Producto no encontrado
+          document.body.style.backgroundColor = "#fee2e2";
+          setTimeout(() => (document.body.style.backgroundColor = ""), 300);
+          
+          Swal.fire({
+            icon: 'error',
+            title: '❌ Código no encontrado',
+            text: `El código "${code}" no existe en el inventario.`,
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: '#ef4444'
+          }).then(() => {
+              scannerInput.focus();
+          });
         }
       }
     });
