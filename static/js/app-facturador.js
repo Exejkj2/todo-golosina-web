@@ -2279,7 +2279,7 @@ function renderizarResultadosLocales(productos) {
         tr.style.backgroundColor = "#e2e8f0"; 
       }
       tr.innerHTML = `
-        <td style="text-transform: capitalize; font-size: 14px;"><strong>${p.nombre}</strong></td>
+        <td style="text-transform: capitalize; font-size: 14px;"><strong>${p.nombre.toLowerCase()}</strong></td>
         <td class="text-end fw-bold pe-4">$${p.precio_lista_1.toLocaleString()}</td>
       `;
       resultsBody.appendChild(tr);
