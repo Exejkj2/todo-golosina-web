@@ -1754,16 +1754,7 @@ function setupEventListeners() {
     const row = e.target.closest("tr");
     if (row && currentSearchResults.length > 0) {
       const index = Array.from(row.parentNode.children).indexOf(row);
-      if (index >= 0) {
-        const p = currentSearchResults[index];
-        addItem(p, 1);
-        const mS = document.getElementById("modalSearchIn");
-        if (mS) {
-          mS.value = "";
-          renderizarResultadosLocales(window.catalogoProductos.slice(0, 100));
-          mS.focus();
-        }
-      }
+      if (index >= 0) askQty(currentSearchResults[index]);
     }
   });
 
@@ -2101,14 +2092,7 @@ function handleGlobalShortcuts(e) {
       } else if (e.key === "Enter") {
         e.preventDefault();
         if (searchSelectedIndex >= 0 && currentSearchResults[searchSelectedIndex]) {
-          const p = currentSearchResults[searchSelectedIndex];
-          addItem(p, 1);
-          const mS = document.getElementById("modalSearchIn");
-          if (mS) {
-            mS.value = "";
-            renderizarResultadosLocales(window.catalogoProductos.slice(0, 100));
-            mS.focus();
-          }
+          askQty(currentSearchResults[searchSelectedIndex]);
         }
       }
     }
