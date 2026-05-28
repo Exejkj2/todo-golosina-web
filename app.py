@@ -581,18 +581,73 @@ def registrar_venta():
     if isinstance(data, list):
         items = data
         cliente_id = None
-        total_venta = 0.0
-        detalle = []
         lista_sel = 1
+        general_discount_perc = 0.0
     else:
         items = data.get('items', [])
         cliente_id = data.get('cliente_id')
-        total_venta = float(data.get('total', 0))
-        detalle = data.get('detalle', [])
-        lista_sel = data.get('lista_precios', 1)
+        try:
+            lista_sel = int(data.get('lista_precios', 1))
+        except (ValueError, TypeError):
+            lista_sel = 1
+        try:
+            general_discount_perc = float(data.get('general_discount_perc', 0.0))
+        except (ValueError, TypeError):
+            general_discount_perc = 0.0
 
     if not items or len(items) == 0:
         return jsonify({"ok": False, "mensaje": "No se puede registrar una venta sin productos."}), 400
+
+    # Recalcular el total y construir el detalle de forma segura en el backend para evitar forjado de montos (L-04)
+    total_recalculado = 0.0
+    detalle_recalculado = []
+
+    for item in items:
+        p_id = item.get('id')
+        try:
+            qty = int(item.get('qty', 1))
+        except (ValueError, TypeError):
+            qty = 1
+            
+        if not p_id or qty <= 0:
+            continue
+        
+        p = db.session.get(Producto, int(p_id))
+        if p:
+            # Obtener el precio oficial registrado en la base de datos
+            precio_u = p.precio_lista_3 if lista_sel == 3 else (p.precio_lista_2 if lista_sel == 2 else p.precio_lista_1)
+            
+            # Obtener descuento de línea enviado por el frontend
+            try:
+                discount_perc = float(item.get('discount_perc', 0.0))
+            except (ValueError, TypeError):
+                discount_perc = 0.0
+            
+            # Aplicar descuento de volumen si califica y es mayor que el descuento de línea
+            if p.descuento_volumen_activo and p.cantidad_minima_descuento and qty >= p.cantidad_minima_descuento:
+                desc_vol = float(p.porcentaje_descuento_volumen or 0.0)
+                if desc_vol > discount_perc:
+                    discount_perc = desc_vol
+            
+            precio_final = round(precio_u - (precio_u * (discount_perc / 100.0)), 2)
+            subtotal = round(precio_final * qty, 2)
+            
+            total_recalculado += subtotal
+            
+            detalle_recalculado.append({
+                'nombre': p.nombre,
+                'qty': qty,
+                'precio_unit': precio_final,
+                'discount_perc': discount_perc,
+                'subtotal': subtotal
+            })
+
+    # Aplicar el descuento general si existe
+    if general_discount_perc > 0.0:
+        total_recalculado = round(total_recalculado - (total_recalculado * (general_discount_perc / 100.0)), 2)
+
+    total_venta = total_recalculado
+    detalle = detalle_recalculado
 
     from datetime import timedelta
     tiempo_limite = hora_argentina() - timedelta(seconds=60)
