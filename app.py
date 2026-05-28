@@ -1,4 +1,5 @@
 import os 
+from functools import wraps
 from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session, send_from_directory, make_response
 import io
 import traceback
@@ -331,12 +332,14 @@ def add_no_cache_headers(response):
 
 # ─── API REST (Para el Frontend) ─────────────────────────────
 @app.route('/api/estado_conexion', methods=['GET'])
+@login_requerido
 def estado_conexion():
     return jsonify({"online": not es_offline()})
 
 
 # ─── RUTA TEMPORAL DE MIGRACIÓN ───
 @app.route('/forzar-migracion-db')
+@login_requerido
 def forzar_migracion_db():
     try:
         from sqlalchemy import text
@@ -350,6 +353,7 @@ def forzar_migracion_db():
 
 
 @app.route('/importar-csv')
+@login_requerido
 def importar_csv():
     try:
         csv_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'lista_productos.csv')
@@ -386,6 +390,7 @@ def importar_csv():
 
 
 @app.route('/optimizar-db')
+@login_requerido
 def optimizar_db():
     try:
         db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_nombre ON "Productos" (nombre);'))
@@ -399,6 +404,7 @@ def optimizar_db():
 
 
 @app.route('/api/productos', methods=['GET'])
+@login_requerido
 def get_productos():
     if es_offline():
         print("[SERVIDO LOCAL] -> Ejecutando consulta en tienda.db offline (api/productos)")
@@ -429,6 +435,7 @@ def get_productos():
     return jsonify({"productos": [p.to_dict() for p in productos]})
 
 @app.route('/buscar_productos')
+@login_requerido
 def buscar_productos():
     if es_offline():
         print("[SERVIDO LOCAL] -> Ejecutando consulta en tienda.db offline (buscar_productos)")
@@ -447,6 +454,7 @@ def buscar_productos():
     })
 
 @app.route('/buscar_por_codigo/<codigo>')
+@login_requerido
 def buscar_por_codigo(codigo):
     if es_offline():
         print(f"[SERVIDO LOCAL] -> Buscando código '{codigo}' en tienda.db offline (buscar_por_codigo)")
@@ -483,6 +491,7 @@ def buscar_por_codigo(codigo):
         return jsonify({"ok": False, "mensaje": "Producto no encontrado"}), 404
 
 @app.route('/api/productos/<int:producto_id>', methods=['GET'])
+@login_requerido
 def get_producto(producto_id):
     if es_offline():
         print(f"[SERVIDO LOCAL] -> Consultando producto ID {producto_id} en tienda.db offline (get_producto)")
@@ -492,6 +501,7 @@ def get_producto(producto_id):
     return jsonify({"ok": True, "producto": producto.to_dict()})
 
 @app.route('/api/categorias', methods=['GET'])
+@login_requerido
 def get_categorias():
     categorias = db.session.query(Categoria.nombre, db.func.count(Producto.id))\
         .join(Producto, Producto.categoria_id == Categoria.id)\
@@ -503,6 +513,7 @@ def get_categorias():
     })
 
 @app.route('/api/registrar_venta', methods=['POST'])
+@login_requerido
 def registrar_venta():
     import json as _json
     data = request.json
@@ -635,6 +646,7 @@ def to_title_case(text):
     return re.sub(r"\b\w", lambda m: m.group(0).upper(), text.lower())
 
 @app.route('/api/sincronizar', methods=['POST', 'GET'])
+@login_requerido
 def api_sincronizar():
     uri_nube = os.environ.get('DATABASE_URL')
     if not uri_nube:
@@ -874,6 +886,7 @@ def api_sincronizar():
 
 @app.route('/imprimir_ticket/')
 @app.route('/imprimir_ticket/<int:id>')
+@login_requerido
 def endpoint_imprimir_ticket(id=None):
     if id is None:
         return "ID de ticket no proporcionado", 400
@@ -901,6 +914,17 @@ def endpoint_imprimir_ticket(id=None):
     except Exception as e:
         return f"Error al generar el ticket: {str(e)}", 500
 
+
+def login_requerido(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin_autenticado'):
+            if request.path.startswith('/api/'):
+                return jsonify({'ok': False, 'error': 'No autenticado'}), 401
+            return redirect('/')
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.before_request
 def check_admin_auth():
     if request.path.startswith('/admin') or request.path.startswith('/facturador'):
@@ -926,16 +950,19 @@ def index():
     return render_template('index.html')
 
 @app.route('/facturador')
+@login_requerido
 def facturador():
     if not session.get('admin_autenticado'):
         return redirect('/')
     return render_template('facturador.html')
 
 @app.route('/ticket/<int:venta_id>')
+@login_requerido
 def endpoint_ticket_legacy(venta_id):
     return endpoint_imprimir_ticket(venta_id)
 
 @app.route('/descargar_factura/<int:venta_id>')
+@login_requerido
 def descargar_factura(venta_id):
     venta = db.session.get(Venta, venta_id)
     if not venta:
@@ -1034,6 +1061,7 @@ def logout():
     return redirect('/')
 
 @app.route('/api/cambiar-password', methods=['POST'])
+@login_requerido
 def cambiar_password():
     if not session.get('admin_autenticado'):
         return jsonify({'ok': False, 'mensaje': 'No autenticado'}), 401
@@ -1051,6 +1079,7 @@ def cambiar_password():
     return jsonify({'ok': True, 'mensaje': 'Contraseña actualizada correctamente'})
 
 @app.route('/api/clientes/<int:id>', methods=['DELETE'])
+@login_requerido
 def delete_cliente(id):
     try:
         cliente = Cliente.query.get(id)
@@ -1067,6 +1096,7 @@ def delete_cliente(id):
 @app.route('/api/clientes', methods=['GET'])
 @app.route('/buscar_clientes', methods=['GET'])
 @app.route('/obtener_clientes', methods=['GET'])
+@login_requerido
 def get_clientes():
     try:
         buscar = request.args.get('q', '').strip()
@@ -1080,6 +1110,7 @@ def get_clientes():
 
 @app.route('/api/clientes', methods=['POST'])
 @app.route('/guardar_cliente', methods=['POST'])
+@login_requerido
 def add_cliente():
     try:
         data = request.json or {}
@@ -1116,6 +1147,7 @@ def add_cliente():
 
 @app.route('/api/clientes/<int:id>', methods=['PUT'])
 @app.route('/editar_cliente/<int:id>', methods=['POST', 'PUT'])
+@login_requerido
 def edit_cliente(id):
     cliente = db.session.get(Cliente, id)
     if not cliente:
@@ -1154,6 +1186,7 @@ def edit_cliente(id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/clientes/deudores', methods=['GET'])
+@login_requerido
 def get_clientes_deudores():
     try:
         clientes = Cliente.query.filter(Cliente.saldo > 0, Cliente.activo == 1).order_by(Cliente.saldo.desc()).all()
@@ -1162,6 +1195,7 @@ def get_clientes_deudores():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/clientes/registrar_pago', methods=['POST'])
+@login_requerido
 def registrar_pago():
     data = request.json or {}
     cliente_id = data.get('cliente_id')
@@ -1190,6 +1224,7 @@ def registrar_pago():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/caja/estado', methods=['GET'])
+@login_requerido
 def get_caja_estado():
     hoy = date.today()
     # Buscamos si hay una caja abierta
@@ -1199,6 +1234,7 @@ def get_caja_estado():
     return jsonify({"ok": True, "abierta": False})
 
 @app.route('/api/caja/abrir', methods=['POST'])
+@login_requerido
 def abrir_caja():
     data = request.json or {}
     monto = float(data.get('monto_inicial', 0))
@@ -1218,6 +1254,7 @@ def abrir_caja():
         return jsonify({"ok": False, "mensaje": str(e)}), 500
 
 @app.route('/api/caja/cerrar', methods=['POST'])
+@login_requerido
 def cerrar_caja():
     caja = CajaDiaria.query.filter_by(estado='Abierta').order_by(CajaDiaria.id.desc()).first()
     if not caja:
@@ -1234,6 +1271,7 @@ def cerrar_caja():
         return jsonify({"ok": False, "mensaje": str(e)}), 500
 
 @app.route('/api/ventas_hoy', methods=['GET'])
+@login_requerido
 def get_ventas_hoy():
     try:
         fecha_inicio_str = request.args.get('inicio')
@@ -1305,6 +1343,7 @@ def get_ventas_hoy():
         return jsonify({"error_interno": str(e), "detalle": traceback.format_exc()}), 500
 
 @app.route('/api/venta/<int:id>', methods=['GET'])
+@login_requerido
 def get_venta_detalle(id):
     try:
         venta = db.session.get(Venta, id)
@@ -1334,6 +1373,7 @@ def get_venta_detalle(id):
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route('/api/ventas/<int:id_venta>', methods=['GET'])
+@login_requerido
 def obtener_detalle_venta(id_venta):
     venta = Venta.query.get_or_404(id_venta)
     
@@ -1375,6 +1415,7 @@ def obtener_detalle_venta(id_venta):
     }), 200
 
 @app.route('/api/gastos', methods=['POST'])
+@login_requerido
 def add_gasto():
     data = request.json or {}
     descripcion = data.get('descripcion', '').strip()
@@ -1411,6 +1452,7 @@ def add_gasto():
         return jsonify({"ok": False, "mensaje": str(e)}), 500
 
 @app.route('/api/ventas', methods=['GET'])
+@login_requerido
 def get_ventas_general():
     import json as _json
     buscar = request.args.get('q', '').strip()
@@ -1432,6 +1474,7 @@ def get_ventas_general():
     })
 
 @app.route('/api/ventas-cliente/<int:cliente_id>', methods=['GET'])
+@login_requerido
 def get_ventas_cliente(cliente_id):
     import json as _json
     cliente = db.session.get(Cliente, cliente_id)
@@ -1453,6 +1496,7 @@ def get_ventas_cliente(cliente_id):
 # ─── Panel de Administración ──────────────────────────────────
 
 @app.route('/api/buscar_productos', methods=['GET'])
+@login_requerido
 def api_buscar_productos():
     if not session.get('admin_autenticado') and not session.get('facturador_auth'):
         return jsonify({"ok": False, "error": "No autenticado"}), 401
@@ -1482,6 +1526,7 @@ def api_buscar_productos():
 
 
 @app.route('/admin')
+@login_requerido
 def admin_dashboard():
     if not session.get('admin_autenticado'): return redirect('/')
     try:
@@ -1502,6 +1547,7 @@ def admin_dashboard():
         return f"<h1>Error Oculto: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
 
 @app.route('/admin/producto/add', methods=['POST'])
+@login_requerido
 def admin_add_product():
     if not session.get('admin_autenticado'): return redirect('/')
     nombre = request.form.get('nombre')
@@ -1595,6 +1641,7 @@ def admin_add_product():
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/producto/edit/<int:id>', methods=['POST'])
+@login_requerido
 def admin_edit_product(id):
     if not session.get('admin_autenticado'): return redirect('/')
     producto = db.session.get(Producto, id)
@@ -1688,6 +1735,7 @@ def admin_edit_product(id):
         return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/producto/delete/<int:id>', methods=['POST'])
+@login_requerido
 def admin_delete_product(id):
     if not session.get('admin_autenticado'): return redirect('/')
     producto = db.session.get(Producto, id)
@@ -1701,12 +1749,14 @@ def admin_delete_product(id):
 
 # ─── CRUD de Categorías ──────────────────────────────────────
 @app.route('/admin/categorias')
+@login_requerido
 def admin_categorias():
     if not session.get('admin_autenticado'): return redirect('/')
     categorias = Categoria.query.all()
     return render_template('admin_categorias.html', categorias=categorias)
 
 @app.route('/admin/categoria/add', methods=['POST'])
+@login_requerido
 def admin_add_categoria():
     if not session.get('admin_autenticado'): return redirect('/')
     nombre = request.form.get('nombre')
@@ -1722,6 +1772,7 @@ def admin_add_categoria():
     return redirect(url_for('admin_categorias'))
 
 @app.route('/admin/categoria/edit/<int:id>', methods=['POST'])
+@login_requerido
 def admin_edit_categoria(id):
     if not session.get('admin_autenticado'): return redirect('/')
     categoria = db.session.get(Categoria, id)
@@ -1737,6 +1788,7 @@ def admin_edit_categoria(id):
     return redirect(url_for('admin_categorias'))
 
 @app.route('/admin/categoria/delete/<int:id>', methods=['POST'])
+@login_requerido
 def admin_delete_categoria(id):
     if not session.get('admin_autenticado'): return redirect('/')
     categoria = db.session.get(Categoria, id)
@@ -1751,6 +1803,7 @@ def admin_delete_categoria(id):
 
 # ─── Importación Masiva ──────────────────────────────────────
 @app.route('/admin/importar', methods=['POST'])
+@login_requerido
 def admin_importar():
     if not session.get('admin_autenticado'): return redirect('/')
     if 'excel_file' not in request.files:
@@ -1914,6 +1967,7 @@ def admin_importar():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/verificar_precios', methods=['GET'])
+@login_requerido
 def verificar_precios():
     # Si no existe la variable, manda la hora argentina actual como default
     ultima = globals().get('ultima_actualizacion_precios', hora_argentina())
@@ -1921,6 +1975,7 @@ def verificar_precios():
 
 # ─── Exportación a Excel ───────────────────────────────────────
 @app.route('/admin/exportar')
+@login_requerido
 def admin_exportar():
     if not session.get('admin_autenticado'): return redirect('/')
     productos = Producto.query.all()
@@ -1955,6 +2010,7 @@ def admin_exportar():
 
 # ─── Estadísticas de Ventas ──────────────────────────────────
 @app.route('/admin/estadisticas')
+@login_requerido
 def admin_estadisticas():
     if not session.get('admin_autenticado'): return redirect('/')
     top_vendidos = Producto.query.filter_by(activo=1).order_by(Producto.ventas_totales.desc()).limit(5).all()
@@ -2059,12 +2115,14 @@ def setup_database():
 setup_database()
 
 @app.route('/reportes')
+@login_requerido
 def reportes_view():
     if not session.get('facturador_auth'):
         return redirect('/')
     return render_template('reportes.html')
 
 @app.route('/api/reportes', methods=['GET'])
+@login_requerido
 def api_reportes():
     from datetime import datetime, time
     import json
@@ -2127,10 +2185,12 @@ def api_reportes():
     })
 
 @app.route('/manifest.json')
+@login_requerido
 def send_manifest():
     return send_from_directory('static', 'manifest.json')
 
 @app.route('/sw.js')
+@login_requerido
 def send_sw():
     response = make_response(send_from_directory('static', 'sw.js'))
     response.headers['Content-Type'] = 'application/javascript'
