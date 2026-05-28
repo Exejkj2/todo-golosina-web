@@ -1766,6 +1766,59 @@ def admin_delete_product(id):
         flash('Producto eliminado.', 'warning')
     return redirect(url_for('admin_dashboard'))
 
+@app.route('/api/productos/eliminar_masivo', methods=['POST'])
+@login_requerido
+def eliminar_masivo():
+    data = request.json or {}
+    ids = data.get('ids', [])
+    if not ids:
+        return jsonify({'ok': False, 'mensaje': 'No se seleccionaron productos'}), 400
+    
+    try:
+        for p_id in ids:
+            producto = db.session.get(Producto, p_id)
+            if producto:
+                producto.activo = 0
+                producto.sincronizado = not es_offline()
+                producto.ultima_actualizacion = hora_argentina()
+        db.session.commit()
+        return jsonify({'ok': True, 'mensaje': f'{len(ids)} productos eliminados correctamente.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'ok': False, 'mensaje': f'Error al eliminar masivamente: {str(e)}'}), 500
+
+@app.route('/api/productos/aumento_masivo', methods=['POST'])
+@login_requerido
+def aumento_masivo():
+    data = request.json or {}
+    ids = data.get('ids', [])
+    try:
+        porcentaje = float(data.get('porcentaje', 0))
+    except ValueError:
+        return jsonify({'ok': False, 'mensaje': 'Porcentaje inválido.'}), 400
+        
+    if not ids:
+        return jsonify({'ok': False, 'mensaje': 'No se seleccionaron productos'}), 400
+    
+    try:
+        factor = 1.0 + (porcentaje / 100.0)
+        for p_id in ids:
+            producto = db.session.get(Producto, p_id)
+            if producto:
+                producto.precio_anterior = producto.precio_lista_1
+                producto.precio_lista_1 = round(producto.precio_lista_1 * factor, 2)
+                if producto.precio_lista_2:
+                    producto.precio_lista_2 = round(producto.precio_lista_2 * factor, 2)
+                if producto.precio_lista_3:
+                    producto.precio_lista_3 = round(producto.precio_lista_3 * factor, 2)
+                producto.sincronizado = not es_offline()
+                producto.ultima_actualizacion = hora_argentina()
+        db.session.commit()
+        return jsonify({'ok': True, 'mensaje': f'Precios de {len(ids)} productos aumentados un {porcentaje}% correctamente.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'ok': False, 'mensaje': f'Error al aumentar precios masivamente: {str(e)}'}), 500
+
 # ─── CRUD de Categorías ──────────────────────────────────────
 @app.route('/admin/categorias')
 @login_requerido
