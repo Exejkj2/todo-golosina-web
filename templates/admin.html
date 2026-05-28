@@ -81,6 +81,10 @@
         vertical-align: middle;
         color: #334155;
       }
+      #tabla_productos tbody td {
+        font-size: 0.9rem;
+        padding: 8px 10px;
+      }
     
       .tg-brand-name {
         font-family: 'Montserrat', sans-serif;
@@ -323,11 +327,11 @@
                       {% endif %}
                     </td>
                     <td>
-                      <strong style="color: #1e293b">{{ p.nombre }}</strong>
+                      <strong style="color: #1e293b">{{ p.nombre | title }}</strong>
                     </td>
                     <td>
                       <span class="badge bg-light text-dark border"
-                        >{{ p.categoria_rel.nombre if p.categoria_rel else 'General' }}</span
+                        >{{ (p.categoria_rel.nombre if p.categoria_rel else 'General') | title }}</span
                       >
                     </td>
                     <td>
