@@ -916,7 +916,8 @@ def index():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        if username == 'admin' and password == 'admin123':
+        usuario = Usuario.query.filter_by(username=username).first()
+        if usuario and check_password_hash(usuario.password_hash, password):
             session['admin_autenticado'] = True
             
             return redirect('/admin')
