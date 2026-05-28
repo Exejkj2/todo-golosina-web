@@ -2295,16 +2295,13 @@ function renderizarResultadosLocales(productos) {
         tr.style.backgroundColor = "#e2e8f0"; 
       }
       tr.innerHTML = `
-        <td><strong>${p.nombre}</strong><br><small>${p.categoria || "General"}</small></td>
-        <td class="text-center"><span class="badge ${p.stock > 0 ? "bg-success" : "bg-danger"}">${p.stock}</span></td>
-        <td class="text-end fw-bold">$${p.precio_lista_1.toLocaleString()}</td>
-        <td class="text-end text-muted small">$${p.precio_lista_2.toLocaleString()}</td>
-        <td class="text-end text-muted small">$${p.precio_lista_3.toLocaleString()}</td>
+        <td style="text-transform: capitalize;"><strong>${p.nombre}</strong></td>
+        <td class="text-end fw-bold pe-4">$${p.precio_lista_1.toLocaleString()}</td>
       `;
       resultsBody.appendChild(tr);
     });
   } else {
-    resultsBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">No encontrado</td></tr>';
+    resultsBody.innerHTML = '<tr><td colspan="2" class="text-center p-4">No encontrado</td></tr>';
   }
 }
 
