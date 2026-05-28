@@ -146,6 +146,9 @@
             width: 260px;
           "
         >
+          <a href="#" id="btnCambiarPassword" class="text-warning"
+            ><i class="bi bi-shield-lock me-2"></i> Cambiar Contraseña</a
+          >
           <a href="/logout" class="text-danger"
             ><i class="bi bi-box-arrow-left me-2"></i> Cerrar Sesión</a
           >
@@ -1274,6 +1277,35 @@
           } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
+          }
+        });
+      }
+      // --- Cambiar Contraseña ---
+      const btnCambiarPw = document.getElementById('btnCambiarPassword');
+      if (btnCambiarPw) {
+        btnCambiarPw.addEventListener('click', async function(e) {
+          e.preventDefault();
+          const nueva = prompt('Ingrese la nueva contraseña (mínimo 6 caracteres):');
+          if (!nueva) return;
+          if (nueva.trim().length < 6) {
+            alert('La contraseña debe tener al menos 6 caracteres.');
+            return;
+          }
+          try {
+            const res = await fetch('/api/cambiar-password', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ nueva_password: nueva.trim() })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              alert('✅ ' + data.mensaje);
+            } else {
+              alert('⚠️ ' + (data.mensaje || 'Error al cambiar la contraseña.'));
+            }
+          } catch (err) {
+            console.error('Error:', err);
+            alert('Error de conexión al intentar cambiar la contraseña.');
           }
         });
       }

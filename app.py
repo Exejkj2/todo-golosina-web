@@ -1033,6 +1033,23 @@ def logout():
     session.pop('admin_autenticado', None)
     return redirect('/')
 
+@app.route('/api/cambiar-password', methods=['POST'])
+def cambiar_password():
+    if not session.get('admin_autenticado'):
+        return jsonify({'ok': False, 'mensaje': 'No autenticado'}), 401
+    data = request.get_json()
+    if not data or not data.get('nueva_password'):
+        return jsonify({'ok': False, 'mensaje': 'Debe ingresar una nueva contraseña'}), 400
+    nueva = data['nueva_password'].strip()
+    if len(nueva) < 6:
+        return jsonify({'ok': False, 'mensaje': 'La contraseña debe tener al menos 6 caracteres'}), 400
+    usuario = Usuario.query.filter_by(username='admin').first()
+    if not usuario:
+        return jsonify({'ok': False, 'mensaje': 'Usuario admin no encontrado'}), 404
+    usuario.password_hash = generate_password_hash(nueva)
+    db.session.commit()
+    return jsonify({'ok': True, 'mensaje': 'Contraseña actualizada correctamente'})
+
 @app.route('/api/clientes/<int:id>', methods=['DELETE'])
 def delete_cliente(id):
     try:
