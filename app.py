@@ -24,8 +24,8 @@ ultima_actualizacion_precios = hora_argentina()
 DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tienda.db')
 
 app = Flask(__name__)
-app.secret_key = 'llave_secreta_admin_2026'
-app.config['SECRET_KEY'] = 'todo_golosina_secreto_super_seguro'
+app.secret_key = os.environ.get('SECRET_KEY', 'clave-local-segura')
+app.config['SECRET_KEY'] = app.secret_key
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 def es_accesible_bd_nube(uri_nube):
@@ -76,11 +76,9 @@ def es_accesible_bd_nube(uri_nube):
 
 # ─── Configuración de Base de Datos con Detección de Entorno Automática ───
 uri_nube = os.environ.get('DATABASE_URL')
-# Reemplazar por la conexión a Supabase (Contraseña verificada y actualizada)
-if not uri_nube or "render.com" in uri_nube or "supabase.com" not in uri_nube:
-    uri_nube = 'postgresql://postgres.qrrvunhqlzwlcibfoesm:36799463Exe@aws-1-sa-east-1.pooler.supabase.com:5432/postgres'
-
-if uri_nube and uri_nube.startswith('postgres://'):
+if not uri_nube:
+    raise RuntimeError("DATABASE_URL no configurada en las variables de entorno.")
+if uri_nube.startswith('postgres://'):
     uri_nube = uri_nube.replace('postgres://', 'postgresql://', 1)
 
 # Detectar si estamos en el entorno de Render (producción)

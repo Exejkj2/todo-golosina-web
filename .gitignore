@@ -4,4 +4,7 @@ venv/
 .env
 instance/
 database/tienda.db
+tienda.db
+*.db
+*.log
 .vscode/
