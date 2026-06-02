@@ -1050,23 +1050,23 @@ function renderCart() {
 
     return `
     <tr class="${i === cartSelectedIndex ? "table-active" : ""}" style="${i === cartSelectedIndex ? "background-color: #e2e8f0;" : ""}" data-index="${i}">
-      <td class="text-muted" style="font-size: 11px;">#${i + 1}</td>
-      <td>${toTitleCase(item.nombre)}</td>
-      <td class="text-center">
-        <input type="number" class="qty-input" value="${item.qty}" min="1" data-action="updQty" data-id="${item.id}">
+      <td class="text-muted text-start" style="font-size: 11px;">#${i + 1}</td>
+      <td class="text-start">${toTitleCase(item.nombre)}</td>
+      <td class="text-end">
+        <input type="number" class="qty-input text-end" value="${item.qty}" min="1" data-action="updQty" data-id="${item.id}">
       </td>
       <td class="text-end price-text">
         ${discountPerc > 0 ? `<del class="text-muted small d-block">$${item.price.toLocaleString()}</del>` : ""}
         <span class="fw-bold">$${nuevoPrecioUnitario.toLocaleString()}</span>
       </td>
       <td class="text-end">
-        <input type="number" class="qty-input w-100" value="${discountPerc}" min="0" max="100" data-action="updDiscount" data-id="${item.id}">
+        <input type="number" class="qty-input w-100 text-end" value="${discountPerc}" min="0" max="100" data-action="updDiscount" data-id="${item.id}">
         ${discountPerc > 0 ? `<small class="text-success d-block" style="font-size: 0.7rem">-$${(montoDescuentoFila * item.qty).toLocaleString()}</small>` : ""}
       </td>
       <td class="text-end subtotal-text">$${subtotalFila.toLocaleString()}</td>
-      <td class="text-end">
-        <button class="btn btn-sm p-0 text-danger" data-action="eliminarItem" data-index="${i}" title="Eliminar artículo">
-          <i class="bi bi-trash fs-5"></i>
+      <td class="text-center">
+        <button class="btn btn-sm text-danger btn-light" data-action="eliminarItem" data-index="${i}" title="Eliminar artículo">
+          <i class="bi bi-trash"></i>
         </button>
       </td>
     </tr>
