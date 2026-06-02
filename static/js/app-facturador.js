@@ -1101,17 +1101,6 @@ function calcTotal() {
   const gT = document.getElementById("grandTotal");
   if (gT) gT.textContent = `$${tot.toLocaleString()}`;
 
-  // --- Calculadora de Vuelto en Tiempo Real ---
-  const inputAbona = document.getElementById("input-abona");
-  const textoVuelto = document.getElementById("texto-vuelto");
-  if (inputAbona && textoVuelto) {
-    const abona = parseFloat(inputAbona.value) || 0;
-    const vuelto = abona >= tot ? abona - tot : 0;
-    textoVuelto.textContent = `$${vuelto.toLocaleString()}`;
-    textoVuelto.style.color = (abona > 0 && abona >= tot) ? '#198754' : '#6c757d';
-  }
-  // -------------------------------------------
-
   const infoGral = document.getElementById("generalSavingsInfo");
   const spanGral = document.getElementById("monto-descuento-general");
   if (infoGral && spanGral) {
@@ -1123,23 +1112,6 @@ function calcTotal() {
     }
   }
 }
-
-// Listener en tiempo real del campo "Abona con"
-document.addEventListener("DOMContentLoaded", function () {
-  const inputAbona = document.getElementById("input-abona");
-  if (inputAbona) {
-    inputAbona.addEventListener("input", function () {
-      const grandTotalEl = document.getElementById("grandTotal");
-      const textoVuelto = document.getElementById("texto-vuelto");
-      if (!grandTotalEl || !textoVuelto) return;
-      const tot = parseFloat(grandTotalEl.textContent.replace(/[$.]/g, "").replace(",", ".")) || 0;
-      const abona = parseFloat(inputAbona.value) || 0;
-      const vuelto = abona >= tot ? abona - tot : 0;
-      textoVuelto.textContent = `$${vuelto.toLocaleString()}`;
-      textoVuelto.style.color = (abona > 0 && abona >= tot) ? '#198754' : '#6c757d';
-    });
-  }
-});
 
 function openCobro() {
   const tab = getActiveTab();
@@ -1196,29 +1168,32 @@ function calcMultiPago() {
   const cc = parseFloat(document.getElementById("payCc")?.value) || 0;
   
   const sum = ef + tr + db + cc;
-  const resta = tot - sum;
-  
-  const restaEl = document.getElementById("modalResta");
-  const vWrap = document.getElementById("vueltoWrap");
-  const vEl = document.getElementById("modalVuelto");
+  const diferencia = sum - tot; // positivo = vuelto, negativo = resta
 
-  if (resta > 0) {
-    if (restaEl) {
-      restaEl.textContent = `$${resta.toLocaleString()}`;
-      restaEl.className = "m-0 fw-black text-danger";
-    }
-    vWrap?.classList.add("d-none");
+  const restaLabel = document.getElementById("restaLabel");
+  const restaEl = document.getElementById("modalResta");
+  const restaWrap = document.getElementById("restaWrap");
+
+  if (!restaEl) return;
+
+  if (diferencia < 0) {
+    // Falta dinero — RESTA
+    if (restaLabel) restaLabel.textContent = "Resta:";
+    restaEl.textContent = `$${Math.abs(diferencia).toLocaleString()}`;
+    restaEl.className = "m-0 fw-black text-danger";
+    if (restaWrap) { restaWrap.style.background = "#fff8e1"; restaWrap.style.borderColor = "#ffd54f"; }
+  } else if (diferencia > 0) {
+    // Sobra dinero — VUELTO
+    if (restaLabel) restaLabel.textContent = "Vuelto:";
+    restaEl.textContent = `$${diferencia.toLocaleString()}`;
+    restaEl.className = "m-0 fw-black text-success";
+    if (restaWrap) { restaWrap.style.background = "#e8f5e9"; restaWrap.style.borderColor = "#66bb6a"; }
   } else {
-    if (restaEl) {
-      restaEl.textContent = "$0";
-      restaEl.className = "m-0 fw-black text-success";
-    }
-    if (sum > tot) { 
-      vWrap?.classList.remove("d-none"); 
-      if (vEl) vEl.textContent = `$${(sum - tot).toLocaleString()}`; 
-    } else { 
-      vWrap?.classList.add("d-none"); 
-    }
+    // Exacto
+    if (restaLabel) restaLabel.textContent = "Resta:";
+    restaEl.textContent = "$0";
+    restaEl.className = "m-0 fw-black text-success";
+    if (restaWrap) { restaWrap.style.background = "#fff8e1"; restaWrap.style.borderColor = "#ffd54f"; }
   }
 }
 
