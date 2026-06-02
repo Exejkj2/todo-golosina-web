@@ -976,7 +976,7 @@ def api_sincronizar():
 
 @app.route('/imprimir_ticket/')
 @app.route('/imprimir_ticket/<int:id>')
-@login_requerido
+@login_requerido # Protegido (A-05)
 def endpoint_imprimir_ticket(id=None):
     if id is None:
         return "ID de ticket no proporcionado", 400
@@ -1050,12 +1050,12 @@ def facturador():
     return render_template('facturador.html')
 
 @app.route('/ticket/<int:venta_id>')
-@login_requerido
+@login_requerido # Protegido (A-05)
 def endpoint_ticket_legacy(venta_id):
     return endpoint_imprimir_ticket(venta_id)
 
 @app.route('/descargar_factura/<int:venta_id>')
-@login_requerido
+@login_requerido # Protegido (A-05)
 def descargar_factura(venta_id):
     venta = db.session.get(Venta, venta_id)
     if not venta:
@@ -2121,7 +2121,7 @@ def verificar_precios():
 
 # ─── Exportación a Excel ───────────────────────────────────────
 @app.route('/admin/exportar')
-@login_requerido
+@login_requerido # Protegido (A-05)
 def admin_exportar():
     if not session.get('admin_autenticado'): return redirect('/')
     productos = Producto.query.all()
@@ -2156,7 +2156,7 @@ def admin_exportar():
 
 # ─── Estadísticas de Ventas ──────────────────────────────────
 @app.route('/admin/estadisticas')
-@login_requerido
+@login_requerido # Protegido (A-05)
 def admin_estadisticas():
     if not session.get('admin_autenticado'): return redirect('/')
     top_vendidos = Producto.query.filter_by(activo=1).order_by(Producto.ventas_totales.desc()).limit(5).all()
@@ -2261,14 +2261,14 @@ def setup_database():
 setup_database()
 
 @app.route('/reportes')
-@login_requerido
+@login_requerido # Protegido (A-05)
 def reportes_view():
     if not session.get('facturador_auth'):
         return redirect('/')
     return render_template('reportes.html')
 
 @app.route('/api/reportes', methods=['GET'])
-@login_requerido
+@login_requerido # Protegido (A-05)
 def api_reportes():
     from datetime import datetime, time
     import json
