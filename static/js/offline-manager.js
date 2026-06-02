@@ -99,31 +99,59 @@ async function queueSale(saleData) {
 
 async function syncPendingSales() {
   if (!navigator.onLine) return;
-  const tx = db.transaction('ventas_pendientes', 'readwrite');
-  const store = tx.objectStore('ventas_pendientes');
-  const request = store.getAll();
-  
-  request.onsuccess = async () => {
-    const pending = request.result;
-    if (pending.length === 0) return;
 
-    console.log(`Sincronizando ${pending.length} ventas pendientes...`);
-
-    for (const sale of pending) {
-      try {
-        const res = await fetch('/api/registrar_venta', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sale)
-        });
-        const d = await res.json();
-      } catch (e) {
-        console.error("Error sincronizando venta individual:", e);
+  const getPending = () => new Promise((resolve) => {
+    const tx = db.transaction('ventas_pendientes', 'readonly');
+    const store = tx.objectStore('ventas_pendientes');
+    const items = [];
+    store.openCursor().onsuccess = (e) => {
+      const cursor = e.target.result;
+      if (cursor) {
+        items.push({ key: cursor.key, val: cursor.value });
+        cursor.continue();
+      } else {
+        resolve(items);
       }
+    };
+  });
+
+  const pending = await getPending();
+  if (pending.length === 0) return;
+
+  console.log(`Sincronizando ${pending.length} ventas pendientes...`);
+
+  for (const item of pending) {
+    const sale = item.val;
+    const key = item.key;
+
+    // Prevención de colisión de IDs
+    delete sale.id;
+    delete sale.ticket_number;
+
+    try {
+      const res = await fetch('/api/registrar_venta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sale)
+      });
+      
+      if (res.ok) {
+        // Limpieza segura de la cola local
+        const txDel = db.transaction('ventas_pendientes', 'readwrite');
+        txDel.objectStore('ventas_pendientes').delete(key);
+      } else {
+        console.warn("Error del servidor, se reintentará luego:", await res.text());
+        continue;
+      }
+    } catch (e) {
+      console.error("Error de red sincronizando venta individual:", e);
+      continue;
     }
-    store.clear();
-    console.log('Cola de ventas sincronizada');
-  };
+    
+    // Retraso para no saturar el servidor
+    await new Promise(r => setTimeout(r, 300));
+  }
+  console.log('Proceso de sincronización finalizado');
 }
 
 window.addEventListener('online', () => {
