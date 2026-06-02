@@ -2640,22 +2640,3 @@ async function sincronizarDatosConNube() {
 window.addEventListener('online', () => {
     sincronizarDatosConNube();
 });
-
-// ─── SIDEBAR COLAPSABLE ──────────────────────────────────────────────────────
-(function () {
-  const STORAGE_KEY = 'sidebar-collapsed';
-  const body = document.body;
-
-  // Restaurar estado previo
-  if (localStorage.getItem(STORAGE_KEY) === '1') {
-    body.classList.add('sidebar-collapsed');
-  }
-
-  const btn = document.getElementById('btn-toggle-sidebar');
-  if (btn) {
-    btn.addEventListener('click', function () {
-      body.classList.toggle('sidebar-collapsed');
-      localStorage.setItem(STORAGE_KEY, body.classList.contains('sidebar-collapsed') ? '1' : '0');
-    });
-  }
-})();
