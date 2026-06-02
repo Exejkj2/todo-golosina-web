@@ -138,10 +138,8 @@ def login_requerido(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get('admin_autenticado'):
-            # Si es una consulta interna a la API, rechaza con JSON
-            if request.path.startswith('/api/'):
-                return jsonify({'ok': False, 'mensaje': 'Acceso denegado. Inicie sesión.'}), 401
-            # Si intenta entrar a una pantalla, lo devuelve al login
+            if request.path.startswith('/api/') or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"ok": False, "error": "No autorizado"}), 401
             return redirect('/')
         return f(*args, **kwargs)
     return decorated_function
@@ -1012,9 +1010,16 @@ def endpoint_imprimir_ticket(id=None):
 
 @app.before_request
 def check_admin_auth():
-    if request.path.startswith('/admin') or request.path.startswith('/facturador'):
-        # Ignorar rutas estáticas o el login-facturador por si quedan restos (opcional, pero la lógica pide redirigir)
+    if request.method in ['POST', 'PUT', 'DELETE'] and request.path != '/':
         if not session.get('admin_autenticado'):
+            if request.path.startswith('/api/') or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"ok": False, "error": "No autorizado"}), 401
+            return redirect('/')
+
+    if request.path.startswith('/admin') or request.path.startswith('/facturador'):
+        if not session.get('admin_autenticado'):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"ok": False, "error": "No autorizado"}), 401
             return redirect('/')
 
 @app.route('/', methods=['GET', 'POST'])
