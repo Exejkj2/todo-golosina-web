@@ -355,10 +355,11 @@ def estado_conexion():
 @app.route('/forzar-migracion-db')
 @login_requerido
 def forzar_migracion_db():
+    if not session.get('admin_autenticado'): return redirect('/')
     try:
         from sqlalchemy import text
-        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS sincronizado BOOLEAN DEFAULT TRUE;'))
-        db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP;'))
+        db.session.execute(text('ALTER TABLE productos ADD COLUMN IF NOT EXISTS sincronizado BOOLEAN DEFAULT TRUE;'))
+        db.session.execute(text('ALTER TABLE productos ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP;'))
         db.session.commit()
         return "<h1>¡Sincronización forzada con SQLAlchemy Exitosa!</h1>", 200
     except Exception as e:
@@ -369,6 +370,7 @@ def forzar_migracion_db():
 @app.route('/importar-csv')
 @login_requerido
 def importar_csv():
+    if not session.get('admin_autenticado'): return redirect('/')
     try:
         csv_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'lista_productos.csv')
         with open(csv_path, 'r', encoding='utf-8') as f:
@@ -406,10 +408,11 @@ def importar_csv():
 @app.route('/optimizar-db')
 @login_requerido
 def optimizar_db():
+    if not session.get('admin_autenticado'): return redirect('/')
     try:
-        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_nombre ON "Productos" (nombre);'))
-        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_codigo_barra ON "Productos" (codigo_barra);'))
-        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_activo ON "Productos" (activo);'))
+        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_nombre ON productos (nombre);'))
+        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_codigo_barra ON productos (codigo_barra);'))
+        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_activo ON productos (activo);'))
         db.session.commit()
         return "<h1>¡Turbo Activado! Índices creados en Supabase.</h1>", 200
     except Exception as e:
