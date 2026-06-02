@@ -1209,6 +1209,11 @@ if (originalBtnConfirmar) {
       return;
     }
     isProcessingVenta = true;
+    
+    // Deshabilitar botón para prevenir doble submit
+    const originalBtnText = newBtn.innerHTML;
+    newBtn.disabled = true;
+    newBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Procesando...';
 
     try {
       const tab = getActiveTab();
@@ -1333,6 +1338,8 @@ if (originalBtnConfirmar) {
       console.error(e);
     } finally {
       isProcessingVenta = false;
+      newBtn.disabled = false;
+      newBtn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i> CONFIRMAR';
     }
   });
 }
