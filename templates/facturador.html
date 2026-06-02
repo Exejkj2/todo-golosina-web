@@ -196,7 +196,9 @@
         color: #000;
       }
       .qty-input {
-        width: 50px;
+        width: 100%;
+        min-width: 60px;
+        max-width: 80px;
         text-align: center;
         border: 1px solid #ddd;
         border-radius: 6px;
@@ -1018,13 +1020,13 @@
               <table class="cart-table">
                 <thead>
                   <tr>
-                    <th style="width: 50px">#</th>
-                    <th>Producto</th>
-                    <th style="width: 120px" class="text-center">Cant.</th>
-                    <th style="width: 120px" class="text-end">P. Unit.</th>
-                    <th style="width: 100px" class="text-end">DESC. (%)</th>
-                    <th style="width: 120px" class="text-end">Subtotal</th>
-                    <th style="width: 50px"></th>
+                    <th style="width: 5%">#</th>
+                    <th style="width: 45%">Producto</th>
+                    <th style="width: 12%" class="text-center">Cant.</th>
+                    <th style="width: 12%" class="text-end">P. Unit.</th>
+                    <th style="width: 12%" class="text-end">DESC. (%)</th>
+                    <th style="width: 10%" class="text-end">Subtotal</th>
+                    <th style="width: 4%"></th>
                   </tr>
                 </thead>
                 <tbody id="cartBody">
@@ -1048,7 +1050,7 @@
                   </div>
                 </div>
                 <small class="text-muted fw-bold text-uppercase" style="letter-spacing: 1px;">Total a pagar</small>
-                <h2 id="grandTotal" class="text-success fw-black mt-2" style="font-size: 3.5rem; letter-spacing: -2px; line-height: 1;">$0</h2>
+                <h2 id="grandTotal" class="text-success fw-black mt-2" style="font-size: 2.2rem; letter-spacing: -1px; line-height: 1;">$0</h2>
               </div>
             </div>
 
