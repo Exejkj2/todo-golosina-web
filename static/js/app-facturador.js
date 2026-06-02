@@ -2647,3 +2647,26 @@ async function sincronizarDatosConNube() {
 window.addEventListener('online', () => {
     sincronizarDatosConNube();
 });
+
+// ─── AUTO-FOCUS PERSISTENTE PARA ESCÁNER ─────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const scannerInput = document.getElementById('scannerInput');
+  if (scannerInput) {
+    // Foco inicial al cargar
+    setTimeout(() => {
+      scannerInput.focus();
+    }, 100);
+
+    // Listener global para clics
+    document.addEventListener('click', (e) => {
+      // Excepción: Si el usuario hace clic en otro input, textarea o select, no interrumpimos
+      const targetTag = e.target.tagName.toUpperCase();
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(targetTag)) {
+        return;
+      }
+      
+      // Regresar foco inmediatamente al escáner
+      scannerInput.focus();
+    });
+  }
+});
