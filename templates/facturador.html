@@ -204,12 +204,15 @@
         font-size: 13px;
       }
       .payment-section {
-        background: #f5f5f5;
-        border-left: 1px solid var(--border);
+        background: #fdfdfd;
+        border: 1px solid #eaeaea;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         display: flex;
         flex-direction: column;
-        padding: 20px;
-        width: 300px;
+        padding: 25px;
+        width: 340px;
+        margin: 15px;
       }
       .total-display {
         text-align: right;
@@ -1034,7 +1037,6 @@
           <!-- RIGHT: PAYMENT SUMMARY -->
           <div
             class="payment-section d-flex flex-column justify-content-between"
-            style="background: #f5f5f5"
           >
             <div>
               <div class="total-display">
@@ -1045,8 +1047,8 @@
                     Ahorro: <span id="monto-descuento-general">-$0</span>
                   </div>
                 </div>
-                <small class="text-muted fw-bold">Total a pagar</small>
-                <h2 id="grandTotal" class="text-dark fw-bold">$0</h2>
+                <small class="text-muted fw-bold text-uppercase" style="letter-spacing: 1px;">Total a pagar</small>
+                <h2 id="grandTotal" class="text-success fw-black mt-2" style="font-size: 3.5rem; letter-spacing: -2px; line-height: 1;">$0</h2>
               </div>
             </div>
 
