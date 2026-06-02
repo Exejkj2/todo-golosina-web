@@ -1101,6 +1101,17 @@ function calcTotal() {
   const gT = document.getElementById("grandTotal");
   if (gT) gT.textContent = `$${tot.toLocaleString()}`;
 
+  // --- Calculadora de Vuelto en Tiempo Real ---
+  const inputAbona = document.getElementById("input-abona");
+  const textoVuelto = document.getElementById("texto-vuelto");
+  if (inputAbona && textoVuelto) {
+    const abona = parseFloat(inputAbona.value) || 0;
+    const vuelto = abona >= tot ? abona - tot : 0;
+    textoVuelto.textContent = `$${vuelto.toLocaleString()}`;
+    textoVuelto.style.color = (abona > 0 && abona >= tot) ? '#198754' : '#6c757d';
+  }
+  // -------------------------------------------
+
   const infoGral = document.getElementById("generalSavingsInfo");
   const spanGral = document.getElementById("monto-descuento-general");
   if (infoGral && spanGral) {
@@ -1112,6 +1123,23 @@ function calcTotal() {
     }
   }
 }
+
+// Listener en tiempo real del campo "Abona con"
+document.addEventListener("DOMContentLoaded", function () {
+  const inputAbona = document.getElementById("input-abona");
+  if (inputAbona) {
+    inputAbona.addEventListener("input", function () {
+      const grandTotalEl = document.getElementById("grandTotal");
+      const textoVuelto = document.getElementById("texto-vuelto");
+      if (!grandTotalEl || !textoVuelto) return;
+      const tot = parseFloat(grandTotalEl.textContent.replace(/[$.]/g, "").replace(",", ".")) || 0;
+      const abona = parseFloat(inputAbona.value) || 0;
+      const vuelto = abona >= tot ? abona - tot : 0;
+      textoVuelto.textContent = `$${vuelto.toLocaleString()}`;
+      textoVuelto.style.color = (abona > 0 && abona >= tot) ? '#198754' : '#6c757d';
+    });
+  }
+});
 
 function openCobro() {
   const tab = getActiveTab();
