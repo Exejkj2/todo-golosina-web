@@ -596,7 +596,7 @@ def registrar_venta():
             general_discount_perc = 0.0
 
     if not items or len(items) == 0:
-        return jsonify({"ok": False, "mensaje": "No se puede registrar una venta sin productos."}), 400
+        return jsonify({"ok": False, "mensaje": "No se puede registrar una venta sin artículos."}), 400
 
     # Recalcular el total y construir el detalle de forma segura en el backend para evitar forjado de montos (L-04)
     total_recalculado = 0.0
@@ -980,8 +980,12 @@ def api_sincronizar():
 def endpoint_imprimir_ticket(id=None):
     if id is None:
         return "ID de ticket no proporcionado", 400
+    
+    venta = db.session.get(Venta, id)
+    if not venta:
+        abort(404, description="El comprobante no existe o fue anulado.")
+        
     try:
-        venta = Venta.query.get_or_404(id)
         import json
         detalle = json.loads(venta.detalle_json or '[]')
         
@@ -1468,7 +1472,9 @@ def get_venta_detalle(id):
 @app.route('/api/ventas/<int:id_venta>', methods=['GET'])
 @login_requerido
 def obtener_detalle_venta(id_venta):
-    venta = Venta.query.get_or_404(id_venta)
+    venta = db.session.get(Venta, id_venta)
+    if not venta:
+        return jsonify({"ok": False, "mensaje": "El comprobante no existe o fue anulado."}), 404
     
     items_vendidos = []
     
