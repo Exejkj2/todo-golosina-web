@@ -7,7 +7,7 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text, or_
 from werkzeug.security import generate_password_hash, check_password_hash
-import pandas as pd
+# pandas removido para aligerar el servidor
 from fpdf import FPDF
 from datetime import datetime, date, timedelta
 import json
@@ -2141,10 +2141,17 @@ def admin_exportar():
             'Link Imagen': p.imagen_url or p.imagen,
             'Activo': 'SI' if p.activo == 1 else 'NO'
         })
-    df = pd.DataFrame(data)
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Inventario'
+    if data:
+        headers = list(data[0].keys())
+        ws.append(headers)
+        for row in data:
+            ws.append([row[h] for h in headers])
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Inventario')
+    wb.save(output)
     output.seek(0)
     
     return send_file(
