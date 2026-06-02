@@ -12,3 +12,8 @@ tienda.db
 .vscode/
 routes.txt
 all_urls.txt
+
+# Certificados AFIP
+certificados_afip/
+*.key
+*.crt
