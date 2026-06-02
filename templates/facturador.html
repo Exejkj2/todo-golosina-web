@@ -123,7 +123,8 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
+        overflow-x: hidden;
+        width: calc(100% - 260px);
         position: relative;
       }
 
@@ -213,8 +214,6 @@
         display: flex;
         flex-direction: column;
         padding: 25px;
-        width: 340px;
-        margin: 15px;
       }
       .total-display {
         text-align: right;
@@ -934,9 +933,9 @@
           </button>
         </div>
 
-        <div class="main-grid">
+        <div class="row w-100 m-0 flex-grow-1" style="overflow-y: hidden;">
           <!-- LEFT: CART LIST -->
-          <div class="d-flex flex-column overflow-hidden">
+          <div class="col-lg-8 col-md-7 d-flex flex-column overflow-hidden px-0">
             <!-- CLIENT SELECTION BAR -->
             <div class="customer-section p-3 border-bottom bg-light">
               <div class="row align-items-end g-3">
@@ -1017,7 +1016,8 @@
             </div>
 
             <div class="cart-section">
-              <table class="cart-table">
+              <div class="table-responsive">
+                <table class="cart-table">
                 <thead>
                   <tr>
                     <th style="width: 5%">#</th>
@@ -1032,14 +1032,14 @@
                 <tbody id="cartBody">
                   <!-- Items injected by JS -->
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           </div>
 
           <!-- RIGHT: PAYMENT SUMMARY -->
-          <div
-            class="payment-section d-flex flex-column justify-content-between"
-          >
+          <div class="col-lg-4 col-md-5 p-3">
+            <div class="payment-section d-flex flex-column justify-content-between h-100 w-100 m-0">
             <div>
               <div class="total-display">
                 <div class="mb-3">
@@ -1079,6 +1079,7 @@
               >
                 <i class="bi bi-wallet2 me-3"></i> COBRAR (F12)
               </button>
+            </div>
             </div>
           </div>
         </div>
