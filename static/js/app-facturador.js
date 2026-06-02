@@ -1,14 +1,7 @@
 // app-facturador.js - Lógica principal del Facturador (Versión CSP-Compliant)
 // Todo Golosina POS System
 
-// Service Worker Registration
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/static/service-worker.js')
-      .then(reg => console.log('SW: Registrado'))
-      .catch(err => console.log('SW: Error', err));
-  });
-}
+
 
 // Global Variables
 const horaCargaPantalla = new Date();

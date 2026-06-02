@@ -9,7 +9,7 @@ from sqlalchemy import text, or_
 from werkzeug.security import generate_password_hash, check_password_hash
 # pandas removido para aligerar el servidor
 from fpdf import FPDF
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 import json
 import socket
 import time
@@ -28,7 +28,7 @@ ultima_actualizacion_precios = hora_argentina()
 DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tienda.db')
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'clave-local-segura')
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 app.config['SECRET_KEY'] = app.secret_key
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -648,9 +648,12 @@ def registrar_venta():
     detalle = detalle_recalculado
 
     from datetime import timedelta
+    import json as _json
     tiempo_limite = hora_argentina() - timedelta(seconds=60)
+    detalle_json_str = _json.dumps(detalle)
     venta_fantasma = Venta.query.filter(
         Venta.total == total_venta,
+        Venta.detalle_json == detalle_json_str,
         Venta.fecha >= tiempo_limite
     ).first()
 
@@ -1390,7 +1393,7 @@ def get_ventas_hoy():
             if caja:
                 inicio_rango = caja.fecha_apertura
             else:
-                inicio_rango = datetime.combine(date.today(), datetime.time.min)
+                inicio_rango = datetime.combine(date.today(), time.min)
 
             ventas = Venta.query.filter(Venta.fecha >= inicio_rango).order_by(Venta.fecha.desc()).all()
             gastos = Gasto.query.filter(Gasto.fecha >= inicio_rango).all()
@@ -1442,7 +1445,8 @@ def get_ventas_hoy():
             "gastos": [g.to_dict() for g in gastos]
         })
     except Exception as e:
-        return jsonify({"error_interno": str(e), "detalle": traceback.format_exc()}), 500
+        print(f"Error en get_ventas_hoy: {e}")
+        return jsonify([])
 
 @app.route('/api/venta/<int:id>', methods=['GET'])
 @login_requerido
@@ -2281,7 +2285,7 @@ setup_database()
 @app.route('/reportes')
 @login_requerido # Protegido (A-05)
 def reportes_view():
-    if not session.get('facturador_auth'):
+    if not session.get('admin_autenticado'):
         return redirect('/')
     return render_template('reportes.html')
 
