@@ -1269,7 +1269,9 @@ if (originalBtnConfirmar) {
       const payload = {
         tipo: "Local",
         cliente_id: tab.selectedCliente.id,
-        total: tot,
+        lista_precios: tab.selectedLista || 1,
+        total_venta: tot,            // Total real de la venta (suma de artículos con descuentos)
+        total: tot,                  // Alias mantenido por compatibilidad con rutas antiguas
         items: tab.cart.map((i) => {
           const nuevoPrecioUnit = i.price - (i.price * ((i.discount || 0) / 100));
           return { id: i.id, qty: i.qty, discount_perc: i.discount || 0, price_final: nuevoPrecioUnit };
@@ -1278,7 +1280,9 @@ if (originalBtnConfirmar) {
           const nuevoPrecioUnit = i.price - (i.price * ((i.discount || 0) / 100));
           return { nombre: i.nombre, qty: i.qty, precio_unit: nuevoPrecioUnit, discount_perc: i.discount || 0, subtotal: nuevoPrecioUnit * i.qty };
         }),
+        // pagos: montos REALES por medio de pago (el backend recortará el efectivo al total real)
         pagos: { efectivo: ef, transferencia: tr, debito: db, cc: cc },
+        monto_entregado: ef + tr + db + cc, // Total físico entregado por el cliente (solo informativo)
         general_discount_perc: tab.generalDiscount || 0,
         general_savings: montoDescuentoGral,
         facturar_afip: quiereFactura

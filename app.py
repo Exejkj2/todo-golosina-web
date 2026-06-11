@@ -688,7 +688,8 @@ def registrar_venta():
         
         # Soporte para medios de pago múltiples
         pagos = data.get('pagos', {})
-        p_ef = float(pagos.get('efectivo', 0))
+        # monto_entregado_ef: lo que el cliente entrega físicamente (puede incluir vuelto)
+        monto_entregado_ef = float(pagos.get('efectivo', 0))
         p_tr = float(pagos.get('transferencia', 0))
         p_db = float(pagos.get('debito', 0))
         p_cc = float(pagos.get('cc', 0))
@@ -696,10 +697,22 @@ def registrar_venta():
         # Fallback para modo simple (un solo método)
         if not pagos and data.get('metodo_pago'):
             m = data.get('metodo_pago')
-            if m == 'Efectivo': p_ef = total_venta
+            if m == 'Efectivo': monto_entregado_ef = total_venta
             elif m in ['Mercado Pago', 'Transferencia']: p_tr = total_venta
             elif m == 'Débito': p_db = total_venta
             elif m == 'Cuenta Corriente': p_cc = total_venta
+
+        # FIX CONTABLE (L-05): El monto real cobrado en efectivo es la venta menos lo pagado
+        # por otros medios. El excedente entregado por el cliente (vuelto) NO debe sumarse a
+        # los ingresos de la caja. Solo guardamos el total_venta como referencia de cobros reales.
+        otros_medios = p_tr + p_db + p_cc
+        # Lo que realmente se cobró en efectivo = total_venta - lo pagado por otros medios
+        # (mínimo 0, máximo monto_entregado_ef para no inventar dinero)
+        p_ef = max(0.0, round(min(monto_entregado_ef, total_venta - otros_medios), 2))
+
+        # El monto entregado por el cliente se guarda como dato informativo (para calcular vuelto)
+        monto_entregado_total = monto_entregado_ef + p_tr + p_db + p_cc
+        vuelto = max(0.0, round(monto_entregado_total - total_venta, 2))
 
         if p_cc > 0 and cliente_id:
             cliente = db.session.get(Cliente, cliente_id)
@@ -715,10 +728,11 @@ def registrar_venta():
             lista_precios=lista_sel,
             tipo=data.get('tipo', 'local'),
             metodo_pago=data.get('metodo_pago', 'Varios'),
-            pago_efectivo=p_ef,
+            pago_efectivo=p_ef,          # Monto REAL cobrado en efectivo (sin vuelto)
             pago_transferencia=p_tr,
             pago_debito=p_db,
             pago_cc=p_cc,
+            entregado=monto_entregado_ef, # Monto que el cliente entregó físicamente (informativo)
             fecha=hora_argentina(),
             sincronizado=not es_offline(),
             ultima_actualizacion=hora_argentina()

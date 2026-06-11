@@ -947,10 +947,13 @@ if (originalBtnConfirmar) {
       const payload = {
         tipo: "Local",
         cliente_id: tab.selectedCliente.id,
-        total: tot,
+        total_venta: tot,            // Total real de la venta (suma de artículos)
+        total: tot,                  // Alias mantenido por compatibilidad con rutas antiguas
         items: [...tab.cart].map((i) => ({ id: i.id, qty: i.qty })),
         detalle: [...tab.cart].map((i) => ({ nombre: i.nombre, qty: i.qty, precio_unit: i.price, subtotal: i.price * i.qty })),
+        // pagos: montos REALES por medio de pago (el backend recortará el efectivo al total real)
         pagos: { efectivo: ef, transferencia: tr, debito: db, cc: cc },
+        monto_entregado: ef + tr + db + cc, // Total físico entregado por el cliente (solo informativo)
         facturar_afip: quiereFactura
       };
 
