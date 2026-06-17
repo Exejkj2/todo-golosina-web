@@ -27,21 +27,26 @@
     <!-- Scripts moved to end of body for correct load order -->
     <style>
       :root {
-        --bg: #ebebeb;
+        --primary-color: #FF4B91; /* Rosa vibrante para botones de acción principal */
+        --bg-light: #FFFFFF; /* Blanco puro para fondos principales */
+        --bg-secondary: #FFEDE9; /* Rosa pastel muy suave para tarjetas o filas alternas */
+        --text-dark: #2D283E; /* Gris oscuro/azulado para el texto general, evitando el negro puro */
+
+        --bg: var(--bg-light);
         --panel: #ffffff;
-        --primary: #3483fa; /* Azul ML */
-        --accent: #fff159; /* Amarillo ML */
-        --success: #00a650; /* Verde ML */
+        --primary: var(--primary-color); 
+        --accent: #fff159; 
+        --success: #00a650; 
         --warning: #ff7733;
-        --sidebar: #2c3e50;
-        --sidebar-hover: #34495e;
-        --text: #333333;
+        --sidebar: #2D283E;
+        --sidebar-hover: #3a3451;
+        --text: var(--text-dark);
         --text-muted: #666666;
         --border: #dddddd;
       }
       body {
-        background: var(--bg);
-        color: var(--text);
+        background: var(--bg-light);
+        color: var(--text-dark);
         font-family: 'Montserrat', sans-serif;
         min-height: 100vh;
         overflow-x: hidden;

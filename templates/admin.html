@@ -17,13 +17,20 @@
       rel="stylesheet"
     />
     <style>
+      :root {
+        --primary-color: #FF4B91; /* Rosa vibrante para botones de acción principal */
+        --bg-light: #FFFFFF; /* Blanco puro para fondos principales */
+        --bg-secondary: #FFEDE9; /* Rosa pastel muy suave para tarjetas o filas alternas */
+        --text-dark: #2D283E; /* Gris oscuro/azulado para el texto general, evitando el negro puro */
+      }
       body {
-        background-color: #f8f9fa;
+        background-color: var(--bg-light);
+        color: var(--text-dark);
         font-family: "Montserrat", sans-serif;
       }
       .sidebar {
         min-height: 100vh;
-        background-color: #2b2d42;
+        background-color: #2D283E; /* Dark sidebar */
         color: white;
         padding-top: 2rem;
       }
@@ -37,8 +44,8 @@
       .sidebar a:hover,
       .sidebar a.active {
         color: white;
-        background-color: rgba(254, 57, 148, 0.2);
-        border-left: 4px solid #fe3994;
+        background-color: rgba(255, 75, 145, 0.2);
+        border-left: 4px solid var(--primary-color);
       }
       .content {
         padding: 2.5rem;
@@ -46,17 +53,20 @@
       .card-admin {
         border-radius: 15px;
         border: none;
+        background-color: var(--bg-secondary);
         box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
         overflow: hidden;
       }
-      .btn-pink {
-        background-color: #fe3994;
+      .btn-pink, .btn-primary {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
         color: white;
         border-radius: 8px;
         font-weight: 500;
       }
-      .btn-pink:hover {
-        background-color: #d82b7b;
+      .btn-pink:hover, .btn-primary:hover {
+        background-color: #E63E81;
+        border-color: #E63E81;
         color: white;
       }
       .img-preview {
