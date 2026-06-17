@@ -770,6 +770,7 @@ function filtrarDeudores() {
   const filtered = deudores.filter(c => c.nombre.toLowerCase().includes(q));
   renderDeudores(filtered);
 }
+function renderDeudores(list) {
   const body = document.getElementById("deudoresBody");
   if (!body) return;
   if (list.length === 0) { body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No hay deudores</td></tr>'; return; }
