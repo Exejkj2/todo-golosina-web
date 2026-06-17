@@ -18,9 +18,11 @@ intentos_login = {}
 import csv
 from urllib.parse import urlparse
 
-# --- Configuración de Zona Horaria (Argentina UTC-3: Naive approach) ---
+import pytz
+# --- Configuración de Zona Horaria (Argentina UTC-3) ---
 def hora_argentina():
-    return datetime.utcnow() - timedelta(hours=3)
+    tz = pytz.timezone('America/Argentina/Buenos_Aires')
+    return datetime.now(tz).replace(tzinfo=None)
 
 ultima_actualizacion_precios = hora_argentina()
 
@@ -317,6 +319,7 @@ class CajaDiaria(db.Model):
     monto_final = db.Column(db.Float, nullable=True)
     fecha_cierre = db.Column(db.DateTime, nullable=True)
     estado = db.Column(db.String(20), default='Abierta') # 'Abierta' o 'Cerrada'
+    turno = db.Column(db.String(20), default='Mañana') # 'Mañana' o 'Tarde'
 
     def __init__(self, **kwargs):
         super(CajaDiaria, self).__init__(**kwargs)
@@ -327,6 +330,7 @@ class CajaDiaria(db.Model):
             'monto_inicial': self.monto_inicial,
             'monto_final': self.monto_final,
             'estado': self.estado,
+            'turno': self.turno,
             'fecha_apertura': self.fecha_apertura.strftime('%Y-%m-%d %H:%M') if self.fecha_apertura else '',
             'fecha_cierre': self.fecha_cierre.strftime('%Y-%m-%d %H:%M') if self.fecha_cierre else ''
         }
@@ -334,8 +338,35 @@ class CajaDiaria(db.Model):
 # ─── INICIALIZACIÓN CRÍTICA (Render/Gunicorn compatible) ──────
 with app.app_context():
     db.create_all()
+    try:
+        db.session.execute(text("ALTER TABLE cajas_diarias ADD COLUMN turno VARCHAR(20) DEFAULT 'Mañana';"))
+        db.session.commit()
+    except:
+        db.session.rollback()
     print("Base de datos y tablas inicializadas correctamente.")
 
+
+@app.before_request
+def verificar_corte_automatico():
+    if request.path.startswith('/static/'):
+        return
+    try:
+        caja = CajaDiaria.query.filter_by(estado='Abierta').order_by(CajaDiaria.id.desc()).first()
+        if caja:
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            ahora = datetime.now(tz)
+            if caja.turno == 'Mañana' and ahora.hour >= 13:
+                caja.estado = 'Cerrada'
+                caja.fecha_cierre = hora_argentina()
+                db.session.commit()
+                print(f"Corte automático ejecutado para caja turno Mañana ID: {caja.id}")
+            elif caja.turno == 'Tarde' and ahora.hour >= 22:
+                caja.estado = 'Cerrada'
+                caja.fecha_cierre = hora_argentina()
+                db.session.commit()
+                print(f"Corte automático ejecutado para caja turno Tarde ID: {caja.id}")
+    except Exception as e:
+        print(f"Error en corte automático: {e}")
 
 @app.after_request
 def add_no_cache_headers(response):
@@ -1367,7 +1398,11 @@ def abrir_caja():
         return jsonify({"ok": False, "mensaje": "Ya existe una caja abierta"}), 400
     
     try:
-        nueva = CajaDiaria(monto_inicial=monto, estado='Abierta')
+        tz = pytz.timezone('America/Argentina/Buenos_Aires')
+        ahora = datetime.now(tz)
+        turno_asignado = 'Mañana' if ahora.hour < 13 else 'Tarde'
+
+        nueva = CajaDiaria(monto_inicial=monto, estado='Abierta', turno=turno_asignado)
         db.session.add(nueva)
         db.session.commit()
         return jsonify({"ok": True, "caja": nueva.to_dict()})
@@ -2298,6 +2333,75 @@ def setup_database():
 # ─── Inicialización de la Base de Datos ──────────────────────
 # Llamamos a esta función aquí para que se ejecute al importar 'app' en Render/Gunicorn
 setup_database()
+
+@app.route('/admin/reportes/turnos')
+@login_requerido
+def reportes_turnos_view():
+    if not session.get('admin_autenticado'):
+        return redirect('/')
+    return render_template('admin_reportes_turnos.html')
+
+@app.route('/api/reportes/turnos', methods=['GET'])
+@login_requerido
+def api_reportes_turnos():
+    from datetime import datetime, time
+    import pytz
+    
+    fecha_str = request.args.get('fecha')
+    if not fecha_str:
+        tz = pytz.timezone('America/Argentina/Buenos_Aires')
+        fecha_str = datetime.now(tz).strftime('%Y-%m-%d')
+        
+    try:
+        fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({"ok": False, "mensaje": "Fecha inválida"}), 400
+        
+    ventas = Venta.query.filter(
+        Venta.fecha >= datetime.combine(fecha_obj, time.min),
+        Venta.fecha <= datetime.combine(fecha_obj, time.max)
+    ).all()
+    
+    # Agrupar por turno
+    turnos_stats = {
+        'Mañana': {'total_recaudado': 0.0, 'cantidad_ventas': 0, 'ventas': []},
+        'Tarde': {'total_recaudado': 0.0, 'cantidad_ventas': 0, 'ventas': []}
+    }
+    
+    for v in ventas:
+        hora = v.fecha.hour
+        turno = 'Mañana' if hora < 13 else 'Tarde'
+        
+        turnos_stats[turno]['total_recaudado'] += v.total
+        turnos_stats[turno]['cantidad_ventas'] += 1
+        turnos_stats[turno]['ventas'].append(v)
+        
+    # Calcular productos más vendidos por turno
+    import json
+    for turno_key in turnos_stats.keys():
+        productos_count = {}
+        for v in turnos_stats[turno_key]['ventas']:
+            try:
+                detalle = json.loads(v.detalle_json)
+                for item in detalle:
+                    nombre = item.get('nombre', 'Desconocido')
+                    qty = int(item.get('qty', 1))
+                    productos_count[nombre] = productos_count.get(nombre, 0) + qty
+            except Exception:
+                pass
+                
+        # Ordenar y tomar los 5 principales
+        top_productos = sorted(productos_count.items(), key=lambda x: x[1], reverse=True)[:5]
+        turnos_stats[turno_key]['productos_top'] = [{"nombre": k, "cantidad": v} for k, v in top_productos]
+        
+        # Eliminamos array ventas para no saturar json
+        del turnos_stats[turno_key]['ventas']
+        
+    return jsonify({
+        "ok": True,
+        "fecha": fecha_str,
+        "turnos": turnos_stats
+    })
 
 @app.route('/reportes')
 @login_requerido # Protegido (A-05)
