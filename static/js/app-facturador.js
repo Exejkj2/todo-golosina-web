@@ -571,7 +571,7 @@ function switchSection(section, btn) {
   if (section === "venta" && window.innerWidth <= 768) section = "mobileWarning";
   document.querySelectorAll(".sidebar-item").forEach((el) => el.classList.remove("active"));
   if (btn) btn.classList.add("active");
-  document.querySelectorAll(".section-container").forEach((el) => el.classList.remove("active"));
+  document.querySelectorAll(".section-container, .section").forEach((el) => el.classList.remove("active"));
   const target = document.getElementById("section" + section.charAt(0).toUpperCase() + section.slice(1));
   if (target) target.classList.add("active");
   if (window.innerWidth <= 768) document.querySelector(".sidebar")?.classList.remove("active");
