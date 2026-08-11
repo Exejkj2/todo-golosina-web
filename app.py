@@ -27,6 +27,11 @@ def hora_argentina():
     return datetime.now(tz).replace(tzinfo=None)
 
 ultima_actualizacion_precios = hora_argentina()
+ultima_actualizacion_catalogo = hora_argentina().isoformat()
+
+def actualizar_version_catalogo():
+    global ultima_actualizacion_catalogo
+    ultima_actualizacion_catalogo = hora_argentina().isoformat()
 
 # ─── Configuración ────────────────────────────────────────────
 DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tienda.db')
@@ -181,7 +186,7 @@ class Producto(db.Model):
     categoria_id = db.Column(db.Integer, db.ForeignKey('categoria.id'))
     categoria_rel = db.relationship('Categoria', backref='productos')
     stock = db.Column(db.Integer, default=0)
-    activo = db.Column(db.Integer, default=1)
+    activo = db.Column(db.Boolean, default=True)
     
     favorito = db.Column(db.Boolean, default=False)
     permitir_sin_stock = db.Column(db.Boolean, default=True)
@@ -476,7 +481,7 @@ def get_productos():
     buscar    = request.args.get('buscar', '').strip()
     orden     = request.args.get('orden', 'id')
 
-    query = Producto.query.filter_by(activo=1)
+    query = Producto.query.filter_by(activo=True)
 
     if categoria_nombre:
         cat = Categoria.query.filter_by(nombre=categoria_nombre).first()
@@ -501,7 +506,7 @@ def get_productos():
 @app.route('/api/productos/catalogo_completo', methods=['GET'])
 @login_requerido
 def catalogo_completo():
-    productos = Producto.query.filter_by(activo=1).order_by(Producto.nombre.asc()).all()
+    productos = Producto.query.filter_by(activo=True).order_by(Producto.nombre.asc()).all()
     return jsonify({
         "productos": [
             {
@@ -645,6 +650,15 @@ def registrar_venta():
 
     if not items or len(items) == 0:
         return jsonify({"ok": False, "mensaje": "No se puede registrar una venta sin artículos."}), 400
+
+    # Validación de existencia de productos en base de datos
+    for item in items:
+        p_id = item.get('id')
+        if p_id:
+            p = db.session.get(Producto, int(p_id))
+            if not p or not p.activo:
+                nombre_p = item.get('name', item.get('nombre', f"ID {p_id}"))
+                return jsonify({"error": f"El producto {nombre_p} ya no está disponible en la base de datos. Por favor, actualiza tu catálogo."}), 400
 
     # Recalcular el total y construir el detalle de forma segura en el backend para evitar forjado de montos (L-04)
     total_recalculado = 0.0
@@ -1848,6 +1862,7 @@ def admin_add_product():
     )
     db.session.add(nuevo)
     db.session.commit()
+    actualizar_version_catalogo()
     flash('Producto agregado exitosamente.', 'success')
     return redirect(url_for('admin_dashboard'))
 
@@ -1932,6 +1947,7 @@ def admin_edit_product(id):
         producto.sincronizado = not es_offline()
         producto.ultima_actualizacion = hora_argentina()
         db.session.commit()
+        actualizar_version_catalogo()
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({"ok": True, "mensaje": "Producto editado correctamente."})
@@ -1951,10 +1967,11 @@ def admin_delete_product(id):
     if not session.get('admin_autenticado'): return redirect('/')
     producto = db.session.get(Producto, id)
     if producto:
-        producto.activo = 0 # Soft delete
+        producto.activo = False # Soft delete
         producto.sincronizado = not es_offline()
         producto.ultima_actualizacion = hora_argentina()
         db.session.commit()
+        actualizar_version_catalogo()
         flash('Producto eliminado.', 'warning')
     return redirect(url_for('admin_dashboard'))
 
@@ -1970,10 +1987,11 @@ def eliminar_masivo():
         for p_id in ids:
             producto = db.session.get(Producto, p_id)
             if producto:
-                producto.activo = 0
+                producto.activo = False
                 producto.sincronizado = not es_offline()
                 producto.ultima_actualizacion = hora_argentina()
         db.session.commit()
+        actualizar_version_catalogo()
         return jsonify({'ok': True, 'mensaje': f'{len(ids)} productos eliminados correctamente.'})
     except Exception as e:
         db.session.rollback()
@@ -2006,6 +2024,7 @@ def aumento_masivo():
                 producto.sincronizado = not es_offline()
                 producto.ultima_actualizacion = hora_argentina()
         db.session.commit()
+        actualizar_version_catalogo()
         return jsonify({'ok': True, 'mensaje': f'Precios de {len(ids)} productos aumentados un {porcentaje}% correctamente.'})
     except Exception as e:
         db.session.rollback()
@@ -2079,109 +2098,93 @@ def admin_importar():
         flash('Ningún archivo seleccionado.', 'danger')
         return redirect(url_for('admin_dashboard'))
 
-    stats = {'actualizados_ok': 0, 'no_encontrados': 0, 'leidos_como_cero': 0}
+    stats = {'actualizados_ok': 0, 'nuevos': 0, 'desactivados': 0}
     try:
         import openpyxl
         wb = openpyxl.load_workbook(file, data_only=True)
         hoja = wb.active
         
-        # Crear un diccionario: {'nombre de columna': indice}
         encabezados = {}
         for i, celda in enumerate(hoja[1]):
             if celda.value:
                 encabezados[str(celda.value).strip().lower()] = i
 
-        # Buscar las columnas clave permitiendo sinónimos
         idx_precio = encabezados.get('precio lista 1') or encabezados.get('precio')
         idx_codigo = encabezados.get('código de barras') or encabezados.get('codigo de barras') or encabezados.get('codigo') or encabezados.get('código')
         idx_nombre = encabezados.get('nombre')
-
-        if idx_precio is None:
-            return jsonify({"error": "El Excel no tiene la columna 'Precio Lista 1' ni 'Precio'."}), 400
-        if idx_codigo is None:
-            return jsonify({"error": "El Excel no tiene la columna 'Código de barras'."}), 400
-
-        # Índices opcionales
-        idx_cat = encabezados.get('categoría') or encabezados.get('categoria')
-        idx_p2 = encabezados.get('precio_lista_2')
-        idx_p3 = encabezados.get('precio_lista_3')
         idx_stock = encabezados.get('stock')
-        idx_img = encabezados.get('link imagen') or encabezados.get('url imagen')
-        idx_destacado = encabezados.get('destacado') or encabezados.get('favorito')
-        idx_sinstock = encabezados.get('venta sin stock')
+        idx_cat = encabezados.get('categoría') or encabezados.get('categoria')
+        idx_p2 = encabezados.get('precio_lista_2') or encabezados.get('precio lista 2')
+        idx_p3 = encabezados.get('precio_lista_3') or encabezados.get('precio lista 3')
+
+        if idx_precio is None or idx_codigo is None or idx_nombre is None:
+            return jsonify({"error": "El Excel debe tener las columnas 'Nombre', 'Precio' y 'Código de barras'."}), 400
 
         def limpiar_precio(valor_celda):
-            if valor_celda is None:
-                return 0.0
-            
-            valor_str = str(valor_celda).strip()
-            if valor_str.lower() in ['nan', 'none', '']:
-                return 0.0
-            
-            # Eliminamos signo pesos, puntos de miles o espacios comunes en formatos de moneda
+            if valor_celda is None: return 0.0
+            valor_str = str(valor_celda).strip().lower()
+            if valor_str in ['nan', 'none', '']: return 0.0
             valor_str = valor_str.replace('$', '').replace(' ', '')
-            
-            # Si el Excel usa coma para decimales (ej: 150,50), la cambiamos por punto para Python
-            if ',' in valor_str and '.' not in valor_str:
-                valor_str = valor_str.replace(',', '.')
-            elif ',' in valor_str and '.' in valor_str:
-                # Si tiene ambos (ej: 1,500.00), quitamos la coma de miles
-                valor_str = valor_str.replace(',', '')
-                
-            try:
-                return float(valor_str)
-            except ValueError:
-                return 0.0
+            if ',' in valor_str and '.' not in valor_str: valor_str = valor_str.replace(',', '.')
+            elif ',' in valor_str and '.' in valor_str: valor_str = valor_str.replace(',', '')
+            try: return float(valor_str)
+            except ValueError: return 0.0
+
+        # Mapear productos actuales en memoria para acceso rápido
+        productos_actuales = Producto.query.all()
+        productos_por_codigo = {str(p.codigo_barra).strip(): p for p in productos_actuales if p.codigo_barra}
+        
+        ids_procesados = set()
 
         for fila in hoja.iter_rows(min_row=2):
-            if fila[idx_codigo].value is None and (idx_nombre is None or fila[idx_nombre].value is None):
+            if fila[idx_codigo].value is None or fila[idx_nombre].value is None:
                 continue
                 
-            valor_precio_crudo = fila[idx_precio].value
-            precio_final = limpiar_precio(valor_precio_crudo)
+            codigo_excel = str(fila[idx_codigo].value).strip()
+            if codigo_excel.endswith('.0'): codigo_excel = codigo_excel[:-2]
             
-            # LOG PARA RENDER: Imprimir qué está leyendo el sistema
-            print(f"Fila {fila[0].row} - Crudo: '{valor_precio_crudo}' -> Convertido a: {precio_final}")
+            nombre_excel = str(fila[idx_nombre].value).strip()
+            precio_final = limpiar_precio(fila[idx_precio].value)
             
-            codigo_crudo = fila[idx_codigo].value
-            if not codigo_crudo:
-                continue
-            
-            # Convertir a string, quitar espacios y si excel le metió un '.0' al final, sacarlo
-            codigo_excel = str(codigo_crudo).strip()
-            if codigo_excel.endswith('.0'):
-                codigo_excel = codigo_excel[:-2]
-                
-            val_nombre = str(fila[idx_nombre].value).strip() if (idx_nombre is not None and fila[idx_nombre].value is not None) else ''
-            
-            # Buscar el producto donde el campo codigo_barra contenga el código del Excel
-            prod = Producto.query.filter(Producto.codigo_barra.ilike(f'%{codigo_excel}%')).first()
-                
-            if not prod and val_nombre:
-                prod = Producto.query.filter(Producto.nombre.ilike(val_nombre)).first()
-                
+            stock_final = 0
+            if idx_stock is not None and fila[idx_stock].value is not None:
+                try: stock_final = int(fila[idx_stock].value)
+                except: pass
+
+            # UPSERT LOGIC
+            prod = productos_por_codigo.get(codigo_excel)
             if not prod:
-                stats['no_encontrados'] += 1
-                if not val_nombre:
-                    continue # No se puede crear si no hay nombre
-                prod = Producto(nombre=val_nombre)
-                db.session.add(prod)
-            else:
-                if precio_final <= 0:
-                    stats['leidos_como_cero'] += 1
-                else:
-                    stats['actualizados_ok'] += 1
-                
-            # Actualización en la Base de Datos
-            prod.precio_lista_1 = precio_final
-            prod.sincronizado = not es_offline()
-            prod.ultima_actualizacion = hora_argentina()
-            if prod.id: # Si el producto ya existe en la BD
-                print(f"Actualizado: {prod.nombre} -> ${precio_final}")
-            
-            if codigo_excel and codigo_excel not in (prod.codigo_barra or ''):
+                # Intento buscar por nombre si no halló por código
+                prod = next((p for p in productos_actuales if p.nombre.lower() == nombre_excel.lower()), None)
+
+            if prod:
+                # Update
+                prod.nombre = nombre_excel
+                prod.precio_lista_1 = precio_final
                 prod.codigo_barra = codigo_excel
+                prod.stock = stock_final
+                prod.activo = True
+                prod.sincronizado = not es_offline()
+                prod.ultima_actualizacion = hora_argentina()
+                stats['actualizados_ok'] += 1
+            else:
+                # Insert
+                prod = Producto(
+                    nombre=nombre_excel,
+                    precio_lista_1=precio_final,
+                    codigo_barra=codigo_excel,
+                    stock=stock_final,
+                    activo=True,
+                    sincronizado=not es_offline(),
+                    ultima_actualizacion=hora_argentina()
+                )
+                db.session.add(prod)
+                db.session.flush() # para obtener prod.id
+                stats['nuevos'] += 1
+                # Lo agregamos al diccionario para evitar duplicados en la misma subida
+                productos_por_codigo[codigo_excel] = prod
                 
+            # Resto de campos opcionales
             if idx_cat is not None and fila[idx_cat].value is not None:
                 cat_name = str(fila[idx_cat].value).strip()
                 if cat_name and cat_name.lower() not in ['nan', 'none']:
@@ -2189,7 +2192,7 @@ def admin_importar():
                     if not categoria:
                         categoria = Categoria(nombre=cat_name)
                         db.session.add(categoria)
-                        db.session.commit()
+                        db.session.flush()
                     prod.categoria_id = categoria.id
 
             if idx_p2 is not None and fila[idx_p2].value is not None:
@@ -2201,33 +2204,30 @@ def admin_importar():
                 prod.precio_lista_3 = limpiar_precio(fila[idx_p3].value)
             else:
                 prod.precio_lista_3 = precio_final
-                
-            if idx_stock is not None and fila[idx_stock].value is not None:
-                try:
-                    prod.stock = int(fila[idx_stock].value)
-                except:
-                    pass
-                    
-            if idx_img is not None and fila[idx_img].value is not None:
-                img_val = str(fila[idx_img].value).strip()
-                if img_val and img_val.lower() not in ['nan', 'none']:
-                    prod.imagen_url = img_val
-                    
-            if idx_destacado is not None and fila[idx_destacado].value is not None:
-                dest = str(fila[idx_destacado].value).strip().upper()
-                prod.favorito = True if dest == 'SI' else False
-                
-            if idx_sinstock is not None and fila[idx_sinstock].value is not None:
-                ss = str(fila[idx_sinstock].value).strip().upper()
-                prod.permitir_sin_stock = True if ss == 'SI' else False
-                
+
+            ids_procesados.add(prod.id)
+
+        # SOFT DELETE LOGIC
+        for p in productos_actuales:
+            if p.id not in ids_procesados and p.activo:
+                p.activo = False
+                p.ultima_actualizacion = hora_argentina()
+                p.sincronizado = not es_offline()
+                stats['desactivados'] += 1
+
         db.session.commit()
+        
         global ultima_actualizacion_precios
         ultima_actualizacion_precios = hora_argentina()
-        reporte = f"✅ Éxito: {stats['actualizados_ok']} | ❌ No encontrados: {stats['no_encontrados']} | ⚠️ Precios rotos ($0): {stats['leidos_como_cero']}"
-        return jsonify({"mensaje": reporte}), 200
+        actualizar_version_catalogo()
+        
+        mensaje = f"✅ Catálogo sincronizado correctamente. Actualizados: {stats['actualizados_ok']}, Nuevos: {stats['nuevos']}, Desactivados: {stats['desactivados']}."
+        return jsonify({"mensaje": mensaje}), 200
+        
     except Exception as e:
         db.session.rollback()
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/verificar_precios', methods=['GET'])
@@ -2236,6 +2236,16 @@ def verificar_precios():
     # Si no existe la variable, manda la hora argentina actual como default
     ultima = globals().get('ultima_actualizacion_precios', hora_argentina())
     return jsonify({"ultima_actualizacion": ultima.isoformat()}), 200
+
+@app.route('/api/catalogo/version', methods=['GET'])
+def catalogo_version():
+    global ultima_actualizacion_catalogo
+    return jsonify({"version": ultima_actualizacion_catalogo})
+
+@app.route('/api/catalogo/version/update', methods=['POST'])
+def catalogo_version_update():
+    actualizar_version_catalogo()
+    return jsonify({"ok": True, "version": ultima_actualizacion_catalogo})
 
 # ─── Exportación a Excel ───────────────────────────────────────
 @app.route('/admin/exportar')

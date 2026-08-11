@@ -28,6 +28,31 @@ let procesandoMovimiento = false;
 
 window.catalogoProductos = [];
 window.cargandoCatalogo = false;
+let currentCatalogoVersion = null;
+
+async function verificarVersionCatalogo() {
+  if (!navigator.onLine) return;
+  try {
+    const res = await fetch('/api/catalogo/version');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (currentCatalogoVersion === null) {
+      currentCatalogoVersion = data.version;
+    } else if (currentCatalogoVersion !== data.version) {
+      currentCatalogoVersion = data.version;
+      window.catalogoProductos = []; // Limpiamos caché
+      await cargarCatalogoEnMemoria();
+      const Toast = Swal.mixin({
+        toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true
+      });
+      Toast.fire({ icon: 'info', title: 'Catálogo actualizado' });
+    }
+  } catch(e) {
+    console.error("Error verificando catálogo:", e);
+  }
+}
+// Polling cada 2 minutos
+setInterval(verificarVersionCatalogo, 120000);
 
 async function cargarCatalogoEnMemoria() {
   if (window.catalogoProductos.length > 0 || window.cargandoCatalogo) return;
@@ -1329,7 +1354,14 @@ if (originalBtnConfirmar) {
         
         cargarDashboard(); 
       } else { 
-        Swal.fire({ icon: 'error', title: 'Error', text: d.mensaje });
+        if (res.status === 400 && d.error) {
+          Swal.fire({ icon: 'error', title: 'Producto no disponible', text: d.error });
+          if (typeof cargarCatalogoEnMemoria === 'function') {
+            cargarCatalogoEnMemoria();
+          }
+        } else {
+          Swal.fire({ icon: 'error', title: 'Error', text: d.mensaje || 'Error al procesar la venta' });
+        }
       }
     } catch (e) {
       console.error(e);
@@ -1347,6 +1379,7 @@ async function abrirModalProductos() {
   searchSelectedIndex = -1;
   currentSearchResults = [];
   
+  await verificarVersionCatalogo();
   cargarCatalogoEnMemoria();
 
   const dialog = document.querySelector("#searchModal .modal-dialog");
