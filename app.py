@@ -1,4 +1,6 @@
 import os 
+from dotenv import load_dotenv
+load_dotenv()
 from functools import wraps
 from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session, send_from_directory, make_response
 import io
@@ -277,6 +279,7 @@ class Venta(db.Model):
     entregado = db.Column(db.Float, default=0.0)
     sincronizado = db.Column(db.Boolean, default=True, nullable=False)
     ultima_actualizacion = db.Column(db.DateTime, default=hora_argentina, onupdate=hora_argentina)
+    detalles = db.relationship('DetalleVenta', backref='venta', lazy=True, cascade="all, delete-orphan")
 
     def __init__(self, **kwargs):
         super(Venta, self).__init__(**kwargs)
@@ -292,6 +295,20 @@ class Gasto(db.Model):
 
     def __init__(self, **kwargs):
         super(Gasto, self).__init__(**kwargs)
+
+class DetalleVenta(db.Model):
+    __tablename__ = 'detalle_ventas'
+    id = db.Column(db.Integer, primary_key=True)
+    venta_id = db.Column(db.Integer, db.ForeignKey('ventas.id'), nullable=False)
+    producto_id = db.Column(db.Integer, db.ForeignKey('"Productos".id'), nullable=True)
+    nombre_producto = db.Column(db.String(150), nullable=False)
+    cantidad = db.Column(db.Integer, default=1)
+    precio_unitario = db.Column(db.Float, default=0.0)
+    descuento_porcentaje = db.Column(db.Float, default=0.0)
+    subtotal = db.Column(db.Float, default=0.0)
+
+    def __init__(self, **kwargs):
+        super(DetalleVenta, self).__init__(**kwargs)
 
     def to_dict(self):
         f = self.fecha
@@ -346,7 +363,6 @@ with app.app_context():
     print("Base de datos y tablas inicializadas correctamente.")
 
 
-@app.before_request
 def verificar_corte_automatico():
     if request.path.startswith('/static/'):
         return
@@ -709,68 +725,101 @@ def registrar_venta():
 
     venta_id = None
     if detalle or items:
-        if not detalle:
-            detalle = []
-            for item in items:
-                p = db.session.get(Producto, int(item.get('id', 0)))
-                if p:
-                    precio_u = p.precio_lista_3 if lista_sel == 3 else (p.precio_lista_2 if lista_sel == 2 else p.precio)
-                    detalle.append({'nombre': p.nombre, 'qty': item.get('qty', 1), 'precio_unit': precio_u})
-        
-        # Soporte para medios de pago múltiples
-        pagos = data.get('pagos', {})
-        # monto_entregado_ef: lo que el cliente entrega físicamente (puede incluir vuelto)
-        monto_entregado_ef = float(pagos.get('efectivo', 0))
-        p_tr = float(pagos.get('transferencia', 0))
-        p_db = float(pagos.get('debito', 0))
-        p_cc = float(pagos.get('cc', 0))
+        try:
+            if not detalle:
+                detalle = []
+                for item in items:
+                    p = db.session.get(Producto, int(item.get('id', 0)))
+                    if p:
+                        precio_u = p.precio_lista_3 if lista_sel == 3 else (p.precio_lista_2 if lista_sel == 2 else p.precio)
+                        detalle.append({'nombre': p.nombre, 'qty': item.get('qty', 1), 'precio_unit': precio_u})
+            
+            # Soporte para medios de pago múltiples
+            pagos = data.get('pagos', {})
+            # monto_entregado_ef: lo que el cliente entrega físicamente (puede incluir vuelto)
+            monto_entregado_ef = float(pagos.get('efectivo', 0))
+            p_tr = float(pagos.get('transferencia', 0))
+            p_db = float(pagos.get('debito', 0))
+            p_cc = float(pagos.get('cc', 0))
 
-        # Fallback para modo simple (un solo método)
-        if not pagos and data.get('metodo_pago'):
-            m = data.get('metodo_pago')
-            if m == 'Efectivo': monto_entregado_ef = total_venta
-            elif m in ['Mercado Pago', 'Transferencia']: p_tr = total_venta
-            elif m == 'Débito': p_db = total_venta
-            elif m == 'Cuenta Corriente': p_cc = total_venta
+            # Fallback para modo simple (un solo método)
+            if not pagos and data.get('metodo_pago'):
+                m = data.get('metodo_pago')
+                if m == 'Efectivo': monto_entregado_ef = total_venta
+                elif m in ['Mercado Pago', 'Transferencia']: p_tr = total_venta
+                elif m == 'Débito': p_db = total_venta
+                elif m == 'Cuenta Corriente': p_cc = total_venta
 
-        # FIX CONTABLE (L-05): El monto real cobrado en efectivo es la venta menos lo pagado
-        # por otros medios. El excedente entregado por el cliente (vuelto) NO debe sumarse a
-        # los ingresos de la caja. Solo guardamos el total_venta como referencia de cobros reales.
-        otros_medios = p_tr + p_db + p_cc
-        # Lo que realmente se cobró en efectivo = total_venta - lo pagado por otros medios
-        # (mínimo 0, máximo monto_entregado_ef para no inventar dinero)
-        p_ef = max(0.0, round(min(monto_entregado_ef, total_venta - otros_medios), 2))
+            # FIX CONTABLE (L-05): El monto real cobrado en efectivo es la venta menos lo pagado
+            # por otros medios. El excedente entregado por el cliente (vuelto) NO debe sumarse a
+            # los ingresos de la caja. Solo guardamos el total_venta como referencia de cobros reales.
+            otros_medios = p_tr + p_db + p_cc
+            # Lo que realmente se cobró en efectivo = total_venta - lo pagado por otros medios
+            # (mínimo 0, máximo monto_entregado_ef para no inventar dinero)
+            p_ef = max(0.0, round(min(monto_entregado_ef, total_venta - otros_medios), 2))
 
-        # El monto entregado por el cliente se guarda como dato informativo (para calcular vuelto)
-        monto_entregado_total = monto_entregado_ef + p_tr + p_db + p_cc
-        vuelto = max(0.0, round(monto_entregado_total - total_venta, 2))
+            # El monto entregado por el cliente se guarda como dato informativo (para calcular vuelto)
+            monto_entregado_total = monto_entregado_ef + p_tr + p_db + p_cc
+            vuelto = max(0.0, round(monto_entregado_total - total_venta, 2))
 
-        if p_cc > 0 and cliente_id:
-            cliente = db.session.get(Cliente, cliente_id)
-            if cliente:
-                if cliente.limite_credito > 0 and (cliente.saldo + p_cc) > cliente.limite_credito:
-                    return jsonify({"ok": False, "mensaje": f"Límite de crédito excedido. Saldo: ${cliente.saldo:.2f}, Límite: ${cliente.limite_credito:.2f}"}), 403
-                cliente.saldo += p_cc
+            if p_cc > 0 and cliente_id:
+                cliente = db.session.get(Cliente, cliente_id)
+                if cliente:
+                    if cliente.limite_credito > 0 and (cliente.saldo + p_cc) > cliente.limite_credito:
+                        return jsonify({"ok": False, "mensaje": f"Límite de crédito excedido. Saldo: ${cliente.saldo:.2f}, Límite: ${cliente.limite_credito:.2f}"}), 403
+                    cliente.saldo += p_cc
 
-        venta = Venta(
-            cliente_id=cliente_id,
-            total=total_venta,
-            detalle_json=_json.dumps(detalle, ensure_ascii=False),
-            lista_precios=lista_sel,
-            tipo=data.get('tipo', 'local'),
-            metodo_pago=data.get('metodo_pago', 'Varios'),
-            pago_efectivo=p_ef,          # Monto REAL cobrado en efectivo (sin vuelto)
-            pago_transferencia=p_tr,
-            pago_debito=p_db,
-            pago_cc=p_cc,
-            entregado=monto_entregado_ef, # Monto que el cliente entregó físicamente (informativo)
-            fecha=hora_argentina(),
-            sincronizado=not es_offline(),
-            ultima_actualizacion=hora_argentina()
-        )
-        db.session.add(venta)
-        db.session.commit()
-        venta_id = venta.id
+            venta = Venta(
+                cliente_id=cliente_id,
+                total=total_venta,
+                detalle_json=_json.dumps(detalle, ensure_ascii=False),
+                lista_precios=lista_sel,
+                tipo=data.get('tipo', 'local'),
+                metodo_pago=data.get('metodo_pago', 'Varios'),
+                pago_efectivo=p_ef,          # Monto REAL cobrado en efectivo (sin vuelto)
+                pago_transferencia=p_tr,
+                pago_debito=p_db,
+                pago_cc=p_cc,
+                entregado=monto_entregado_ef, # Monto que el cliente entregó físicamente (informativo)
+                fecha=hora_argentina(),
+                sincronizado=not es_offline(),
+                ultima_actualizacion=hora_argentina()
+            )
+            db.session.add(venta)
+            db.session.flush()
+
+            if isinstance(data, list):
+                items_input = data
+            else:
+                items_input = data.get('items', [])
+                
+            for d in detalle:
+                prod_id = None
+                for it in items_input:
+                    if str(it.get('id', '')) != '':
+                        p_temp = db.session.get(Producto, int(it['id']))
+                        if p_temp and p_temp.nombre == d['nombre']:
+                            prod_id = p_temp.id
+                            break
+                
+                det_obj = DetalleVenta(
+                    venta_id=venta.id,
+                    producto_id=prod_id,
+                    nombre_producto=d['nombre'],
+                    cantidad=d.get('qty', 1),
+                    precio_unitario=d.get('precio_unit', 0.0),
+                    descuento_porcentaje=d.get('discount_perc', 0.0),
+                    subtotal=d.get('subtotal', 0.0)
+                )
+                db.session.add(det_obj)
+
+            db.session.commit()
+            venta_id = venta.id
+        except Exception as e:
+            db.session.rollback()
+            import traceback
+            print(f"Error al registrar venta: {e}\n{traceback.format_exc()}")
+            return jsonify({"ok": False, "mensaje": f"Error interno al guardar la venta: {str(e)}"}), 500
     else:
         db.session.commit()
 
@@ -1107,6 +1156,7 @@ def index():
 def facturador():
     if not session.get('admin_autenticado'):
         return redirect('/')
+    verificar_corte_automatico()
     return render_template('facturador.html')
 
 @app.route('/ticket/<int:venta_id>')
@@ -1430,6 +1480,7 @@ def cerrar_caja():
 @app.route('/api/ventas_hoy', methods=['GET'])
 @login_requerido
 def get_ventas_hoy():
+    verificar_corte_automatico()
     try:
         fecha_inicio_str = request.args.get('inicio')
         fecha_fin_str = request.args.get('fin')

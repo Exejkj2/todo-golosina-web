@@ -1951,12 +1951,20 @@ function setupEventListeners() {
 
   // Scanner
   const scannerInput = document.getElementById("scannerInput");
+  let isScannerProcessing = false;
   if (scannerInput) {
     scannerInput.addEventListener("keydown", async (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
+        if (isScannerProcessing) return;
+        isScannerProcessing = true;
+        
         const code = scannerInput.value.trim();
         scannerInput.value = "";
+        
+        // Liberar el candado en 300ms (debounce)
+        setTimeout(() => { isScannerProcessing = false; }, 300);
+        
         if (!code) return;
         
         // Búsqueda local instantánea a la velocidad de la luz en memoria
