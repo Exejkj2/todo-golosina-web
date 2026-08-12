@@ -306,20 +306,6 @@ class Gasto(db.Model):
     def __init__(self, **kwargs):
         super(Gasto, self).__init__(**kwargs)
 
-class DetalleVenta(db.Model):
-    __tablename__ = 'detalle_ventas'
-    id = db.Column(db.Integer, primary_key=True)
-    venta_id = db.Column(db.Integer, db.ForeignKey('ventas.id'), nullable=False)
-    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=True)
-    nombre_producto = db.Column(db.String(150), nullable=False)
-    cantidad = db.Column(db.Integer, default=1)
-    precio_unitario = db.Column(db.Float, default=0.0)
-    descuento_porcentaje = db.Column(db.Float, default=0.0)
-    subtotal = db.Column(db.Float, default=0.0)
-
-    def __init__(self, **kwargs):
-        super(DetalleVenta, self).__init__(**kwargs)
-
     def to_dict(self):
         f = self.fecha
         if isinstance(f, str):
@@ -337,6 +323,22 @@ class DetalleVenta(db.Model):
             'categoria': self.categoria,
             'tipo': self.tipo
         }
+
+class DetalleVenta(db.Model):
+    __tablename__ = 'detalle_ventas'
+    id = db.Column(db.Integer, primary_key=True)
+    venta_id = db.Column(db.Integer, db.ForeignKey('ventas.id'), nullable=False)
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=True)
+    nombre_producto = db.Column(db.String(150), nullable=False)
+    cantidad = db.Column(db.Integer, default=1)
+    precio_unitario = db.Column(db.Float, default=0.0)
+    descuento_porcentaje = db.Column(db.Float, default=0.0)
+    subtotal = db.Column(db.Float, default=0.0)
+
+    producto = db.relationship('Producto', backref='detalles_venta')
+
+    def __init__(self, **kwargs):
+        super(DetalleVenta, self).__init__(**kwargs)
 
 class CajaDiaria(db.Model):
     __tablename__ = 'cajas_diarias'
