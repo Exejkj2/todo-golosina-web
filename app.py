@@ -1924,16 +1924,15 @@ def admin_add_product():
 
     codigo_barra = request.form.get('codigo_barra', '').strip()
     if codigo_barra:
-        # Validación multi-variante: separar por comas y verificar cada uno
         nuevos_codigos = [c.strip() for c in codigo_barra.split(',') if c.strip()]
-        filtros = [Producto.codigo_barra.ilike(f'%{c}%') for c in nuevos_codigos]
-        posibles_duplicados = Producto.query.filter(or_(*filtros), Producto.activo == 1).all()
-
-        for p in posibles_duplicados:
+        otros_productos = Producto.query.filter(Producto.activo == 1).all()
+        for p in otros_productos:
+            if not p.codigo_barra:
+                continue
             codigos_existentes = [c.strip() for c in p.codigo_barra.split(',') if c.strip()]
             for nc in nuevos_codigos:
                 if nc in codigos_existentes:
-                     return jsonify({"error": f"El código '{nc}' ya está registrado en el producto: {p.nombre}"}), 400
+                     return jsonify({"error": f"El código '{nc}' ya está registrado en el producto '{p.nombre}' (ID: {p.id})."}), 400
 
     nuevo = Producto(
         nombre=nombre, precio_lista_1=precio_lista_1, precio_lista_2=precio_lista_2, precio_lista_3=precio_lista_3,
@@ -2003,20 +2002,21 @@ def admin_edit_product(id):
     nuevo_codigo_str = request.form.get('codigo_barra', '').strip()
     if nuevo_codigo_str:
         nuevos_codigos = [c.strip() for c in nuevo_codigo_str.split(',') if c.strip()]
-        filtros = [Producto.codigo_barra.ilike(f'%{c}%') for c in nuevos_codigos]
         
         # Leemos explícitamente el id del formulario para asegurar la exclusión
         form_id = request.form.get('producto_id')
         producto_id = int(form_id) if form_id and form_id.isdigit() else id
         
-        # Buscamos en OTROS productos (excluyendo el id actual)
-        posibles_duplicados = Producto.query.filter(or_(*filtros), Producto.id != producto_id, Producto.activo == 1).all()
+        # Buscamos en TODOS los otros productos activos
+        otros_productos = Producto.query.filter(Producto.id != producto_id, Producto.activo == 1).all()
 
-        for p in posibles_duplicados:
+        for p in otros_productos:
+            if not p.codigo_barra:
+                continue
             codigos_existentes = [c.strip() for c in p.codigo_barra.split(',') if c.strip()]
             for nc in nuevos_codigos:
                 if nc in codigos_existentes:
-                     return jsonify({"error": f"El código '{nc}' ya está registrado en el producto: {p.nombre}"}), 400
+                     return jsonify({"error": f"El código '{nc}' ya pertenece al producto '{p.nombre}' (ID: {p.id})."}), 400
 
     try:
         # Triple Lista de Precios
