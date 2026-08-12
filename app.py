@@ -309,7 +309,7 @@ class DetalleVenta(db.Model):
     __tablename__ = 'detalle_ventas'
     id = db.Column(db.Integer, primary_key=True)
     venta_id = db.Column(db.Integer, db.ForeignKey('ventas.id'), nullable=False)
-    producto_id = db.Column(db.Integer, db.ForeignKey('"Productos".id'), nullable=True)
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=True)
     nombre_producto = db.Column(db.String(150), nullable=False)
     cantidad = db.Column(db.Integer, default=1)
     precio_unitario = db.Column(db.Float, default=0.0)
@@ -2014,14 +2014,15 @@ def admin_edit_product(id):
 @login_requerido
 def admin_delete_product(id):
     if not session.get('admin_autenticado'): return redirect('/')
-    producto = db.session.get(Producto, id)
-    if producto:
-        producto.activo = 0 # Soft delete
-        producto.sincronizado = not es_offline()
-        producto.ultima_actualizacion = hora_argentina()
+    try:
+        producto = Producto.query.get_or_404(id)
+        db.session.delete(producto)
         db.session.commit()
         actualizar_version_catalogo()
-        flash('Producto eliminado.', 'warning')
+        flash('Producto eliminado definitivamente de la base de datos.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al intentar eliminar el producto (puede tener ventas asociadas): {str(e)}', 'danger')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/api/productos/eliminar_masivo', methods=['POST'])
