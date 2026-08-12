@@ -177,7 +177,7 @@ class Categoria(db.Model):
         super(Categoria, self).__init__(**kwargs)
 
 class Producto(db.Model):
-    __tablename__ = '"Productos"'
+    __tablename__ = 'productos'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text)
