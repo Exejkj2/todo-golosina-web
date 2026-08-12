@@ -1848,6 +1848,70 @@ def api_buscar_productos():
     })
 
 
+@app.route('/api/mantenimiento/unificar-duplicados', methods=['POST', 'GET'])
+@login_requerido
+def unificar_duplicados():
+    if not session.get('admin_autenticado'): return jsonify({"error": "No autorizado"}), 401
+    
+    try:
+        # 1. Encontrar codigos duplicados (ignorando vacios o nulos)
+        duplicados_query = db.session.query(Producto.codigo_barra)\
+            .filter(Producto.codigo_barra != None, Producto.codigo_barra != '')\
+            .group_by(Producto.codigo_barra)\
+            .having(db.func.count(Producto.id) > 1)\
+            .all()
+            
+        codigos_duplicados = [row[0] for row in duplicados_query]
+        
+        maestros_procesados = 0
+        clones_eliminados = 0
+        
+        for codigo in codigos_duplicados:
+            # Traer todos los productos con este código, ordenados por id ascendente
+            productos_grupo = Producto.query.filter(Producto.codigo_barra == codigo).order_by(Producto.id.asc()).all()
+            
+            if len(productos_grupo) > 1:
+                maestro = productos_grupo[0]
+                clones = productos_grupo[1:]
+                
+                maestros_procesados += 1
+                
+                for clon in clones:
+                    # Sumar stock
+                    maestro.stock += clon.stock
+                    
+                    # Transferir DetalleVenta
+                    DetalleVenta.query.filter_by(producto_id=clon.id).update({'producto_id': maestro.id})
+                    
+                    # Transferir HistorialPrecio
+                    HistorialPrecio.query.filter_by(producto_id=clon.id).update({'producto_id': maestro.id})
+                    
+                    # Eliminar clon
+                    db.session.delete(clon)
+                    clones_eliminados += 1
+                    
+        db.session.commit()
+        
+        try:
+            actualizar_version_catalogo()
+        except Exception:
+            pass
+            
+        return jsonify({
+            "ok": True,
+            "maestros_procesados": maestros_procesados,
+            "clones_eliminados": clones_eliminados
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 500
+
 @app.route('/admin/historial-precios')
 @login_requerido
 def admin_historial_precios():
