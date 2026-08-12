@@ -2102,20 +2102,24 @@ def vaciar_catalogo():
 @app.route('/api/sincronizar-bd', methods=['POST'])
 @login_requerido
 def sincronizar_bd():
-    if not session.get('admin_autenticado'):
-        return jsonify({'ok': False, 'mensaje': 'No autorizado'}), 401
-    
-    data = request.json or {}
-    ids_validos = data.get('ids_validos')
-    
-    if not isinstance(ids_validos, list):
-        return jsonify({'ok': False, 'mensaje': 'Formato de ids_validos incorrecto, debe ser una lista.'}), 400
-
     try:
+        if not session.get('admin_autenticado'):
+            return jsonify({'success': False, 'error': 'No autorizado', 'ok': False, 'mensaje': 'No autorizado'}), 401
+        
+        data = request.get_json(silent=True) or {}
+        
+        if 'ids_validos' not in data:
+            return jsonify({'success': False, 'error': 'Falta el parámetro ids_validos', 'ok': False, 'mensaje': 'Falta el parámetro ids_validos'}), 400
+            
+        ids_validos = data.get('ids_validos')
+        
+        if not isinstance(ids_validos, list):
+            return jsonify({'success': False, 'error': 'Formato de ids_validos incorrecto, debe ser una lista.', 'ok': False, 'mensaje': 'Formato incorrecto'}), 400
+
         if not ids_validos:
             productos_sobrantes = Producto.query.all()
         else:
-            productos_sobrantes = Producto.query.filter(~Producto.id.in_(ids_validos)).all()
+            productos_sobrantes = Producto.query.filter(Producto.id.notin_(ids_validos)).all()
             
         eliminados = 0
         desactivados = 0
@@ -2125,8 +2129,11 @@ def sincronizar_bd():
             if tiene_ventas:
                 if p.activo != 0:
                     p.activo = 0
-                    p.sincronizado = not es_offline()
-                    p.ultima_actualizacion = hora_argentina()
+                    try:
+                        p.sincronizado = not es_offline()
+                        p.ultima_actualizacion = hora_argentina()
+                    except:
+                        pass
                     desactivados += 1
             else:
                 db.session.delete(p)
@@ -2137,13 +2144,18 @@ def sincronizar_bd():
             actualizar_version_catalogo()
         except:
             pass # Para evitar error si no existe la funcion
+            
         return jsonify({
+            'success': True,
             'ok': True, 
             'mensaje': f'Sincronización exitosa: {eliminados} eliminados, {desactivados} desactivados.'
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'ok': False, 'mensaje': f'Error al sincronizar BD: {str(e)}'}), 500
+        import traceback
+        print(f"Error en sincronizar_bd: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e), 'ok': False, 'mensaje': f'Error interno: {str(e)}'}), 500
 
 @app.route('/api/productos/aumento_masivo', methods=['POST'])
 @login_requerido
