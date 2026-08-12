@@ -239,6 +239,15 @@ class Producto(db.Model):
             'ultima_actualizacion': self.ultima_actualizacion.isoformat() if self.ultima_actualizacion else None
         }
 
+class HistorialPrecio(db.Model):
+    __tablename__ = 'historial_precios'
+    id = db.Column(db.Integer, primary_key=True)
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
+    producto_rel = db.relationship('Producto', backref=db.backref('historial_precios', lazy=True, cascade='all, delete-orphan'))
+    precio_anterior = db.Column(db.Float, nullable=False)
+    precio_nuevo = db.Column(db.Float, nullable=False)
+    fecha = db.Column(db.DateTime, default=hora_argentina)
+
 # ─── Modelos de Clientes y Ventas ───────────────────────────────────────
 class Cliente(db.Model):
     __tablename__ = 'clientes'
@@ -1839,6 +1848,15 @@ def api_buscar_productos():
     })
 
 
+@app.route('/admin/historial-precios')
+@login_requerido
+def admin_historial_precios():
+    if not session.get('admin_autenticado'): return redirect('/')
+    # Filtro ultimos 7 dias
+    hace_7_dias = hora_argentina() - timedelta(days=7)
+    historial = HistorialPrecio.query.filter(HistorialPrecio.fecha >= hace_7_dias).order_by(HistorialPrecio.fecha.desc()).all()
+    return render_template('admin_historial_precios.html', historial=historial)
+
 @app.route('/admin')
 @login_requerido
 def admin_dashboard():
@@ -2021,6 +2039,8 @@ def admin_edit_product(id):
                      return jsonify({"error": f"El código '{nc}' ya pertenece al producto '{p.nombre}' (ID: {p.id})."}), 400
 
     try:
+        precio_anterior_historico = producto.precio_lista_1
+
         # Triple Lista de Precios
         p1_str = request.form.get('precio', '0').strip().replace(',', '.')
         p2_str = request.form.get('precio_2', '').strip().replace(',', '.')
@@ -2040,6 +2060,21 @@ def admin_edit_product(id):
 
         producto.sincronizado = not es_offline()
         producto.ultima_actualizacion = hora_argentina()
+        
+        # Verificar si cambió el precio principal para el historial y notificar a cajas
+        if abs(producto.precio_lista_1 - precio_anterior_historico) > 0.001:
+            nuevo_historial = HistorialPrecio(
+                producto_id=producto.id,
+                precio_anterior=precio_anterior_historico,
+                precio_nuevo=producto.precio_lista_1
+            )
+            db.session.add(nuevo_historial)
+            db.session.flush()
+            
+            # Avisar por SSE
+            for q in sse_clients:
+                q.put({"tipo": "actualizacion_precios", "modificados": [f"Se actualizó el precio de: {producto.nombre}"]})
+
         db.session.commit()
         actualizar_version_catalogo()
         
@@ -2513,20 +2548,20 @@ def setup_database():
         
         # Intentar añadir la columna de código de barras de manera segura por si la tabla ya existe
         try:
-            db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN codigo_barra VARCHAR(100);'))
+            db.session.execute(text('ALTER TABLE productos ADD COLUMN codigo_barra VARCHAR(100);'))
             db.session.commit()
         except Exception:
             db.session.rollback()
 
         # Agregar columnas de sincronización en Productos de manera segura
         try:
-            db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN sincronizado BOOLEAN DEFAULT TRUE;'))
+            db.session.execute(text('ALTER TABLE productos ADD COLUMN sincronizado BOOLEAN DEFAULT TRUE;'))
             db.session.commit()
         except Exception:
             db.session.rollback()
 
         try:
-            db.session.execute(text('ALTER TABLE "Productos" ADD COLUMN ultima_actualizacion TIMESTAMP;'))
+            db.session.execute(text('ALTER TABLE productos ADD COLUMN ultima_actualizacion TIMESTAMP;'))
             db.session.commit()
         except Exception:
             db.session.rollback()
