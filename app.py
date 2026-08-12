@@ -2004,8 +2004,13 @@ def admin_edit_product(id):
     if nuevo_codigo_str:
         nuevos_codigos = [c.strip() for c in nuevo_codigo_str.split(',') if c.strip()]
         filtros = [Producto.codigo_barra.ilike(f'%{c}%') for c in nuevos_codigos]
-        # Buscamos en OTROS productos
-        posibles_duplicados = Producto.query.filter(or_(*filtros), Producto.id != id, Producto.activo == 1).all()
+        
+        # Leemos explícitamente el id del formulario para asegurar la exclusión
+        form_id = request.form.get('producto_id')
+        producto_id = int(form_id) if form_id and form_id.isdigit() else id
+        
+        # Buscamos en OTROS productos (excluyendo el id actual)
+        posibles_duplicados = Producto.query.filter(or_(*filtros), Producto.id != producto_id, Producto.activo == 1).all()
 
         for p in posibles_duplicados:
             codigos_existentes = [c.strip() for c in p.codigo_barra.split(',') if c.strip()]
