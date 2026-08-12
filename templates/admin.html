@@ -1307,16 +1307,27 @@
               body: formData,
               headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
-            const data = await response.json();
+            let data;
+            try {
+              const textResp = await response.text();
+              try {
+                  data = JSON.parse(textResp);
+              } catch (e) {
+                  throw new Error(`Error HTTP ${response.status}: ${textResp.substring(0, 100)}...`);
+              }
+            } catch (err) {
+              throw err;
+            }
+
             if (response.ok) {
               alert(data.mensaje);
               window.location.reload();
             } else {
-              alert('Error: ' + (data.error || 'Ocurrió un error en el servidor.'));
+              alert('Error del Servidor: ' + (data.error || 'Ocurrió un error desconocido.'));
             }
           } catch (err) {
             console.error('Error en importación:', err);
-            alert('Error crítico de conexión al procesar el archivo.');
+            alert('Fallo la importación: ' + err.message);
           } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
