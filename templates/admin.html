@@ -226,6 +226,9 @@
           <a href="{{ url_for('admin_exportar') }}" class="btn btn-success px-4" style="background-color: #10b981; border: none;">
             📥 Exportar Excel
           </a>
+          <button type="button" id="btnSincronizarBD" class="btn btn-warning px-4 text-white" style="background-color: #f59e0b; border: none;">
+            <i class="bi bi-arrow-repeat"></i> Sincronizar BD
+          </button>
         </div>
 
         <!-- Barra de Herramientas Masivas -->
@@ -1504,6 +1507,50 @@
           } catch (err) {
             console.error(err);
             alert('Error de conexión al intentar vaciar el catálogo.');
+          } finally {
+            this.innerHTML = oldHtml;
+            this.disabled = false;
+          }
+        });
+      }
+      
+      // --- Sincronizar BD ---
+      const btnSincronizar = document.getElementById('btnSincronizarBD');
+      if (btnSincronizar) {
+        btnSincronizar.addEventListener('click', async function() {
+          if (!confirm("¿Estás seguro de sincronizar la BD? Esto eliminará o desactivará todos los productos en la base de datos que no estén en la tabla actual de esta pantalla.")) {
+            return;
+          }
+          
+          const oldHtml = this.innerHTML;
+          this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sincronizando...';
+          this.disabled = true;
+          
+          // Extraer todos los IDs de la tabla actual (elementos con clase checkbox-product)
+          const ids_validos = [];
+          document.querySelectorAll('.checkbox-product').forEach(checkbox => {
+            const id = parseInt(checkbox.value);
+            if (!isNaN(id)) {
+              ids_validos.push(id);
+            }
+          });
+          
+          try {
+            const response = await fetch('/api/sincronizar-bd', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids_validos: ids_validos })
+            });
+            const data = await response.json();
+            if (response.ok && data.ok) {
+              alert('✅ ' + data.mensaje);
+              window.location.reload();
+            } else {
+              alert('⚠️ Error al sincronizar: ' + (data.mensaje || 'Desconocido'));
+            }
+          } catch (err) {
+            console.error(err);
+            alert('Error de conexión al intentar sincronizar la base de datos.');
           } finally {
             this.innerHTML = oldHtml;
             this.disabled = false;
