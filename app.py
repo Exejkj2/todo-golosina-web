@@ -1,6 +1,6 @@
 import os 
 try:
-    from dotenv import load_dotenv
+    from dotenv import load_dotenv  # type: ignore
     load_dotenv()
 except ImportError:
     pass
@@ -2045,6 +2045,20 @@ def eliminar_masivo():
     except Exception as e:
         db.session.rollback()
         return jsonify({'ok': False, 'mensaje': f'Error al eliminar masivamente: {str(e)}'}), 500
+@app.route('/api/productos/vaciar_catalogo', methods=['POST'])
+@login_requerido
+def vaciar_catalogo():
+    if not session.get('admin_autenticado'):
+        return jsonify({'ok': False, 'mensaje': 'No autorizado'}), 401
+    try:
+        # Borrado lógico masivo
+        Producto.query.filter_by(activo=1).update({'activo': 0})
+        db.session.commit()
+        actualizar_version_catalogo()
+        return jsonify({'ok': True, 'mensaje': 'Catálogo vaciado correctamente.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'ok': False, 'mensaje': f'Error al vaciar catálogo: {str(e)}'}), 500
 
 @app.route('/api/productos/aumento_masivo', methods=['POST'])
 @login_requerido
@@ -2183,11 +2197,10 @@ def admin_importar():
             try: return float(valor_str)
             except ValueError: return 0.0
 
-        # Mapear productos actuales en memoria para acceso rápido
-        productos_actuales = Producto.query.all()
-        productos_por_codigo = {str(p.codigo_barra).strip(): p for p in productos_actuales if p.codigo_barra}
-        
+        # Eliminamos la carga total de productos en memoria para ahorrar RAM
         ids_procesados = set()
+        contador = 0
+        BATCH_SIZE = 200
 
         for fila in hoja.iter_rows(min_row=2):
             if fila[idx_codigo].value is None or fila[idx_nombre].value is None:
@@ -2204,11 +2217,11 @@ def admin_importar():
                 try: stock_final = int(fila[idx_stock].value)
                 except: pass
 
-            # UPSERT LOGIC
-            prod = productos_por_codigo.get(codigo_excel)
+            # UPSERT LOGIC consultando individualmente para no saturar la RAM
+            prod = Producto.query.filter_by(codigo_barra=codigo_excel).first()
             if not prod:
                 # Intento buscar por nombre si no halló por código
-                prod = next((p for p in productos_actuales if p.nombre.lower() == nombre_excel.lower()), None)
+                prod = Producto.query.filter(Producto.nombre.ilike(nombre_excel)).first()
 
             if prod:
                 # Update
@@ -2232,10 +2245,9 @@ def admin_importar():
                     ultima_actualizacion=hora_argentina()
                 )
                 db.session.add(prod)
-                db.session.flush() # para obtener prod.id
                 stats['nuevos'] += 1
-                # Lo agregamos al diccionario para evitar duplicados en la misma subida
-                productos_por_codigo[codigo_excel] = prod
+                
+            db.session.flush() # para obtener prod.id si es nuevo
                 
             # Resto de campos opcionales
             if idx_cat is not None and fila[idx_cat].value is not None:
@@ -2259,16 +2271,35 @@ def admin_importar():
                 prod.precio_lista_3 = precio_final
 
             ids_procesados.add(prod.id)
+            contador += 1
+            
+            # Liberar memoria de SQLAlchemy en lotes
+            if contador % BATCH_SIZE == 0:
+                db.session.commit()
+                db.session.expunge_all()
 
-        # SOFT DELETE LOGIC
-        for p in productos_actuales:
-            if p.id not in ids_procesados and p.activo:
-                p.activo = 0
-                p.ultima_actualizacion = hora_argentina()
-                p.sincronizado = not es_offline()
-                stats['desactivados'] += 1
-
+        # Commit de los elementos restantes
         db.session.commit()
+        db.session.expunge_all()
+
+        # SOFT DELETE LOGIC masivo (sin traer objetos a memoria)
+        if ids_procesados:
+            # Desactivar todo lo que está activo y no está en la lista del Excel
+            desactivados = Producto.query.filter(
+                Producto.activo == 1,
+                ~Producto.id.in_(ids_procesados)
+            ).update({
+                'activo': 0,
+                'ultima_actualizacion': hora_argentina(),
+                'sincronizado': not es_offline()
+            }, synchronize_session=False)
+            stats['desactivados'] = desactivados
+            db.session.commit()
+            db.session.expunge_all()
+
+        # Garbage Collection forzada para liberar RAM inmediatamente
+        import gc
+        gc.collect()
         
         global ultima_actualizacion_precios
         ultima_actualizacion_precios = hora_argentina()
