@@ -2708,7 +2708,7 @@ window.addEventListener('online', () => {
     sincronizarDatosConNube();
 });
 
-// ─── AUTO-FOCUS PERSISTENTE PARA ESCÁNER ─────────────────────────────────────
+// ─── AUTO-FOCUS PERSISTENTE PARA ESCÁNER Y SSE ──────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const scannerInput = document.getElementById('scannerInput');
   if (scannerInput) {
@@ -2728,5 +2728,45 @@ document.addEventListener('DOMContentLoaded', () => {
       // Regresar foco inmediatamente al escáner
       scannerInput.focus();
     });
+  }
+
+  // Inicializar Conexión SSE
+  try {
+    const eventSource = new EventSource('/api/stream-actualizaciones');
+    eventSource.onmessage = function(event) {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.tipo === "actualizacion_precios" && data.modificados && data.modificados.length > 0) {
+          
+          let listHtml = "<ul style='text-align: left; max-height: 200px; overflow-y: auto;'>";
+          data.modificados.forEach(item => {
+            listHtml += `<li>${item}</li>`;
+          });
+          listHtml += "</ul>";
+
+          Swal.fire({
+            title: '¡ATENCIÓN! Se actualizaron precios',
+            html: `Los siguientes artículos fueron modificados:<br><br>${listHtml}<br>Presiona OK para actualizar el catálogo local.`,
+            icon: 'warning',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            confirmButtonText: 'OK, Actualizar',
+            confirmButtonColor: '#3085d6'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              // Recargar la página o volver a llamar a la función que descarga el catálogo
+              window.location.reload(true);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Error al procesar mensaje SSE:", err);
+      }
+    };
+    eventSource.onerror = function(err) {
+      console.error("Error en conexión SSE (Reconectando automáticamente...)", err);
+    };
+  } catch (err) {
+    console.error("No se pudo inicializar EventSource", err);
   }
 });

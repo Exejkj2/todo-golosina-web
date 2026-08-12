@@ -5,7 +5,8 @@ try:
 except ImportError:
     pass
 from functools import wraps
-from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session, send_from_directory, make_response
+from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session, send_from_directory, make_response, Response
+from queue import Queue
 import io
 import traceback
 from flask_cors import CORS
@@ -360,6 +361,43 @@ class CajaDiaria(db.Model):
             'fecha_apertura': self.fecha_apertura.strftime('%Y-%m-%d %H:%M') if self.fecha_apertura else '',
             'fecha_cierre': self.fecha_cierre.strftime('%Y-%m-%d %H:%M') if self.fecha_cierre else ''
         }
+
+# ─── Variables para Server-Sent Events (SSE) ─────────────────────────────────
+# Lista global para mantener las colas de los clientes de SSE (cajas)
+sse_clients = []
+
+@app.route('/api/stream-actualizaciones')
+def stream_actualizaciones():
+    def event_stream():
+        q = Queue()
+        sse_clients.append(q)
+        try:
+            while True:
+                data = q.get()
+                yield f"data: {json.dumps(data)}\n\n"
+        except GeneratorExit:
+            if q in sse_clients:
+                sse_clients.remove(q)
+                
+    return Response(event_stream(), mimetype="text/event-stream")
+
+@app.route('/api/enviar-aviso', methods=['POST'])
+@login_requerido
+def enviar_aviso():
+    if not session.get('admin_autenticado'):
+        return jsonify({'ok': False, 'mensaje': 'No autorizado'}), 401
+        
+    data = request.json or {}
+    modificados = data.get('modificados', [])
+    
+    if not modificados:
+        return jsonify({'ok': False, 'mensaje': 'No hay artículos para notificar'}), 400
+        
+    # Enviar a todos los clientes SSE conectados
+    for q in sse_clients:
+        q.put({"tipo": "actualizacion_precios", "modificados": modificados})
+        
+    return jsonify({'ok': True, 'mensaje': 'Aviso enviado a las cajas correctamente.'})
 
 # ─── INICIALIZACIÓN CRÍTICA (Render/Gunicorn compatible) ──────
 with app.app_context():

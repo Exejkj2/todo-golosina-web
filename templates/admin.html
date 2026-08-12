@@ -229,6 +229,9 @@
           <button type="button" id="btnSincronizarBD" class="btn btn-warning px-4 text-white" style="background-color: #f59e0b; border: none;">
             <i class="bi bi-arrow-repeat"></i> Sincronizar BD
           </button>
+          <button type="button" id="btnEnviarAviso" class="btn btn-info px-4 text-white" style="background-color: #0dcaf0; border: none;">
+            <i class="bi bi-broadcast"></i> Avisar Cajas
+          </button>
         </div>
 
         <!-- Barra de Herramientas Masivas -->
@@ -1551,6 +1554,61 @@
           } catch (err) {
             console.error(err);
             alert('Error de conexión al intentar sincronizar la base de datos.');
+          } finally {
+            this.innerHTML = oldHtml;
+            this.disabled = false;
+          }
+        });
+      }
+
+      // --- Enviar Aviso SSE a Cajas ---
+      const btnEnviarAviso = document.getElementById('btnEnviarAviso');
+      if (btnEnviarAviso) {
+        btnEnviarAviso.addEventListener('click', async function() {
+          // Recolectar nombres de artículos modificados o seleccionados
+          // Como aproximación, usamos los productos seleccionados en la tabla actual
+          const modificados = [];
+          document.querySelectorAll('.checkbox-product:checked').forEach(checkbox => {
+            // El nombre del producto está en el TD hermano
+            const tr = checkbox.closest('tr');
+            if (tr) {
+              const tdNombre = tr.querySelector('td:nth-child(5)'); // Columna del nombre
+              if (tdNombre) {
+                modificados.push(tdNombre.innerText.trim());
+              } else {
+                modificados.push("ID: " + checkbox.value);
+              }
+            }
+          });
+
+          if (modificados.length === 0) {
+            alert("⚠️ Selecciona al menos un producto modificado en la tabla para enviar el aviso.");
+            return;
+          }
+
+          if (!confirm("¿Deseas enviar una notificación de actualización a todas las cajas sobre estos " + modificados.length + " artículos?")) {
+            return;
+          }
+
+          const oldHtml = this.innerHTML;
+          this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Avisando...';
+          this.disabled = true;
+
+          try {
+            const response = await fetch('/api/enviar-aviso', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ modificados: modificados })
+            });
+            const data = await response.json();
+            if (response.ok && data.ok) {
+              alert('✅ ' + data.mensaje);
+            } else {
+              alert('⚠️ Error: ' + (data.mensaje || 'Desconocido'));
+            }
+          } catch (err) {
+            console.error(err);
+            alert('Error al intentar enviar aviso a las cajas.');
           } finally {
             this.innerHTML = oldHtml;
             this.disabled = false;
