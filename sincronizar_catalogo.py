@@ -69,7 +69,7 @@ def procesar_csv(ruta_csv):
                     if codigo_barra:
                         producto.codigo_barra = codigo_barra
                     producto.stock = stock
-                    producto.activo = True
+                    producto.activo = 1
                     ids_procesados.add(producto.id)
                 else:
                     # INSERT: Crear nuevo
@@ -78,7 +78,7 @@ def procesar_csv(ruta_csv):
                         precio_lista_1=precio_1,
                         codigo_barra=codigo_barra,
                         stock=stock,
-                        activo=True,
+                        activo=1,
                         sincronizado=True,
                         ultima_actualizacion=hora_argentina()
                     )
@@ -90,7 +90,7 @@ def procesar_csv(ruta_csv):
         desactivados = 0
         for p in productos_actuales:
             if p.id not in ids_procesados and p.activo:
-                p.activo = False
+                p.activo = 0
                 p.ultima_actualizacion = hora_argentina()
                 desactivados += 1
                 

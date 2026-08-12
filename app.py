@@ -186,7 +186,7 @@ class Producto(db.Model):
     categoria_id = db.Column(db.Integer, db.ForeignKey('categoria.id'))
     categoria_rel = db.relationship('Categoria', backref='productos')
     stock = db.Column(db.Integer, default=0)
-    activo = db.Column(db.Boolean, default=True)
+    activo = db.Column(db.Integer, default=1)
     
     favorito = db.Column(db.Boolean, default=False)
     permitir_sin_stock = db.Column(db.Boolean, default=True)
@@ -481,7 +481,7 @@ def get_productos():
     buscar    = request.args.get('buscar', '').strip()
     orden     = request.args.get('orden', 'id')
 
-    query = Producto.query.filter_by(activo=True)
+    query = Producto.query.filter_by(activo=1)
 
     if categoria_nombre:
         cat = Categoria.query.filter_by(nombre=categoria_nombre).first()
@@ -506,7 +506,7 @@ def get_productos():
 @app.route('/api/productos/catalogo_completo', methods=['GET'])
 @login_requerido
 def catalogo_completo():
-    productos = Producto.query.filter_by(activo=True).order_by(Producto.nombre.asc()).all()
+    productos = Producto.query.filter_by(activo=1).order_by(Producto.nombre.asc()).all()
     return jsonify({
         "productos": [
             {
@@ -656,7 +656,7 @@ def registrar_venta():
         p_id = item.get('id')
         if p_id:
             p = db.session.get(Producto, int(p_id))
-            if not p or not p.activo:
+            if not p or p.activo == 0:
                 nombre_p = item.get('name', item.get('nombre', f"ID {p_id}"))
                 return jsonify({"error": f"El producto {nombre_p} ya no está disponible en la base de datos. Por favor, actualiza tu catálogo."}), 400
 
@@ -1967,7 +1967,7 @@ def admin_delete_product(id):
     if not session.get('admin_autenticado'): return redirect('/')
     producto = db.session.get(Producto, id)
     if producto:
-        producto.activo = False # Soft delete
+        producto.activo = 0 # Soft delete
         producto.sincronizado = not es_offline()
         producto.ultima_actualizacion = hora_argentina()
         db.session.commit()
@@ -1987,7 +1987,7 @@ def eliminar_masivo():
         for p_id in ids:
             producto = db.session.get(Producto, p_id)
             if producto:
-                producto.activo = False
+                producto.activo = 0
                 producto.sincronizado = not es_offline()
                 producto.ultima_actualizacion = hora_argentina()
         db.session.commit()
@@ -2163,7 +2163,7 @@ def admin_importar():
                 prod.precio_lista_1 = precio_final
                 prod.codigo_barra = codigo_excel
                 prod.stock = stock_final
-                prod.activo = True
+                prod.activo = 1
                 prod.sincronizado = not es_offline()
                 prod.ultima_actualizacion = hora_argentina()
                 stats['actualizados_ok'] += 1
@@ -2174,7 +2174,7 @@ def admin_importar():
                     precio_lista_1=precio_final,
                     codigo_barra=codigo_excel,
                     stock=stock_final,
-                    activo=True,
+                    activo=1,
                     sincronizado=not es_offline(),
                     ultima_actualizacion=hora_argentina()
                 )
@@ -2210,7 +2210,7 @@ def admin_importar():
         # SOFT DELETE LOGIC
         for p in productos_actuales:
             if p.id not in ids_procesados and p.activo:
-                p.activo = False
+                p.activo = 0
                 p.ultima_actualizacion = hora_argentina()
                 p.sincronizado = not es_offline()
                 stats['desactivados'] += 1
