@@ -380,16 +380,21 @@ def verificar_corte_automatico():
         if caja:
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             ahora = datetime.now(tz)
-            if caja.turno == 'Mañana' and ahora.hour >= 13:
+            apertura = caja.fecha_apertura
+            
+            cierre_necesario = False
+            if apertura and apertura.date() < ahora.date():
+                cierre_necesario = True
+            elif caja.turno == 'Mañana' and ahora.hour >= 13 and (apertura and apertura.hour < 13):
+                cierre_necesario = True
+            elif caja.turno == 'Tarde' and ahora.hour >= 22 and (apertura and apertura.hour < 22):
+                cierre_necesario = True
+                
+            if cierre_necesario:
                 caja.estado = 'Cerrada'
                 caja.fecha_cierre = hora_argentina()
                 db.session.commit()
-                print(f"Corte automático ejecutado para caja turno Mañana ID: {caja.id}")
-            elif caja.turno == 'Tarde' and ahora.hour >= 22:
-                caja.estado = 'Cerrada'
-                caja.fecha_cierre = hora_argentina()
-                db.session.commit()
-                print(f"Corte automático ejecutado para caja turno Tarde ID: {caja.id}")
+                print(f"Corte automático ejecutado para caja turno {caja.turno} ID: {caja.id}")
     except Exception as e:
         print(f"Error en corte automático: {e}")
 
