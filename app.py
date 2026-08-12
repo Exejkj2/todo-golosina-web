@@ -668,7 +668,7 @@ def registrar_venta():
             p_id_int = None
 
         producto = Producto.query.get(p_id_int) if p_id_int is not None else None
-        if producto is None or getattr(producto, 'activo', 1) == 0:
+        if not producto or getattr(producto, 'activo', 1) in [0, False, '0', None]:
             db.session.rollback()
             return jsonify({"error": f"El producto con ID {p_id} ya no existe o está inactivo. Vacía tu carrito y recarga el catálogo."}), 400
 
