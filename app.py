@@ -1,6 +1,9 @@
 import os 
-from dotenv import load_dotenv
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 from functools import wraps
 from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session, send_from_directory, make_response
 import io
@@ -1470,12 +1473,21 @@ def registrar_pago():
 @app.route('/api/caja/estado', methods=['GET'])
 @login_requerido
 def get_caja_estado():
-    hoy = date.today()
-    # Buscamos si hay una caja abierta
-    caja = CajaDiaria.query.filter_by(estado='Abierta').order_by(CajaDiaria.id.desc()).first()
-    if caja:
-        return jsonify({"ok": True, "abierta": True, "caja": caja.to_dict()})
-    return jsonify({"ok": True, "abierta": False})
+    try:
+        caja = CajaDiaria.query.filter_by(estado='Abierta').order_by(CajaDiaria.id.desc()).first()
+        if caja:
+            return jsonify({
+                "ok": True,
+                "abierta": True,
+                "monto_inicial": caja.monto_inicial,
+                "caja": caja.to_dict()
+            }), 200
+        return jsonify({
+            "ok": True,
+            "abierta": False
+        }), 200
+    except Exception as e:
+        return jsonify({"ok": False, "abierta": False, "error": str(e)}), 500
 
 @app.route('/api/caja/abrir', methods=['POST'])
 @login_requerido
@@ -2115,19 +2127,23 @@ def admin_delete_categoria(id):
 @app.route('/admin/importar', methods=['POST'])
 @login_requerido
 def admin_importar():
-    if not session.get('admin_autenticado'): return redirect('/')
-    if 'excel_file' not in request.files:
-        flash('No se subió ningún archivo.', 'danger')
-        return redirect(url_for('admin_dashboard'))
-    
-    file = request.files['excel_file']
-    if file.filename == '':
-        flash('Ningún archivo seleccionado.', 'danger')
-        return redirect(url_for('admin_dashboard'))
-
-    stats = {'actualizados_ok': 0, 'nuevos': 0, 'desactivados': 0}
     try:
-        import openpyxl
+        if not session.get('admin_autenticado'): 
+            return jsonify({"error": "No autorizado"}), 401
+
+        if 'excel_file' not in request.files:
+            return jsonify({"error": "No se subió ningún archivo con la clave 'excel_file'."}), 400
+        
+        file = request.files['excel_file']
+        if not file or file.filename == '':
+            return jsonify({"error": "Ningún archivo seleccionado."}), 400
+
+        try:
+            import openpyxl
+        except ImportError:
+            raise Exception("La librería 'openpyxl' no está instalada en el servidor. Instálala ejecutando: pip install openpyxl")
+
+        stats = {'actualizados_ok': 0, 'nuevos': 0, 'desactivados': 0}
         wb = openpyxl.load_workbook(file, data_only=True)
         hoja = wb.active
         
@@ -2250,11 +2266,10 @@ def admin_importar():
         
         mensaje = f"✅ Catálogo sincronizado correctamente. Actualizados: {stats['actualizados_ok']}, Nuevos: {stats['nuevos']}, Desactivados: {stats['desactivados']}."
         return jsonify({"mensaje": mensaje}), 200
-        
+
     except Exception as e:
         db.session.rollback()
-        import traceback
-        traceback.print_exc()
+        print(f"Error detallado: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/verificar_precios', methods=['GET'])

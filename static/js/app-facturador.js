@@ -2401,10 +2401,32 @@ async function verificarCaja() {
     try {
         const res = await fetch("/api/caja/estado");
         const d = await res.json();
-        if (d.ok && !d.abierta) {
-            getModal('modal-abrir-caja')?.show();
+
+        const modalEl = document.getElementById('modal-abrir-caja');
+        const modalObj = getModal('modal-abrir-caja');
+
+        if (d.abierta || (d.ok && d.abierta)) {
+            // Si la caja ya está abierta, ocultar el modal y permitir cobro
+            modalObj?.hide();
+            if (modalEl) {
+                modalEl.classList.remove('show');
+                modalEl.style.display = 'none';
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+            const elemMonto = document.getElementById("cajaInicio");
+            if (elemMonto && d.monto_inicial !== undefined) {
+                elemMonto.textContent = `$${parseFloat(d.monto_inicial).toLocaleString()}`;
+            }
+        } else {
+            // Si la caja está cerrada, mostrar el modal de apertura
+            modalObj?.show();
         }
-    } catch(err) { console.error("Error verificando caja:", err); }
+    } catch(err) {
+        console.error("Error verificando estado de la caja:", err);
+    }
 }
 
 async function abrirCaja() {
