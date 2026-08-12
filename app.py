@@ -8,6 +8,7 @@ import traceback
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text, or_
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 # pandas removido para aligerar el servidor
 from fpdf import FPDF
@@ -629,8 +630,8 @@ def registrar_venta():
     tipo_comprobante = "Factura C" if afip_ok else "Ticket No Fiscal"
     
     # Acepta dos formatos:
-    # A) Lista directa (uso original del carrito público): [{id, qty}, ...]
-    # B) Objeto con cliente: {cliente_id, items:[{id,qty,name,precio_unit}], total}
+    # A) Lista directa (uso original del carrito público): [{id/producto_id, qty}, ...]
+    # B) Objeto con cliente: {cliente_id, items:[{id/producto_id,qty,name,precio_unit}], total}
     if isinstance(data, list):
         items = data
         cliente_id = None
@@ -651,21 +652,29 @@ def registrar_venta():
     if not items or len(items) == 0:
         return jsonify({"ok": False, "mensaje": "No se puede registrar una venta sin artículos."}), 400
 
-    # Validación de existencia de productos en base de datos
+    # ─── Validación Previa de Productos ──────────────────────────────
     for item in items:
-        p_id = item.get('id')
-        if p_id:
-            p = db.session.get(Producto, int(p_id))
-            if not p or p.activo == 0:
-                nombre_p = item.get('name', item.get('nombre', f"ID {p_id}"))
-                return jsonify({"error": f"El producto {nombre_p} ya no está disponible en la base de datos. Por favor, actualiza tu catálogo."}), 400
+        p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
+        if not p_id:
+            db.session.rollback()
+            return jsonify({"error": "No se especificó un ID de producto válido en los ítems de la venta."}), 400
+
+        try:
+            p_id_int = int(p_id)
+        except (ValueError, TypeError):
+            p_id_int = None
+
+        producto = Producto.query.get(p_id_int) if p_id_int is not None else None
+        if producto is None or getattr(producto, 'activo', 1) == 0:
+            db.session.rollback()
+            return jsonify({"error": f"El producto con ID {p_id} ya no existe o está inactivo. Vacía tu carrito y recarga el catálogo."}), 400
 
     # Recalcular el total y construir el detalle de forma segura en el backend para evitar forjado de montos (L-04)
     total_recalculado = 0.0
     detalle_recalculado = []
 
     for item in items:
-        p_id = item.get('id')
+        p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
         try:
             qty = int(item.get('qty', 1))
         except (ValueError, TypeError):
@@ -674,7 +683,7 @@ def registrar_venta():
         if not p_id or qty <= 0:
             continue
         
-        p = db.session.get(Producto, int(p_id))
+        p = Producto.query.get(int(p_id))
         if p:
             # Obtener el precio oficial registrado en la base de datos
             precio_u = p.precio_lista_3 if lista_sel == 3 else (p.precio_lista_2 if lista_sel == 2 else p.precio_lista_1)
@@ -697,6 +706,7 @@ def registrar_venta():
             total_recalculado += subtotal
             
             detalle_recalculado.append({
+                'producto_id': p.id,
                 'nombre': p.nombre,
                 'qty': qty,
                 'precio_unit': precio_final,
@@ -712,7 +722,6 @@ def registrar_venta():
     detalle = detalle_recalculado
 
     from datetime import timedelta
-    import json as _json
     tiempo_limite = hora_argentina() - timedelta(seconds=60)
     detalle_json_str = _json.dumps(detalle)
     venta_fantasma = Venta.query.filter(
@@ -726,10 +735,10 @@ def registrar_venta():
         return jsonify({"ok": True, "mensaje": "Venta procesada (eco bloqueado)", "venta_id": venta_fantasma.id}), 200
 
     for item in items:
-        producto_id = item.get('id')
+        p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
         qty = item.get('qty', 0)
-        if producto_id and qty > 0:
-            producto = db.session.get(Producto, int(producto_id))
+        if p_id and qty > 0:
+            producto = Producto.query.get(int(p_id))
             if producto:
                 producto.ventas_totales += qty
                 if producto.stock >= qty:
@@ -743,10 +752,16 @@ def registrar_venta():
             if not detalle:
                 detalle = []
                 for item in items:
-                    p = db.session.get(Producto, int(item.get('id', 0)))
+                    p_id_fallback = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
+                    p = Producto.query.get(int(p_id_fallback)) if p_id_fallback else None
                     if p:
                         precio_u = p.precio_lista_3 if lista_sel == 3 else (p.precio_lista_2 if lista_sel == 2 else p.precio)
-                        detalle.append({'nombre': p.nombre, 'qty': item.get('qty', 1), 'precio_unit': precio_u})
+                        detalle.append({
+                            'producto_id': p.id,
+                            'nombre': p.nombre,
+                            'qty': item.get('qty', 1),
+                            'precio_unit': precio_u
+                        })
             
             # Soporte para medios de pago múltiples
             pagos = data.get('pagos', {})
@@ -769,7 +784,6 @@ def registrar_venta():
             # los ingresos de la caja. Solo guardamos el total_venta como referencia de cobros reales.
             otros_medios = p_tr + p_db + p_cc
             # Lo que realmente se cobró en efectivo = total_venta - lo pagado por otros medios
-            # (mínimo 0, máximo monto_entregado_ef para no inventar dinero)
             p_ef = max(0.0, round(min(monto_entregado_ef, total_venta - otros_medios), 2))
 
             # El monto entregado por el cliente se guarda como dato informativo (para calcular vuelto)
@@ -780,6 +794,7 @@ def registrar_venta():
                 cliente = db.session.get(Cliente, cliente_id)
                 if cliente:
                     if cliente.limite_credito > 0 and (cliente.saldo + p_cc) > cliente.limite_credito:
+                        db.session.rollback()
                         return jsonify({"ok": False, "mensaje": f"Límite de crédito excedido. Saldo: ${cliente.saldo:.2f}, Límite: ${cliente.limite_credito:.2f}"}), 403
                     cliente.saldo += p_cc
 
@@ -802,19 +817,16 @@ def registrar_venta():
             db.session.add(venta)
             db.session.flush()
 
-            if isinstance(data, list):
-                items_input = data
-            else:
-                items_input = data.get('items', [])
-                
             for d in detalle:
-                prod_id = None
-                for it in items_input:
-                    if str(it.get('id', '')) != '':
-                        p_temp = db.session.get(Producto, int(it['id']))
-                        if p_temp and p_temp.nombre == d['nombre']:
-                            prod_id = p_temp.id
-                            break
+                prod_id = d.get('producto_id')
+                if not prod_id:
+                    for it in items:
+                        pid_temp = it.get('producto_id') if it.get('producto_id') is not None else it.get('id')
+                        if pid_temp:
+                            p_temp = Producto.query.get(int(pid_temp))
+                            if p_temp and p_temp.nombre == d['nombre']:
+                                prod_id = p_temp.id
+                                break
                 
                 det_obj = DetalleVenta(
                     venta_id=venta.id,
@@ -827,15 +839,30 @@ def registrar_venta():
                 )
                 db.session.add(det_obj)
 
-            db.session.commit()
-            venta_id = venta.id
+            try:
+                db.session.commit()
+                venta_id = venta.id
+            except IntegrityError as ie:
+                db.session.rollback()
+                print(f"⚠️ IntegrityError al hacer commit en registrar_venta: {ie}")
+                return jsonify({"error": "Error de integridad de datos. Uno de los productos ya no existe o está inactivo. Vacía tu carrito y recarga el catálogo."}), 400
+
+        except IntegrityError as ie:
+            db.session.rollback()
+            print(f"⚠️ IntegrityError capturado en registrar_venta: {ie}")
+            return jsonify({"error": "Error de integridad de datos. Uno de los productos ya no existe o está inactivo. Vacía tu carrito y recarga el catálogo."}), 400
         except Exception as e:
             db.session.rollback()
             import traceback
             print(f"Error al registrar venta: {e}\n{traceback.format_exc()}")
             return jsonify({"ok": False, "mensaje": f"Error interno al guardar la venta: {str(e)}"}), 500
     else:
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError as ie:
+            db.session.rollback()
+            print(f"⚠️ IntegrityError al hacer commit final: {ie}")
+            return jsonify({"error": "Error de integridad de datos. Vacía tu carrito y recarga el catálogo."}), 400
 
     return jsonify({"ok": True, "mensaje": f"Venta registrada con éxito{mensaje_afip}", "venta_id": venta_id})
 
