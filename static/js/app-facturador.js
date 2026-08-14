@@ -27,6 +27,12 @@ let isProcessingVenta = false;
 let procesandoMovimiento = false;
 
 window.catalogoProductos = [];
+try {
+  const localCached = JSON.parse(localStorage.getItem('catalogo_local_cache') || '[]');
+  if (Array.isArray(localCached) && localCached.length > 0) {
+    window.catalogoProductos = localCached;
+  }
+} catch(e) {}
 window.cargandoCatalogo = false;
 let currentCatalogoVersion = null;
 

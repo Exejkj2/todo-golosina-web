@@ -1,5 +1,5 @@
 // Service Worker para Facturador POS - Todo Golosina
-const CACHE_NAME = 'todo-golosina-pos-v1';
+const CACHE_NAME = 'todo-golosina-pos-v3';
 
 // Recursos esenciales que se pre-cachean durante la instalación
 const STATIC_ASSETS = [
@@ -8,7 +8,7 @@ const STATIC_ASSETS = [
   '/static/css/bootstrap.min.css',
   '/static/css/bootstrap-icons.min.css',
   '/static/js/offline-manager.js',
-  '/static/js/app-facturador.js?v=2.0.0',
+  '/static/js/app-facturador.js?v=2.1.0',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
   'https://cdn.jsdelivr.net/npm/sweetalert2@11',
   'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap'
