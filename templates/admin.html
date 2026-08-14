@@ -529,20 +529,6 @@
                           <div class="row mb-3">
                             <div class="col">
                               <label class="form-label small fw-bold text-muted"
-                                >Precio Anterior (Oferta) ($)</label
-                              >
-                              <input
-                                type="number"
-                                step="0.01"
-                                name="precio_anterior"
-                                class="form-control bg-light"
-                                value="{{ p.precio_anterior or '' }}"
-                              />
-                            </div>
-                          </div>
-                          <div class="row mb-3">
-                            <div class="col">
-                              <label class="form-label small fw-bold text-muted"
                                 >Stock</label
                               >
                               <input
@@ -588,44 +574,11 @@
                           </div>
                           <div class="mb-3 d-flex gap-4">
                             <div class="form-check form-switch">
-                              <input class="form-check-input" type="checkbox" role="switch" name="favorito" id="favEdit{{ p.id }}" {% if p.favorito %}checked{% endif %}>
-                              <label class="form-check-label small fw-bold text-muted" for="favEdit{{ p.id }}">Destacar en Inicio</label>
-                            </div>
-                            <div class="form-check form-switch">
                               <input class="form-check-input" type="checkbox" role="switch" name="permitir_sin_stock" id="stockEdit{{ p.id }}" {% if p.permitir_sin_stock %}checked{% endif %}>
                               <label class="form-check-label small fw-bold text-muted" for="stockEdit{{ p.id }}">Permitir compra sin stock</label>
                             </div>
                           </div>
 
-                          <!-- ─── Descuento por Volumen ─── -->
-                          <div class="p-3 rounded-3 mb-3" style="background:#f8fafc; border: 1px solid #e2e8f0;">
-                            <div class="form-check form-switch mb-2">
-                              <input class="form-check-input" type="checkbox" role="switch"
-                                     name="descuento_volumen_activo" id="descChk{{ p.id }}"
-                                     {% if p.descuento_volumen_activo %}checked{% endif %}
-                                     onchange="toggleDescuentoFields('descFields{{ p.id }}', this)">
-                              <label class="form-check-label fw-bold text-muted small" for="descChk{{ p.id }}">
-                                🛒 Activar Descuento por Volumen / Mayorista
-                              </label>
-                            </div>
-                            <div id="descFields{{ p.id }}" {% if p.descuento_volumen_activo %}style="display: block;"{% else %}style="display: none;"{% endif %}>
-                              <div class="row g-2">
-                                <div class="col">
-                                  <label class="form-label small fw-bold text-muted">Cantidad mínima</label>
-                                  <input type="number" name="cantidad_minima_descuento"
-                                         class="form-control bg-white form-control-sm" min="1" placeholder="Ej: 10"
-                                         value="{{ p.cantidad_minima_descuento or '' }}">
-                                </div>
-                                <div class="col">
-                                  <label class="form-label small fw-bold text-muted">% de Descuento</label>
-                                  <input type="number" name="porcentaje_descuento_volumen"
-                                         class="form-control bg-white form-control-sm" min="1" max="100" step="0.5" placeholder="Ej: 15"
-                                         value="{{ p.porcentaje_descuento_volumen or '' }}">
-                                </div>
-                              </div>
-                              <small class="text-muted mt-1 d-block">Ej: llevando {{ p.cantidad_minima_descuento or '10' }} o más → {{ p.porcentaje_descuento_volumen or '15' }}% de descuento</small>
-                            </div>
-                          </div>
                           <div class="mb-3">
                             <label class="form-label small fw-bold text-muted"
                               >Descripción</label
@@ -637,35 +590,6 @@
                             >
 {{ p.descripcion }}</textarea
                             >
-                          </div>
-                          <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted"
-                              >URL de Imagen</label
-                            >
-                            <input
-                              type="url"
-                              name="imagen_url"
-                              class="form-control bg-light edit-img-input"
-                              value="{{ p.imagen_url or p.imagen }}"
-                              placeholder="https://..."
-                            />
-                            <div class="text-center mt-3">
-                              {% if p.imagen_url or p.imagen %}
-                              <img
-                                class="rounded shadow-sm"
-                                style="max-height: 120px; display: inline-block"
-                                src="{{ p.imagen_url or p.imagen }}"
-                                alt="Vista previa"
-                              />
-                              {% else %}
-                              <img
-                                class="rounded shadow-sm"
-                                style="max-height: 120px; display: none"
-                                src=""
-                                alt="Vista previa"
-                              />
-                              {% endif %}
-                            </div>
                           </div>
                         </div>
                         <div class="modal-footer border-0 pt-0">
@@ -827,19 +751,6 @@
             </div>
             <div class="row mb-3">
               <div class="col">
-                <label class="form-label small fw-bold text-muted"
-                  >Precio Anterior (Oferta) ($)</label
-                >
-                <input
-                  type="number"
-                  step="0.01"
-                  name="precio_anterior"
-                  class="form-control bg-light"
-                />
-              </div>
-            </div>
-            <div class="row mb-3">
-              <div class="col">
                 <label class="form-label small fw-bold text-muted">Stock</label>
                 <input
                   type="number"
@@ -876,41 +787,11 @@
             </div>
             <div class="mb-3 d-flex gap-4">
               <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" name="favorito" id="favAdd">
-                <label class="form-check-label small fw-bold text-muted" for="favAdd">Destacar en Inicio</label>
-              </div>
-              <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch" name="permitir_sin_stock" id="stockAdd" checked>
                 <label class="form-check-label small fw-bold text-muted" for="stockAdd">Permitir compra sin stock</label>
               </div>
             </div>
 
-            <!-- ─── Descuento por Volumen ─── -->
-            <div class="p-3 rounded-3 mb-3" style="background:#f8fafc; border: 1px solid #e2e8f0;">
-              <div class="form-check form-switch mb-2">
-                <input class="form-check-input" type="checkbox" role="switch"
-                       name="descuento_volumen_activo" id="descAddChk"
-                       onchange="toggleDescuentoFields('descAddFields', this)">
-                <label class="form-check-label fw-bold text-muted small" for="descAddChk">
-                  🛒 Activar Descuento por Volumen / Mayorista
-                </label>
-              </div>
-              <div id="descAddFields" style="display:none;">
-                <div class="row g-2">
-                  <div class="col">
-                    <label class="form-label small fw-bold text-muted">Cantidad mínima</label>
-                    <input type="number" name="cantidad_minima_descuento" id="cantMinAdd"
-                           class="form-control bg-white form-control-sm" min="1" placeholder="Ej: 10">
-                  </div>
-                  <div class="col">
-                    <label class="form-label small fw-bold text-muted">% de Descuento</label>
-                    <input type="number" name="porcentaje_descuento_volumen" id="porcDescAdd"
-                           class="form-control bg-white form-control-sm" min="1" max="100" step="0.5" placeholder="Ej: 15">
-                  </div>
-                </div>
-                <small class="text-muted mt-1 d-block">Ej: llevando 10 o más → 15% de descuento</small>
-              </div>
-            </div>
             <div class="mb-3">
               <label class="form-label small fw-bold text-muted"
                 >Descripción</label
@@ -920,26 +801,6 @@
                 class="form-control bg-light"
                 rows="2"
               ></textarea>
-            </div>
-            <div class="mb-3">
-              <label class="form-label small fw-bold text-muted"
-                >URL de Imagen</label
-              >
-              <input
-                type="url"
-                name="imagen_url"
-                id="addImgUrl"
-                class="form-control bg-light"
-                placeholder="https://ejemplo.com/imagen.png"
-              />
-              <div class="text-center mt-3">
-                <img
-                  id="addImgPreview"
-                  src=""
-                  class="img-fluid rounded shadow-sm"
-                  style="max-height: 120px; display: none"
-                />
-              </div>
             </div>
           </div>
           <div class="modal-footer border-0 pt-0">
@@ -953,38 +814,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-      // Script para previsualizar imagen en Agregar
-      const addUrlInput = document.getElementById("addImgUrl");
-      const addImgPreview = document.getElementById("addImgPreview");
-      addUrlInput.addEventListener("input", function () {
-        if (this.value) {
-          addImgPreview.src = this.value;
-          addImgPreview.style.display = "inline-block";
-        } else {
-          addImgPreview.style.display = "none";
-        }
-      });
-
-      // Script para previsualizar imágenes en Editar
-      document.querySelectorAll(".edit-img-input").forEach((input) => {
-        input.addEventListener("input", function () {
-          const imgContainer = this.nextElementSibling;
-          const img = imgContainer.querySelector("img");
-          if (this.value) {
-            img.src = this.value;
-            img.style.display = "inline-block";
-          } else {
-            img.style.display = "none";
-          }
-        });
-      });
-
-      // ─── UX: mostrar/ocultar campos de descuento por volumen ───
-      function toggleDescuentoFields(containerId, checkbox) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        container.style.display = checkbox.checked ? 'block' : 'none';
-      }
 
       /**
        * Formatea un string a Title Case (Primera letra de cada palabra en Mayúscula)

@@ -185,23 +185,15 @@ class Producto(db.Model):
     precio_lista_1 = db.Column(db.Float, nullable=False) # Lista 1
     precio_lista_2 = db.Column(db.Float, nullable=True, default=0.0) # Lista 2
     precio_lista_3 = db.Column(db.Float, nullable=True, default=0.0) # Lista 3
-    precio_anterior = db.Column(db.Float, nullable=True)
-    imagen = db.Column(db.String(255), default='')
-    imagen_url = db.Column(db.Text, default='')
     categoria_id = db.Column(db.Integer, db.ForeignKey('categoria.id'))
     categoria_rel = db.relationship('Categoria', backref='productos')
     stock = db.Column(db.Integer, default=0)
     activo = db.Column(db.Integer, default=1)
     
-    favorito = db.Column(db.Boolean, default=False)
     permitir_sin_stock = db.Column(db.Boolean, default=True)
     ventas_totales = db.Column(db.Integer, default=0)
     codigo_barra = db.Column(db.String(100), nullable=True)
 
-    # ─── Descuento por Volumen / Mayorista ───
-    descuento_volumen_activo = db.Column(db.Boolean, default=False)
-    cantidad_minima_descuento = db.Column(db.Integer, nullable=True)
-    porcentaje_descuento_volumen = db.Column(db.Float, nullable=True)
 
     sincronizado = db.Column(db.Boolean, default=True, nullable=False)
     ultima_actualizacion = db.Column(db.DateTime, default=hora_argentina, onupdate=hora_argentina)
@@ -222,19 +214,12 @@ class Producto(db.Model):
             'precio_lista_1': self.precio_lista_1,
             'precio_lista_2': self.precio_lista_2 or self.precio_lista_1,
             'precio_lista_3': self.precio_lista_3 or self.precio_lista_1,
-            'precio_anterior': self.precio_anterior,
-            'imagen': self.imagen_url or self.imagen,
-            'imagen_url': self.imagen_url,
             'categoria': self.categoria_rel.nombre if self.categoria_rel else 'General',
             'stock': self.stock,
             'activo': self.activo,
-            'favorito': self.favorito,
             'permitir_sin_stock': self.permitir_sin_stock,
             'ventas_totales': self.ventas_totales,
             'codigo_barra': self.codigo_barra or '',
-            'descuento_volumen_activo': self.descuento_volumen_activo,
-            'cantidad_minima_descuento': self.cantidad_minima_descuento,
-            'porcentaje_descuento_volumen': self.porcentaje_descuento_volumen,
             'sincronizado': self.sincronizado,
             'ultima_actualizacion': self.ultima_actualizacion.isoformat() if self.ultima_actualizacion else None
         }
@@ -989,19 +974,12 @@ def api_sincronizar():
                         precio_lista_1=p_local.precio_lista_1,
                         precio_lista_2=p_local.precio_lista_2,
                         precio_lista_3=p_local.precio_lista_3,
-                        precio_anterior=p_local.precio_anterior,
-                        imagen=p_local.imagen,
-                        imagen_url=p_local.imagen_url,
                         categoria_id=p_local.categoria_id,
                         stock=p_local.stock,
                         activo=p_local.activo,
-                        favorito=p_local.favorito,
                         permitir_sin_stock=p_local.permitir_sin_stock,
                         ventas_totales=p_local.ventas_totales,
                         codigo_barra=p_local.codigo_barra,
-                        descuento_volumen_activo=p_local.descuento_volumen_activo,
-                        cantidad_minima_descuento=p_local.cantidad_minima_descuento,
-                        porcentaje_descuento_volumen=p_local.porcentaje_descuento_volumen,
                         sincronizado=True,
                         ultima_actualizacion=p_local.ultima_actualizacion
                     )
@@ -1012,19 +990,12 @@ def api_sincronizar():
                     p_nube.precio_lista_1 = p_local.precio_lista_1
                     p_nube.precio_lista_2 = p_local.precio_lista_2
                     p_nube.precio_lista_3 = p_local.precio_lista_3
-                    p_nube.precio_anterior = p_local.precio_anterior
-                    p_nube.imagen = p_local.imagen
-                    p_nube.imagen_url = p_local.imagen_url
                     p_nube.categoria_id = p_local.categoria_id
                     p_nube.stock = p_local.stock
                     p_nube.activo = p_local.activo
-                    p_nube.favorito = p_local.favorito
                     p_nube.permitir_sin_stock = p_local.permitir_sin_stock
                     p_nube.ventas_totales = p_local.ventas_totales
                     p_nube.codigo_barra = p_local.codigo_barra
-                    p_nube.descuento_volumen_activo = p_local.descuento_volumen_activo
-                    p_nube.cantidad_minima_descuento = p_local.cantidad_minima_descuento
-                    p_nube.porcentaje_descuento_volumen = p_local.porcentaje_descuento_volumen
                     p_nube.sincronizado = True
                     p_nube.ultima_actualizacion = p_local.ultima_actualizacion
             
@@ -1123,19 +1094,12 @@ def api_sincronizar():
                         precio_lista_1=p_nube.precio_lista_1,
                         precio_lista_2=p_nube.precio_lista_2,
                         precio_lista_3=p_nube.precio_lista_3,
-                        precio_anterior=p_nube.precio_anterior,
-                        imagen=p_nube.imagen,
-                        imagen_url=p_nube.imagen_url,
                         categoria_id=p_nube.categoria_id,
                         stock=p_nube.stock,
                         activo=p_nube.activo,
-                        favorito=p_nube.favorito,
                         permitir_sin_stock=p_nube.permitir_sin_stock,
                         ventas_totales=p_nube.ventas_totales,
                         codigo_barra=p_nube.codigo_barra,
-                        descuento_volumen_activo=p_nube.descuento_volumen_activo,
-                        cantidad_minima_descuento=p_nube.cantidad_minima_descuento,
-                        porcentaje_descuento_volumen=p_nube.porcentaje_descuento_volumen,
                         sincronizado=True,
                         ultima_actualizacion=t_nube
                     )
@@ -1146,19 +1110,12 @@ def api_sincronizar():
                     p_local.precio_lista_1 = p_nube.precio_lista_1
                     p_local.precio_lista_2 = p_nube.precio_lista_2
                     p_local.precio_lista_3 = p_nube.precio_lista_3
-                    p_local.precio_anterior = p_nube.precio_anterior
-                    p_local.imagen = p_nube.imagen
-                    p_local.imagen_url = p_nube.imagen_url
                     p_local.categoria_id = p_nube.categoria_id
                     p_local.stock = p_nube.stock
                     p_local.activo = p_nube.activo
-                    p_local.favorito = p_nube.favorito
                     p_local.permitir_sin_stock = p_nube.permitir_sin_stock
                     p_local.ventas_totales = p_nube.ventas_totales
                     p_local.codigo_barra = p_nube.codigo_barra
-                    p_local.descuento_volumen_activo = p_nube.descuento_volumen_activo
-                    p_local.cantidad_minima_descuento = p_nube.cantidad_minima_descuento
-                    p_local.porcentaje_descuento_volumen = p_nube.porcentaje_descuento_volumen
                     p_local.sincronizado = True
                     p_local.ultima_actualizacion = t_nube
                     
@@ -1961,7 +1918,6 @@ def admin_add_product():
         precio_anterior = None
         
     descripcion = request.form.get('descripcion', '')
-    imagen_url = request.form.get('imagen_url', '')
     categoria_id_str = request.form.get('categoria_id')
     categoria_id = int(categoria_id_str) if categoria_id_str and categoria_id_str.isdigit() else None
     
@@ -1971,7 +1927,6 @@ def admin_add_product():
     except ValueError:
         stock = 0
 
-    favorito = True if request.form.get('favorito') else False
     permitir_sin_stock = True if request.form.get('permitir_sin_stock') else False
 
     # Triple Lista de Precios
@@ -1993,18 +1948,6 @@ def admin_add_product():
     except ValueError:
         precio_lista_3 = precio_lista_1
 
-    # Descuento por volumen
-    descuento_volumen_activo = True if request.form.get('descuento_volumen_activo') else False
-    cant_min_str = request.form.get('cantidad_minima_descuento', '').strip()
-    porc_desc_str = request.form.get('porcentaje_descuento_volumen', '').strip()
-    try:
-        cantidad_minima_descuento = int(cant_min_str) if cant_min_str else None
-    except ValueError:
-        cantidad_minima_descuento = None
-    try:
-        porcentaje_descuento_volumen = float(porc_desc_str) if porc_desc_str else None
-    except ValueError:
-        porcentaje_descuento_volumen = None
 
     codigo_barra = request.form.get('codigo_barra', '').strip()
     if codigo_barra:
@@ -2020,13 +1963,11 @@ def admin_add_product():
 
     nuevo = Producto(
         nombre=nombre, precio_lista_1=precio_lista_1, precio_lista_2=precio_lista_2, precio_lista_3=precio_lista_3,
-        precio_anterior=precio_anterior, descripcion=descripcion,
-        imagen_url=imagen_url, categoria_id=categoria_id, stock=stock,
-        favorito=favorito, permitir_sin_stock=permitir_sin_stock,
+        descripcion=descripcion,
+        categoria_id=categoria_id, stock=stock,
+        permitir_sin_stock=permitir_sin_stock,
         codigo_barra=codigo_barra,
-        descuento_volumen_activo=descuento_volumen_activo,
-        cantidad_minima_descuento=cantidad_minima_descuento,
-        porcentaje_descuento_volumen=porcentaje_descuento_volumen,
+        
         sincronizado=not es_offline(),
         ultima_actualizacion=hora_argentina()
     )
@@ -2047,14 +1988,8 @@ def admin_edit_product(id):
 
     producto.nombre = request.form.get('nombre')
         
-    precio_ant_str = request.form.get('precio_anterior', '').strip().replace(',', '.')
-    try:
-        producto.precio_anterior = float(precio_ant_str) if precio_ant_str else None
-    except ValueError:
-        producto.precio_anterior = None
         
     producto.descripcion = request.form.get('descripcion', '')
-    producto.imagen_url = request.form.get('imagen_url', '')
     
     cat_id_str = request.form.get('categoria_id')
     producto.categoria_id = int(cat_id_str) if cat_id_str and cat_id_str.isdigit() else None
@@ -2065,22 +2000,10 @@ def admin_edit_product(id):
     except ValueError:
         producto.stock = 0
 
-    producto.favorito = True if request.form.get('favorito') else False
     producto.permitir_sin_stock = True if request.form.get('permitir_sin_stock') else False
     producto.codigo_barra = request.form.get('codigo_barra', '').strip()
 
     # Descuento por volumen
-    producto.descuento_volumen_activo = True if request.form.get('descuento_volumen_activo') else False
-    cant_min_str = request.form.get('cantidad_minima_descuento', '').strip()
-    porc_desc_str = request.form.get('porcentaje_descuento_volumen', '').strip()
-    try:
-        producto.cantidad_minima_descuento = int(cant_min_str) if cant_min_str else None
-    except ValueError:
-        producto.cantidad_minima_descuento = None
-    try:
-        producto.porcentaje_descuento_volumen = float(porc_desc_str) if porc_desc_str else None
-    except ValueError:
-        producto.porcentaje_descuento_volumen = None
 
     # Validación de Duplicados en Edición (Multi-variante)
     nuevo_codigo_str = request.form.get('codigo_barra', '').strip()
