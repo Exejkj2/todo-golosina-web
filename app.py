@@ -5,7 +5,7 @@ try:
 except ImportError:
     pass
 from functools import wraps
-from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session, send_from_directory, make_response, Response
+from flask import Flask, jsonify, request, abort, render_template, redirect, url_for, flash, send_file, session, send_from_directory, make_response, Response, stream_with_context
 from queue import Queue
 import io
 import traceback
@@ -424,18 +424,48 @@ sse_clients = []
 
 @app.route('/api/stream-actualizaciones')
 def stream_actualizaciones():
+    import queue
+    import time as _time
+
+    @stream_with_context
     def event_stream():
         q = Queue()
         sse_clients.append(q)
         try:
+            # Mensaje inicial para confirmar conexión establecida
+            yield f"data: {json.dumps({'tipo': 'conectado', 'mensaje': 'SSE conectado exitosamente'})}\n\n"
+            
             while True:
-                data = q.get()
-                yield f"data: {json.dumps(data)}\n\n"
+                try:
+                    # Intenta extraer evento con timeout de 1 segundo para no bloquear
+                    data = q.get(timeout=1.0)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except queue.Empty:
+                    # Ping / Heartbeat para mantener el socket abierto
+                    yield ": keep-alive\n\n"
+                
+                _time.sleep(1) # Evita saturar el ciclo del servidor
         except GeneratorExit:
+            # Cliente desconectado
             if q in sse_clients:
                 sse_clients.remove(q)
-                
-    return Response(event_stream(), mimetype="text/event-stream")
+        except Exception as e:
+            print(f"❌ Error en SSE event_stream: {e}")
+            traceback.print_exc()
+            if q in sse_clients:
+                sse_clients.remove(q)
+
+    try:
+        response = Response(event_stream(), mimetype="text/event-stream")
+        response.headers['Cache-Control'] = 'no-cache'
+        response.headers['X-Accel-Buffering'] = 'no'
+        response.headers['Connection'] = 'keep-alive'
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
+    except Exception as e:
+        print(f"❌ Error al iniciar stream_actualizaciones: {e}")
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/enviar-aviso', methods=['POST'])
 @login_requerido
