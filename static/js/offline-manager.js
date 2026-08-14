@@ -1,179 +1,320 @@
+/**
+ * Todo Golosina - Gestor Offline PWA (IndexedDB + Service Worker + Auto-Sync)
+ */
 const DB_NAME = 'TodoGolosinaDB';
 const DB_VERSION = 1;
 
-let db;
+let db = null;
 
+// 1. Inicialización de IndexedDB
 function initDB() {
   return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) {
+      console.warn('IndexedDB no es soportado en este navegador. Se usará LocalStorage como fallback.');
+      return resolve(null);
+    }
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('productos')) db.createObjectStore('productos', { keyPath: 'id' });
-      if (!db.objectStoreNames.contains('clientes')) db.createObjectStore('clientes', { keyPath: 'id' });
-      if (!db.objectStoreNames.contains('ventas_pendientes')) db.createObjectStore('ventas_pendientes', { autoIncrement: true });
+      const dbInstance = e.target.result;
+      if (!dbInstance.objectStoreNames.contains('productos')) {
+        dbInstance.createObjectStore('productos', { keyPath: 'id' });
+      }
+      if (!dbInstance.objectStoreNames.contains('clientes')) {
+        dbInstance.createObjectStore('clientes', { keyPath: 'id' });
+      }
+      if (!dbInstance.objectStoreNames.contains('ventas_pendientes')) {
+        dbInstance.createObjectStore('ventas_pendientes', { autoIncrement: true });
+      }
     };
     request.onsuccess = (e) => {
       db = e.target.result;
       resolve(db);
     };
-    request.onerror = (e) => reject(e);
+    request.onerror = (e) => {
+      console.error('Error al abrir IndexedDB:', e);
+      resolve(null);
+    };
   });
 }
 
-async function syncData() {
-  if (!navigator.onLine) return;
+// 2. Guardar Venta en Cola Offline (IndexedDB con fallback a LocalStorage)
+async function guardarVentaOffline(saleData) {
+  return new Promise((resolve, reject) => {
+    saleData.offline = true;
+    saleData.fecha_local = saleData.fecha_local || new Date().toISOString();
+
+    if (db) {
+      try {
+        const tx = db.transaction('ventas_pendientes', 'readwrite');
+        const store = tx.objectStore('ventas_pendientes');
+        const req = store.add(saleData);
+        req.onsuccess = () => {
+          console.log('✅ Venta guardada en IndexedDB (Cola Offline):', saleData);
+          actualizarContadorOfflineUI();
+          resolve(true);
+        };
+        req.onerror = (e) => {
+          console.error('Error guardando en IndexedDB, usando fallback:', e);
+          guardarVentaLocalStorage(saleData);
+          resolve(true);
+        };
+      } catch (err) {
+        guardarVentaLocalStorage(saleData);
+        resolve(true);
+      }
+    } else {
+      guardarVentaLocalStorage(saleData);
+      resolve(true);
+    }
+  });
+}
+
+// Fallback LocalStorage
+function guardarVentaLocalStorage(saleData) {
   try {
-    const [resProds, resClis] = await Promise.all([
-      fetch('/api/productos').then(r => r.json()),
-      fetch('/obtener_clientes').then(r => r.json())
-    ]);
-
-    if (resProds.productos) {
-      const tx = db.transaction('productos', 'readwrite');
-      const store = tx.objectStore('productos');
-      store.clear();
-      resProds.productos.forEach(p => store.add(p));
-    }
-    if (resClis.clientes) {
-      const tx = db.transaction('clientes', 'readwrite');
-      const store = tx.objectStore('clientes');
-      store.clear();
-      resClis.clientes.forEach(c => store.add(c));
-    }
-    console.log('Offline Sync: Data updated');
+    const queue = JSON.parse(localStorage.getItem('ventas_pendientes_backup') || '[]');
+    queue.push(saleData);
+    localStorage.setItem('ventas_pendientes_backup', JSON.stringify(queue));
+    console.log('✅ Venta guardada en LocalStorage (Fallback)');
+    actualizarContadorOfflineUI();
   } catch (e) {
-    console.error('Offline Sync Error:', e);
+    console.error('Error al guardar en LocalStorage:', e);
   }
 }
 
-async function searchLocalProducts(q) {
-  return new Promise((resolve) => {
-    if (!db) return resolve([]);
-    const tx = db.transaction('productos', 'readonly');
-    const store = tx.objectStore('productos');
-    const request = store.getAll();
-    request.onsuccess = () => {
-      const all = request.result;
-      const filtered = all.filter(p => 
-        p.nombre.toLowerCase().includes(q.toLowerCase()) || 
-        (p.codigo_barra && p.codigo_barra.includes(q))
-      ).slice(0, 30);
-      resolve(filtered);
-    };
-  });
+// Guardar registro de ventas fallidas permanentemente (auditoría / no bucle)
+function guardarVentaConError(saleData, razonError) {
+  try {
+    const errorLog = JSON.parse(localStorage.getItem('ventas_error_log') || '[]');
+    errorLog.push({
+      fecha_intento: new Date().toISOString(),
+      error: razonError,
+      venta: saleData
+    });
+    // Mantener solo los últimos 50 errores
+    if (errorLog.length > 50) errorLog.shift();
+    localStorage.setItem('ventas_error_log', JSON.stringify(errorLog));
+  } catch (e) {}
 }
 
-async function searchLocalClients(q) {
-  return new Promise((resolve) => {
-    if (!db) return resolve([]);
-    const tx = db.transaction('clientes', 'readonly');
-    const store = tx.objectStore('clientes');
-    const request = store.getAll();
-    request.onsuccess = () => {
-      const all = request.result;
-      const filtered = all.filter(c => 
-        c.nombre.toLowerCase().includes(q.toLowerCase()) || 
-        (c.cuit && c.cuit.includes(q))
-      );
-      resolve(filtered);
-    };
-  });
-}
+// Alias para compatibilidad con código existente
+window.queueSale = guardarVentaOffline;
+window.guardarVentaOffline = guardarVentaOffline;
+window.guardarVentaConError = guardarVentaConError;
 
-async function getLocalClientById(id) {
-  return new Promise((resolve) => {
-    if (!db) return resolve(null);
-    const tx = db.transaction('clientes', 'readonly');
-    const store = tx.objectStore('clientes');
-    const request = store.get(parseInt(id));
-    request.onsuccess = () => resolve(request.result);
-  });
-}
+// 3. Sincronización de Ventas Offline hacia el Backend
+let isSyncing = false;
+async function sincronizarVentasOffline() {
+  if (!navigator.onLine || isSyncing) return;
+  isSyncing = true;
 
-async function queueSale(saleData) {
-  const tx = db.transaction('ventas_pendientes', 'readwrite');
-  const store = tx.objectStore('ventas_pendientes');
-  store.add(saleData);
-  console.log('Venta guardada localmente (Offline)');
-}
+  console.log('🔄 Iniciando sincronización de ventas offline...');
+  let totalSincronizadas = 0;
 
-async function syncPendingSales() {
-  if (!navigator.onLine) return;
-
-  const getPending = () => new Promise((resolve) => {
-    const tx = db.transaction('ventas_pendientes', 'readonly');
-    const store = tx.objectStore('ventas_pendientes');
-    const items = [];
-    store.openCursor().onsuccess = (e) => {
-      const cursor = e.target.result;
-      if (cursor) {
-        items.push({ key: cursor.key, val: cursor.value });
-        cursor.continue();
-      } else {
-        resolve(items);
+  // A. Sincronizar desde IndexedDB
+  if (db) {
+    const getPending = () => new Promise((resolve) => {
+      try {
+        const tx = db.transaction('ventas_pendientes', 'readonly');
+        const store = tx.objectStore('ventas_pendientes');
+        const items = [];
+        store.openCursor().onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            items.push({ key: cursor.key, val: cursor.value });
+            cursor.continue;
+          } else {
+            resolve(items);
+          }
+        };
+      } catch (e) {
+        resolve([]);
       }
-    };
-  });
+    });
 
-  const pending = await getPending();
-  if (pending.length === 0) return;
+    const pending = await getPending();
+    for (const item of pending) {
+      const sale = { ...item.val };
+      const key = item.key;
 
-  console.log(`Sincronizando ${pending.length} ventas pendientes...`);
+      delete sale.id;
+      delete sale.ticket_number;
 
-  for (const item of pending) {
-    const sale = item.val;
-    const key = item.key;
+      try {
+        const res = await fetch('/api/registrar_venta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sale)
+        });
 
-    // Prevención de colisión de IDs
-    delete sale.id;
-    delete sale.ticket_number;
+        if (res.ok) {
+          const txDel = db.transaction('ventas_pendientes', 'readwrite');
+          txDel.objectStore('ventas_pendientes').delete(key);
+          totalSincronizadas++;
+        } else {
+          // Si el servidor responde con 4xx o 5xx (error del backend o de validación, no de red)
+          let errorDetalle = `HTTP ${res.status}`;
+          try {
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+              const errData = await res.json();
+              errorDetalle = errData.error || errData.mensaje || errorDetalle;
+            } else {
+              const rawText = await res.text();
+              errorDetalle = `Error del servidor: ${rawText.substring(0, 60)}...`;
+            }
+          } catch (parseErr) {
+            errorDetalle = `Error HTTP ${res.status}`;
+          }
 
-    try {
-      const res = await fetch('/api/registrar_venta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sale)
-      });
-      
-      if (res.ok) {
-        // Limpieza segura de la cola local
-        const txDel = db.transaction('ventas_pendientes', 'readwrite');
-        txDel.objectStore('ventas_pendientes').delete(key);
-      } else {
-        console.warn("Error del servidor, se reintentará luego:", await res.text());
-        continue;
+          console.error(`❌ [SYNC] Venta rechazada por el servidor (${errorDetalle}). Removiendo de cola activa para evitar bucle.`);
+          
+          // Eliminar de la cola de reintentos para romper el bucle infinito
+          const txDel = db.transaction('ventas_pendientes', 'readwrite');
+          txDel.objectStore('ventas_pendientes').delete(key);
+          
+          // Guardar en cola de errores permanentes para auditoría
+          guardarVentaConError(sale, errorDetalle);
+        }
+      } catch (err) {
+        // Solo un error de red real (sin conexión) detiene la sincronización para reintentar luego
+        console.warn('⚠️ Fallo de red (sin conexión) durante la sincronización:', err.message || err);
+        break;
       }
-    } catch (e) {
-      console.error("Error de red sincronizando venta individual:", e);
-      continue;
+      await new Promise(r => setTimeout(r, 200));
     }
-    
-    // Retraso para no saturar el servidor
-    await new Promise(r => setTimeout(r, 300));
   }
-  console.log('Proceso de sincronización finalizado');
+
+  // B. Sincronizar desde LocalStorage fallback
+  try {
+    const queue = JSON.parse(localStorage.getItem('ventas_pendientes_backup') || '[]');
+    if (queue.length > 0) {
+      const remaining = [];
+      for (const sale of queue) {
+        try {
+          const res = await fetch('/api/registrar_venta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sale)
+          });
+          if (res.ok) {
+            totalSincronizadas++;
+          } else {
+            let errorDetalle = `HTTP ${res.status}`;
+            try {
+              const contentType = res.headers.get('content-type') || '';
+              if (contentType.includes('application/json')) {
+                const errData = await res.json();
+                errorDetalle = errData.error || errData.mensaje || errorDetalle;
+              } else {
+                const rawText = await res.text();
+                errorDetalle = `Error del servidor: ${rawText.substring(0, 60)}...`;
+              }
+            } catch (e) {}
+            console.error(`❌ [SYNC-LS] Venta rechazada (${errorDetalle}). Removiendo de cola.`);
+            guardarVentaConError(sale, errorDetalle);
+          }
+        } catch (e) {
+          // Error de red real
+          remaining.push(sale);
+        }
+      }
+      localStorage.setItem('ventas_pendientes_backup', JSON.stringify(remaining));
+    }
+  } catch (e) {
+    console.error('Error sincronizando fallback LocalStorage:', e);
+  }
+
+  isSyncing = false;
+  actualizarContadorOfflineUI();
+
+  if (totalSincronizadas > 0) {
+    console.log(`✅ ${totalSincronizadas} ventas offline sincronizadas con éxito.`);
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: `✅ Sincronización exitosa: ${totalSincronizadas} venta(s) enviadas al servidor.`,
+        showConfirmButton: false,
+        timer: 4000
+      });
+    }
+    // Si existe la función de cargar dashboard o reportes, actualizar
+    if (typeof cargarDashboard === 'function') {
+      cargarDashboard();
+    }
+  }
 }
 
-window.addEventListener('online', () => {
+window.sincronizarVentasOffline = sincronizarVentasOffline;
+window.syncPendingSales = sincronizarVentasOffline;
+
+// 4. Actualizar Indicador Visual en la interfaz
+async function actualizarContadorOfflineUI() {
   const ind = document.getElementById('offline-indicator');
-  if (ind) {
-    ind.className = 'badge bg-success';
-    ind.innerHTML = '<i class="bi bi-wifi"></i> Conectado';
+  let pendientesCount = 0;
+
+  if (db) {
+    try {
+      pendientesCount = await new Promise((resolve) => {
+        const tx = db.transaction('ventas_pendientes', 'readonly');
+        const req = tx.objectStore('ventas_pendientes').count();
+        req.onsuccess = () => resolve(req.result || 0);
+        req.onerror = () => resolve(0);
+      });
+    } catch (e) {}
   }
-  syncPendingSales();
-  syncData();
+
+  try {
+    const lsCount = JSON.parse(localStorage.getItem('ventas_pendientes_backup') || '[]').length;
+    pendientesCount += lsCount;
+  } catch (e) {}
+
+  if (ind) {
+    if (!navigator.onLine) {
+      ind.className = 'badge bg-warning text-dark px-3 py-2';
+      ind.innerHTML = `<i class="bi bi-wifi-off me-1"></i> Modo Offline ${pendientesCount > 0 ? `(${pendientesCount} pendientes)` : ''}`;
+    } else if (pendientesCount > 0) {
+      ind.className = 'badge bg-info text-dark px-3 py-2';
+      ind.innerHTML = `<i class="bi bi-cloud-arrow-up me-1"></i> Sincronizando (${pendientesCount} pendientes)...`;
+    } else {
+      ind.className = 'badge bg-success px-3 py-2';
+      ind.innerHTML = '<i class="bi bi-wifi me-1"></i> En línea';
+    }
+  }
+}
+
+// 5. Escuchar eventos de Conectividad en tiempo real
+window.addEventListener('online', () => {
+  console.log('🟢 Conexión a Internet restablecida.');
+  actualizarContadorOfflineUI();
+  sincronizarVentasOffline();
+  if (typeof syncData === 'function') syncData();
 });
 
 window.addEventListener('offline', () => {
-  const ind = document.getElementById('offline-indicator');
-  if (ind) {
-    ind.className = 'badge bg-warning text-dark';
-    ind.innerHTML = '<i class="bi bi-wifi-off"></i> Trabajando Offline';
-  }
+  console.warn('🔴 Conexión a Internet perdida. Activando modo offline...');
+  actualizarContadorOfflineUI();
 });
 
-// Inicialización
+// 6. Registro del Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => {
+        console.log('✅ Service Worker registrado con éxito. Scope:', reg.scope);
+      })
+      .catch((err) => {
+        console.error('❌ Error al registrar el Service Worker:', err);
+      });
+  });
+}
+
+// 7. Inicialización en carga de página
 initDB().then(() => {
-  syncData();
-  syncPendingSales();
+  actualizarContadorOfflineUI();
+  if (navigator.onLine) {
+    sincronizarVentasOffline();
+  }
 });

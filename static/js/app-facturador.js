@@ -54,18 +54,65 @@ async function verificarVersionCatalogo() {
 // Polling cada 2 minutos
 setInterval(verificarVersionCatalogo, 120000);
 
-async function cargarCatalogoEnMemoria() {
-  if (window.catalogoProductos.length > 0 || window.cargandoCatalogo) return;
+async function cargarCatalogoEnMemoria(forceFull = false) {
+  if (window.cargandoCatalogo) return;
   window.cargandoCatalogo = true;
+
   try {
-    const r = await fetch('/api/productos/catalogo_completo');
+    // 1. Si la memoria está vacía, restaurar de inmediato desde la caché local para carga instantánea
+    if (!window.catalogoProductos || window.catalogoProductos.length === 0) {
+      try {
+        const localCached = JSON.parse(localStorage.getItem('catalogo_local_cache') || '[]');
+        if (localCached.length > 0) {
+          window.catalogoProductos = localCached;
+          console.log(`Catálogo restaurado desde caché local: ${localCached.length} productos.`);
+        }
+      } catch (e) {}
+    }
+
+    // 2. Obtener fecha de última sincronización
+    const ultimaSincro = forceFull ? null : localStorage.getItem('ultima_sincronizacion');
+    let url = '/api/productos/catalogo_completo';
+    if (ultimaSincro && window.catalogoProductos && window.catalogoProductos.length > 0) {
+      url += `?ultima_fecha=${encodeURIComponent(ultimaSincro)}`;
+    }
+
+    const r = await fetch(url);
     const data = await r.json();
-    if (data.productos) {
-      window.catalogoProductos = data.productos;
-      console.log(`Catálogo cargado en memoria: ${window.catalogoProductos.length} productos.`);
+
+    if (data.ok && data.productos) {
+      if (data.es_delta && window.catalogoProductos && window.catalogoProductos.length > 0) {
+        console.log(`⚡ Sincronización Delta: ${data.productos.length} productos modificados/nuevos recibidos.`);
+        
+        // Mapa indexado para actualización eficiente O(1)
+        const mapa = new Map(window.catalogoProductos.map(p => [p.id, p]));
+        
+        for (const item of data.productos) {
+          if (item.activo === 0) {
+            mapa.delete(item.id); // Producto eliminado o desactivado
+          } else {
+            mapa.set(item.id, item); // Insertar o actualizar
+          }
+        }
+        window.catalogoProductos = Array.from(mapa.values());
+      } else {
+        // Carga completa inicial
+        console.log(`📦 Carga Completa del Catálogo: ${data.productos.length} productos.`);
+        window.catalogoProductos = data.productos.filter(p => p.activo !== 0);
+      }
+
+      // 3. Persistir en almacenamiento local y actualizar timestamp de sincronización
+      try {
+        localStorage.setItem('catalogo_local_cache', JSON.stringify(window.catalogoProductos));
+        if (data.timestamp_servidor) {
+          localStorage.setItem('ultima_sincronizacion', data.timestamp_servidor);
+        }
+      } catch (e) {
+        console.warn("Aviso al guardar catálogo en LocalStorage:", e);
+      }
     }
   } catch (err) {
-    console.error("Error al cargar el catálogo en memoria:", err);
+    console.error("Error en sincronización de catálogo (Delta):", err);
   } finally {
     window.cargandoCatalogo = false;
   }
@@ -1313,58 +1360,103 @@ if (originalBtnConfirmar) {
         facturar_afip: quiereFactura
       };
 
+      // Si no hay conexión detectada de antemano
       if (!navigator.onLine) {
         payload.offline = true;
-        payload.fecha = new Date().toISOString();
-        if (typeof queueSale === "function") await queueSale(payload);
-        Swal.fire({ icon: 'info', title: 'Modo Offline', text: 'Venta guardada localmente. Se sincronizará al recuperar conexión.' });
-        getModal('cobroModal')?.hide(); resetFacturador(); return;
+        payload.fecha_local = new Date().toISOString();
+        if (typeof guardarVentaOffline === "function") {
+          await guardarVentaOffline(payload);
+        } else if (typeof queueSale === "function") {
+          await queueSale(payload);
+        }
+        Swal.fire({
+          icon: 'info',
+          title: 'Modo Offline',
+          text: 'Venta guardada localmente (Modo Offline). Se sincronizará automáticamente cuando regrese internet.'
+        });
+        getModal('cobroModal')?.hide();
+        resetFacturador();
+        return;
       }
 
-      const res = await fetch("/api/registrar_venta", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const d = await res.json();
-      if (d.ok) {
-        getModal('cobroModal')?.hide();
-        lastVentaId = d.venta_id; 
-        lastVentaTotal = tot;
-        
-        // Notificación de éxito con detalle de CC si corresponde
-        let successMsg = `Venta por $${tot.toLocaleString()} finalizada.`;
-        if (deudaCC > 0) {
-          successMsg = `✅ Venta completada. $${deudaCC.toLocaleString()} cargados a la cuenta corriente de ${tab.selectedCliente.nombre}.`;
-        }
-
-        Swal.fire({
-          icon: 'success',
-          title: '¡Venta Exitosa!',
-          text: successMsg,
-          timer: 4000,
-          showConfirmButton: false
+      try {
+        const res = await fetch("/api/registrar_venta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
 
-        document.body.style.backgroundColor = "#dcfce7";
-        setTimeout(() => (document.body.style.backgroundColor = ""), 300);
-        
-        // Abrir Modal de Opciones (Restaurado)
-        getModal('modalOpcionesVenta')?.show();
-        
-        cargarDashboard(); 
-      } else { 
-        if (res.status === 400 && d.error) {
-          Swal.fire({ icon: 'error', title: 'Producto no disponible', text: d.error });
-          if (typeof cargarCatalogoEnMemoria === 'function') {
-            cargarCatalogoEnMemoria();
+        if (!res.ok) {
+          const contentType = res.headers.get("content-type") || "";
+          let errDetail = `Error HTTP ${res.status}`;
+          if (contentType.includes("application/json")) {
+            const errData = await res.json();
+            errDetail = errData.error || errData.mensaje || errDetail;
+          } else {
+            const errText = await res.text();
+            errDetail = `Error del servidor: ${errText.substring(0, 80)}...`;
           }
-        } else {
-          Swal.fire({ icon: 'error', title: 'Error', text: d.mensaje || 'Error al procesar la venta' });
+          
+          if (res.status === 400) {
+            Swal.fire({ icon: 'error', title: 'Producto no disponible', text: errDetail });
+            if (typeof cargarCatalogoEnMemoria === 'function') {
+              cargarCatalogoEnMemoria(true);
+            }
+          } else {
+            Swal.fire({ icon: 'error', title: 'Error del Servidor', text: errDetail });
+          }
+          return;
         }
+
+        const d = await res.json();
+        if (d.ok || d.success) {
+          getModal('cobroModal')?.hide();
+          lastVentaId = d.venta_id; 
+          lastVentaTotal = tot;
+          
+          // Notificación de éxito con detalle de CC si corresponde
+          let successMsg = `Venta por $${tot.toLocaleString()} finalizada.`;
+          if (deudaCC > 0) {
+            successMsg = `✅ Venta completada. $${deudaCC.toLocaleString()} cargados a la cuenta corriente de ${tab.selectedCliente.nombre}.`;
+          }
+
+          Swal.fire({
+            icon: 'success',
+            title: '¡Venta Exitosa!',
+            text: successMsg,
+            timer: 4000,
+            showConfirmButton: false
+          });
+
+          document.body.style.backgroundColor = "#dcfce7";
+          setTimeout(() => (document.body.style.backgroundColor = ""), 300);
+          
+          // Abrir Modal de Opciones (Restaurado)
+          getModal('modalOpcionesVenta')?.show();
+          
+          cargarDashboard(); 
+        } else { 
+          Swal.fire({ icon: 'error', title: 'Error', text: d.mensaje || d.error || 'Error al procesar la venta' });
+        }
+      } catch (fetchErr) {
+        console.warn("Fallo de conexión en el envío de venta, guardando en cola offline...", fetchErr);
+        payload.offline = true;
+        payload.fecha_local = new Date().toISOString();
+        if (typeof guardarVentaOffline === "function") {
+          await guardarVentaOffline(payload);
+        } else if (typeof queueSale === "function") {
+          await queueSale(payload);
+        }
+        Swal.fire({
+          icon: 'info',
+          title: 'Modo Offline',
+          text: 'Venta guardada localmente (Modo Offline). Se sincronizará automáticamente cuando regrese internet.'
+        });
+        getModal('cobroModal')?.hide();
+        resetFacturador();
       }
     } catch (e) {
-      console.error(e);
+      console.error("Error general en el proceso de cobro:", e);
     } finally {
       isProcessingVenta = false;
       newBtn.disabled = false;

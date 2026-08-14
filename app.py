@@ -37,6 +37,11 @@ ultima_actualizacion_catalogo = hora_argentina().isoformat()
 def actualizar_version_catalogo():
     global ultima_actualizacion_catalogo
     ultima_actualizacion_catalogo = hora_argentina().isoformat()
+    try:
+        if 'cache' in globals() and cache:
+            cache.clear()
+    except Exception:
+        pass
 
 # ─── Configuración ────────────────────────────────────────────
 DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'tienda.db')
@@ -103,47 +108,102 @@ if uri_nube.startswith('postgres://'):
 # Detectar si estamos en el entorno de Render (producción)
 is_render_production = os.environ.get('RENDER') == 'true'
 
+# --- Configuración de Opciones de Conexión de Alto Rendimiento (Connection Pooling) ---
+POSTGRES_POOL_OPTIONS = {
+    "pool_size": 20,           # Conexiones base activas y persistentes en el pool para múltiples cajas
+    "max_overflow": 10,        # Conexiones adicionales permitidas durante picos de concurrencia
+    "pool_timeout": 30,        # Tiempo máx de espera en segundos para obtener una conexión del pool
+    "pool_recycle": 1800,      # Reciclar conexiones cada 30 min para evitar desconexiones de firewall/nube
+    "pool_pre_ping": True,     # Verifica la validez de la conexión (SELECT 1) antes de usarla
+    "connect_args": {
+        "connect_timeout": 5   # Timeout de conexión TCP estricto
+    }
+}
+
+SQLITE_POOL_OPTIONS = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+    "connect_args": {
+        "timeout": 30,                  # Timeout para evitar bloqueos 'database is locked'
+        "check_same_thread": False     # Permite múltiples hilos de peticiones Flask concurrentes
+    }
+}
+
 try:
     if is_render_production:
         if not uri_nube:
             raise Exception("DATABASE_URL no definida en entorno de Render.")
         app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            "pool_pre_ping": True,
-            "pool_recycle": 300,
-            "connect_args": {
-                "connect_timeout": 3  # Timeout estricto de conexión de 3 segundos para Postgres
-            }
-        }
-        print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube)")
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = POSTGRES_POOL_OPTIONS
+        print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube) con Connection Pooling optimizado")
     else:
         # Modo híbrido local: intentar conectar a base de datos de Render si está disponible de forma rápida
         if not uri_nube or urlparse(uri_nube).hostname in ['localhost', '127.0.0.1'] or not es_accesible_bd_nube(uri_nube):
             raise Exception("DATABASE_URL remota no accesible o no configurada para el entorno local.")
         
         app.config['SQLALCHEMY_DATABASE_URI'] = uri_nube
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            "pool_pre_ping": True,
-            "pool_recycle": 300,
-            "connect_args": {
-                "connect_timeout": 3  # Timeout estricto de conexión de 3 segundos para Postgres
-            }
-        }
-        print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube)")
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = POSTGRES_POOL_OPTIONS
+        print("[BACKEND] -> Conectado a PostgreSQL en Render (Nube) con Connection Pooling optimizado")
 except Exception as e:
     # Asegurar fallback absoluto a SQLite
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        "pool_pre_ping": True,
-        "pool_recycle": 300,
-        "connect_args": {
-            "timeout": 15  # SQLite busy_timeout de 15 segundos
-        }
-    }
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = SQLITE_POOL_OPTIONS
     print(f"[BACKEND] -> ¡SIN INTERNET! Operando local con tienda.db (Detalle: {e})")
 
 CORS(app)
+
+# ─── Compresión de Respuestas (Gzip / Deflate) ───────────────────
+try:
+    from flask_compress import Compress
+    app.config['COMPRESS_MIMETYPES'] = [
+        'text/html', 'text/css', 'text/xml',
+        'application/json', 'application/javascript'
+    ]
+    app.config['COMPRESS_LEVEL'] = 6
+    app.config['COMPRESS_MIN_SIZE'] = 500
+    compress = Compress()
+    compress.init_app(app)
+    print("[OPTIMIZACION] -> Flask-Compress activado (Gzip automático).")
+except ImportError:
+    compress = None
+    print("[OPTIMIZACION] -> Flask-Compress no disponible (opcional).")
+
+# ─── Caché en Memoria (Flask-Caching) ─────────────────────────
+try:
+    from flask_caching import Cache
+    cache = Cache(app, config={
+        'CACHE_TYPE': 'SimpleCache',
+        'CACHE_DEFAULT_TIMEOUT': 300
+    })
+    print("[OPTIMIZACION] -> Flask-Caching (SimpleCache) activado.")
+except ImportError:
+    class DummyCache:
+        def cached(self, timeout=None, **kwargs):
+            def decorator(f):
+                return f
+            return decorator
+        def clear(self):
+            pass
+        def delete(self, key):
+            pass
+    cache = DummyCache()
+    print("[OPTIMIZACION] -> Flask-Caching no disponible (opcional).")
+
 db = SQLAlchemy(app)
+
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if "sqlite" in app.config.get("SQLALCHEMY_DATABASE_URI", ""):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.close()
+        except Exception:
+            pass
 
 def es_offline():
     return 'sqlite' in app.config.get('SQLALCHEMY_DATABASE_URI', '')
@@ -517,14 +577,27 @@ def optimizar_db():
 
 @app.route('/api/productos', methods=['GET'])
 @login_requerido
+@cache.cached(timeout=60, query_string=True)
 def get_productos():
     if es_offline():
         print("[SERVIDO LOCAL] -> Ejecutando consulta en tienda.db offline (api/productos)")
     categoria_nombre = request.args.get('categoria', '').strip()
     buscar    = request.args.get('buscar', '').strip()
     orden     = request.args.get('orden', 'id')
+    ultima_fecha_str = request.args.get('ultima_fecha', '').strip()
 
-    query = Producto.query.filter_by(activo=1)
+    query = Producto.query
+
+    # Filtro Delta por fecha de actualización
+    if ultima_fecha_str:
+        try:
+            clean_str = ultima_fecha_str.replace('Z', '').replace(' ', 'T')
+            fecha_filtro = datetime.fromisoformat(clean_str)
+            query = query.filter(Producto.ultima_actualizacion > fecha_filtro)
+        except Exception as e:
+            print(f"[DELTA SYNC] Formato de fecha no reconocido ({ultima_fecha_str}): {e}")
+    else:
+        query = query.filter_by(activo=1)
 
     if categoria_nombre:
         cat = Categoria.query.filter_by(nombre=categoria_nombre).first()
@@ -544,13 +617,41 @@ def get_productos():
         query = query.order_by(Producto.id.desc())
 
     productos = query.limit(50).all()
-    return jsonify({"productos": [p.to_dict() for p in productos]})
+    return jsonify({
+        "ok": True,
+        "es_delta": bool(ultima_fecha_str),
+        "timestamp_servidor": hora_argentina().isoformat(),
+        "productos": [p.to_dict() for p in productos]
+    })
 
 @app.route('/api/productos/catalogo_completo', methods=['GET'])
 @login_requerido
+@cache.cached(timeout=120, query_string=True)
 def catalogo_completo():
-    productos = Producto.query.filter_by(activo=1).order_by(Producto.nombre.asc()).all()
+    ultima_fecha_str = request.args.get('ultima_fecha', '').strip()
+    fecha_filtro = None
+
+    if ultima_fecha_str:
+        try:
+            clean_str = ultima_fecha_str.replace('Z', '').replace(' ', 'T')
+            fecha_filtro = datetime.fromisoformat(clean_str)
+        except Exception as e:
+            print(f"[DELTA SYNC] Formato de fecha inválido ({ultima_fecha_str}): {e}")
+
+    if fecha_filtro:
+        # Modo Delta: Traer todos los productos modificados/creados desde esa fecha (incluidos inactivos para removerlos)
+        productos = Producto.query.filter(Producto.ultima_actualizacion > fecha_filtro).order_by(Producto.nombre.asc()).all()
+        es_delta = True
+    else:
+        # Carga completa: Solo activos
+        productos = Producto.query.filter_by(activo=1).order_by(Producto.nombre.asc()).all()
+        es_delta = False
+
     return jsonify({
+        "ok": True,
+        "es_delta": es_delta,
+        "timestamp_servidor": hora_argentina().isoformat(),
+        "total": len(productos),
         "productos": [
             {
                 "id": p.id,
@@ -559,8 +660,10 @@ def catalogo_completo():
                 "precio_lista_2": p.precio_lista_2 or p.precio_lista_1,
                 "precio_lista_3": p.precio_lista_3 or p.precio_lista_1,
                 "stock": p.stock,
-                "codigo_barra": p.codigo_barra,
-                "categoria": p.categoria_rel.nombre if p.categoria_rel else "General"
+                "activo": p.activo,
+                "codigo_barra": p.codigo_barra or "",
+                "categoria": p.categoria_rel.nombre if p.categoria_rel else "General",
+                "ultima_actualizacion": p.ultima_actualizacion.isoformat() if p.ultima_actualizacion else None
             } for p in productos
         ]
     })
@@ -647,271 +750,242 @@ def get_categorias():
 @login_requerido
 def registrar_venta():
     import json as _json
-    data = request.json
-    if not data:
-        return jsonify({"ok": False, "mensaje": "Datos inválidos"}), 400
-
-    # Capturamos la decisión del usuario (por defecto False)
-    facturar_afip = data.get('facturar_afip', False) if isinstance(data, dict) else False
-
-    afip_ok = False
-    mensaje_afip = ""
-
-    if facturar_afip:
-        try:
-            # Simulación de llamada a AFIP (Aquí iría afip.py)
-            # Si no hay internet, esto lanzará una excepción por timeout
-            print("📡 Intentando conectar con servidores de AFIP...")
-            # check_afip_status() ...
-            afip_ok = True
-        except Exception as e:
-            print(f"⚠️ Error de conexión AFIP: {e}")
-            afip_ok = False
-            mensaje_afip = " (Modo Offline: Pendiente de CAE)"
-
-    tipo_comprobante = "Factura C" if afip_ok else "Ticket No Fiscal"
+    import traceback
     
-    # Acepta dos formatos:
-    # A) Lista directa (uso original del carrito público): [{id/producto_id, qty}, ...]
-    # B) Objeto con cliente: {cliente_id, items:[{id/producto_id,qty,name,precio_unit}], total}
-    if isinstance(data, list):
-        items = data
-        cliente_id = None
-        lista_sel = 1
-        general_discount_perc = 0.0
-    else:
-        items = data.get('items', [])
-        cliente_id = data.get('cliente_id')
-        try:
-            lista_sel = int(data.get('lista_precios', 1))
-        except (ValueError, TypeError):
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"ok": False, "success": False, "error": "Datos inválidos", "mensaje": "Datos inválidos"}), 400
+
+        # Capturamos la decisión del usuario (por defecto False)
+        facturar_afip = data.get('facturar_afip', False) if isinstance(data, dict) else False
+
+        afip_ok = False
+        mensaje_afip = ""
+
+        if facturar_afip:
+            try:
+                # Simulación de llamada a AFIP (Aquí iría afip.py)
+                print("📡 Intentando conectar con servidores de AFIP...")
+                afip_ok = True
+            except Exception as e:
+                print(f"⚠️ Error de conexión AFIP: {e}")
+                afip_ok = False
+                mensaje_afip = " (Modo Offline: Pendiente de CAE)"
+
+        tipo_comprobante = "Factura C" if afip_ok else "Ticket No Fiscal"
+        
+        # Acepta dos formatos:
+        # A) Lista directa: [{id/producto_id, qty}, ...]
+        # B) Objeto: {cliente_id, items:[{id/producto_id,qty,name,precio_unit}], total}
+        if isinstance(data, list):
+            items = data
+            cliente_id = None
             lista_sel = 1
-        try:
-            general_discount_perc = float(data.get('general_discount_perc', 0.0))
-        except (ValueError, TypeError):
             general_discount_perc = 0.0
-
-    if not items or len(items) == 0:
-        return jsonify({"ok": False, "mensaje": "No se puede registrar una venta sin artículos."}), 400
-
-    # ─── Validación Previa de Productos ──────────────────────────────
-    for item in items:
-        p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
-        if not p_id:
-            db.session.rollback()
-            return jsonify({"error": "No se especificó un ID de producto válido en los ítems de la venta."}), 400
-
-        try:
-            p_id_int = int(p_id)
-        except (ValueError, TypeError):
-            p_id_int = None
-
-        producto = Producto.query.get(p_id_int) if p_id_int is not None else None
-        if not producto:
-            db.session.rollback()
-            return jsonify({"error": f"El producto ID {p_id} es None (No existe en la BD)"}), 400
-        
-        valor_activo = getattr(producto, 'activo', 'No tiene atributo activo')
-        if valor_activo in [0, False, '0', None]:
-            db.session.rollback()
-            return jsonify({"error": f"El producto ID {p_id} está inactivo. Valor de activo: {valor_activo}"}), 400
-
-    # Recalcular el total y construir el detalle de forma segura en el backend para evitar forjado de montos (L-04)
-    total_recalculado = 0.0
-    detalle_recalculado = []
-
-    for item in items:
-        p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
-        try:
-            qty = int(item.get('qty', 1))
-        except (ValueError, TypeError):
-            qty = 1
-            
-        if not p_id or qty <= 0:
-            continue
-        
-        p = Producto.query.get(int(p_id))
-        if p:
-            # Obtener el precio oficial registrado en la base de datos
-            precio_u = p.precio_lista_3 if lista_sel == 3 else (p.precio_lista_2 if lista_sel == 2 else p.precio_lista_1)
-            
-            # Obtener descuento de línea enviado por el frontend
+        else:
+            items = data.get('items', [])
+            cliente_id = data.get('cliente_id')
             try:
-                discount_perc = float(item.get('discount_perc', 0.0))
+                lista_sel = int(data.get('lista_precios', 1))
             except (ValueError, TypeError):
-                discount_perc = 0.0
-            
-            # Aplicar descuento de volumen si califica y es mayor que el descuento de línea
-            if p.descuento_volumen_activo and p.cantidad_minima_descuento and qty >= p.cantidad_minima_descuento:
-                desc_vol = float(p.porcentaje_descuento_volumen or 0.0)
-                if desc_vol > discount_perc:
-                    discount_perc = desc_vol
-            
-            precio_final = round(precio_u - (precio_u * (discount_perc / 100.0)), 2)
-            subtotal = round(precio_final * qty, 2)
-            
-            total_recalculado += subtotal
-            
-            detalle_recalculado.append({
-                'producto_id': p.id,
-                'nombre': p.nombre,
-                'qty': qty,
-                'precio_unit': precio_final,
-                'discount_perc': discount_perc,
-                'subtotal': subtotal
-            })
+                lista_sel = 1
+            try:
+                general_discount_perc = float(data.get('general_discount_perc', 0.0))
+            except (ValueError, TypeError):
+                general_discount_perc = 0.0
 
-    # Aplicar el descuento general si existe
-    if general_discount_perc > 0.0:
-        total_recalculado = round(total_recalculado - (total_recalculado * (general_discount_perc / 100.0)), 2)
+        if not items or len(items) == 0:
+            return jsonify({"ok": False, "success": False, "error": "No se puede registrar una venta sin artículos.", "mensaje": "No se puede registrar una venta sin artículos."}), 400
 
-    total_venta = total_recalculado
-    detalle = detalle_recalculado
-
-    from datetime import timedelta
-    tiempo_limite = hora_argentina() - timedelta(seconds=60)
-    detalle_json_str = _json.dumps(detalle)
-    venta_fantasma = Venta.query.filter(
-        Venta.total == total_venta,
-        Venta.detalle_json == detalle_json_str,
-        Venta.fecha >= tiempo_limite
-    ).first()
-
-    if venta_fantasma:
-        print(f"✅ Eco masivo bloqueado (Patovica 60s): Venta de ${total_venta}")
-        return jsonify({"ok": True, "mensaje": "Venta procesada (eco bloqueado)", "venta_id": venta_fantasma.id}), 200
-
-    for item in items:
-        p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
-        qty = item.get('qty', 0)
-        if p_id and qty > 0:
-            producto = Producto.query.get(int(p_id))
-            if producto:
-                producto.ventas_totales += qty
-                if producto.stock >= qty:
-                    producto.stock -= qty
-                else:
-                    producto.stock = 0
-
-    venta_id = None
-    if detalle or items:
-        try:
-            if not detalle:
-                detalle = []
-                for item in items:
-                    p_id_fallback = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
-                    p = Producto.query.get(int(p_id_fallback)) if p_id_fallback else None
-                    if p:
-                        precio_u = p.precio_lista_3 if lista_sel == 3 else (p.precio_lista_2 if lista_sel == 2 else p.precio)
-                        detalle.append({
-                            'producto_id': p.id,
-                            'nombre': p.nombre,
-                            'qty': item.get('qty', 1),
-                            'precio_unit': precio_u
-                        })
-            
-            # Soporte para medios de pago múltiples
-            pagos = data.get('pagos', {})
-            # monto_entregado_ef: lo que el cliente entrega físicamente (puede incluir vuelto)
-            monto_entregado_ef = float(pagos.get('efectivo', 0))
-            p_tr = float(pagos.get('transferencia', 0))
-            p_db = float(pagos.get('debito', 0))
-            p_cc = float(pagos.get('cc', 0))
-
-            # Fallback para modo simple (un solo método)
-            if not pagos and data.get('metodo_pago'):
-                m = data.get('metodo_pago')
-                if m == 'Efectivo': monto_entregado_ef = total_venta
-                elif m in ['Mercado Pago', 'Transferencia']: p_tr = total_venta
-                elif m == 'Débito': p_db = total_venta
-                elif m == 'Cuenta Corriente': p_cc = total_venta
-
-            # FIX CONTABLE (L-05): El monto real cobrado en efectivo es la venta menos lo pagado
-            # por otros medios. El excedente entregado por el cliente (vuelto) NO debe sumarse a
-            # los ingresos de la caja. Solo guardamos el total_venta como referencia de cobros reales.
-            otros_medios = p_tr + p_db + p_cc
-            # Lo que realmente se cobró en efectivo = total_venta - lo pagado por otros medios
-            p_ef = max(0.0, round(min(monto_entregado_ef, total_venta - otros_medios), 2))
-
-            # El monto entregado por el cliente se guarda como dato informativo (para calcular vuelto)
-            monto_entregado_total = monto_entregado_ef + p_tr + p_db + p_cc
-            vuelto = max(0.0, round(monto_entregado_total - total_venta, 2))
-
-            if p_cc > 0 and cliente_id:
-                cliente = db.session.get(Cliente, cliente_id)
-                if cliente:
-                    if cliente.limite_credito > 0 and (cliente.saldo + p_cc) > cliente.limite_credito:
-                        db.session.rollback()
-                        return jsonify({"ok": False, "mensaje": f"Límite de crédito excedido. Saldo: ${cliente.saldo:.2f}, Límite: ${cliente.limite_credito:.2f}"}), 403
-                    cliente.saldo += p_cc
-
-            venta = Venta(
-                cliente_id=cliente_id,
-                total=total_venta,
-                detalle_json=_json.dumps(detalle, ensure_ascii=False),
-                lista_precios=lista_sel,
-                tipo=data.get('tipo', 'local'),
-                metodo_pago=data.get('metodo_pago', 'Varios'),
-                pago_efectivo=p_ef,          # Monto REAL cobrado en efectivo (sin vuelto)
-                pago_transferencia=p_tr,
-                pago_debito=p_db,
-                pago_cc=p_cc,
-                entregado=monto_entregado_ef, # Monto que el cliente entregó físicamente (informativo)
-                fecha=hora_argentina(),
-                sincronizado=not es_offline(),
-                ultima_actualizacion=hora_argentina()
-            )
-            db.session.add(venta)
-            db.session.flush()
-
-            for d in detalle:
-                prod_id = d.get('producto_id')
-                if not prod_id:
-                    for it in items:
-                        pid_temp = it.get('producto_id') if it.get('producto_id') is not None else it.get('id')
-                        if pid_temp:
-                            p_temp = Producto.query.get(int(pid_temp))
-                            if p_temp and p_temp.nombre == d['nombre']:
-                                prod_id = p_temp.id
-                                break
-                
-                det_obj = DetalleVenta(
-                    venta_id=venta.id,
-                    producto_id=prod_id,
-                    nombre_producto=d['nombre'],
-                    cantidad=d.get('qty', 1),
-                    precio_unitario=d.get('precio_unit', 0.0),
-                    descuento_porcentaje=d.get('discount_perc', 0.0),
-                    subtotal=d.get('subtotal', 0.0)
-                )
-                db.session.add(det_obj)
+        # ─── Validación Previa de Productos ──────────────────────────────
+        for item in items:
+            p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
+            if not p_id:
+                db.session.rollback()
+                return jsonify({"ok": False, "success": False, "error": "No se especificó un ID de producto válido en los ítems de la venta."}), 400
 
             try:
-                db.session.commit()
-                venta_id = venta.id
-            except IntegrityError as ie:
+                p_id_int = int(p_id)
+            except (ValueError, TypeError):
+                p_id_int = None
+
+            producto = Producto.query.get(p_id_int) if p_id_int is not None else None
+            if not producto:
                 db.session.rollback()
-                print(f"⚠️ IntegrityError al hacer commit en registrar_venta: {ie}")
-                return jsonify({"error": "Error de integridad de datos. Uno de los productos ya no existe o está inactivo. Vacía tu carrito y recarga el catálogo."}), 400
+                return jsonify({"ok": False, "success": False, "error": f"El producto ID {p_id} no existe en la base de datos."}), 400
+            
+            valor_activo = getattr(producto, 'activo', 1)
+            if valor_activo in [0, False, '0', None]:
+                db.session.rollback()
+                return jsonify({"ok": False, "success": False, "error": f"El producto '{producto.nombre}' está inactivo."}), 400
 
-        except IntegrityError as ie:
-            db.session.rollback()
-            print(f"⚠️ IntegrityError capturado en registrar_venta: {ie}")
-            return jsonify({"error": "Error de integridad de datos. Uno de los productos ya no existe o está inactivo. Vacía tu carrito y recarga el catálogo."}), 400
-        except Exception as e:
-            db.session.rollback()
-            import traceback
-            print(f"Error al registrar venta: {e}\n{traceback.format_exc()}")
-            return jsonify({"ok": False, "mensaje": f"Error interno al guardar la venta: {str(e)}"}), 500
-    else:
-        try:
-            db.session.commit()
-        except IntegrityError as ie:
-            db.session.rollback()
-            print(f"⚠️ IntegrityError al hacer commit final: {ie}")
-            return jsonify({"error": "Error de integridad de datos. Vacía tu carrito y recarga el catálogo."}), 400
+        # Recalcular el total y construir el detalle de forma segura en el backend
+        total_recalculado = 0.0
+        detalle_recalculado = []
 
-    return jsonify({"ok": True, "mensaje": f"Venta registrada con éxito{mensaje_afip}", "venta_id": venta_id})
+        for item in items:
+            p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
+            try:
+                qty = int(item.get('qty', 1))
+            except (ValueError, TypeError):
+                qty = 1
+                
+            if not p_id or qty <= 0:
+                continue
+            
+            p = Producto.query.get(int(p_id))
+            if p:
+                precio_u = p.precio_lista_3 if lista_sel == 3 else (p.precio_lista_2 if lista_sel == 2 else p.precio_lista_1)
+                
+                try:
+                    discount_perc = float(item.get('discount_perc', 0.0))
+                except (ValueError, TypeError):
+                    discount_perc = 0.0
+                
+                precio_final = round(precio_u - (precio_u * (discount_perc / 100.0)), 2)
+                subtotal = round(precio_final * qty, 2)
+                
+                total_recalculado += subtotal
+                
+                detalle_recalculado.append({
+                    'producto_id': p.id,
+                    'nombre': p.nombre,
+                    'qty': qty,
+                    'precio_unit': precio_final,
+                    'discount_perc': discount_perc,
+                    'subtotal': subtotal
+                })
+
+        # Aplicar el descuento general si existe
+        if general_discount_perc > 0.0:
+            total_recalculado = round(total_recalculado - (total_recalculado * (general_discount_perc / 100.0)), 2)
+
+        total_venta = total_recalculado
+        detalle = detalle_recalculado
+
+        from datetime import timedelta
+        tiempo_limite = hora_argentina() - timedelta(seconds=60)
+        detalle_json_str = _json.dumps(detalle, ensure_ascii=False)
+        venta_fantasma = Venta.query.filter(
+            Venta.total == total_venta,
+            Venta.detalle_json == detalle_json_str,
+            Venta.fecha >= tiempo_limite
+        ).first()
+
+        if venta_fantasma:
+            print(f"✅ Eco masivo bloqueado (Patovica 60s): Venta de ${total_venta}")
+            return jsonify({"ok": True, "success": True, "mensaje": "Venta procesada (eco bloqueado)", "venta_id": venta_fantasma.id}), 200
+
+        # Descontar stock e incrementar ventas
+        for item in items:
+            p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
+            qty = item.get('qty', 0)
+            if p_id and qty > 0:
+                producto = Producto.query.get(int(p_id))
+                if producto:
+                    producto.ventas_totales = (producto.ventas_totales or 0) + qty
+                    if producto.stock is not None:
+                        if producto.stock >= qty:
+                            producto.stock -= qty
+                        else:
+                            producto.stock = 0
+
+        # Medios de pago múltiples
+        pagos = data.get('pagos', {})
+        monto_entregado_ef = float(pagos.get('efectivo', 0))
+        p_tr = float(pagos.get('transferencia', 0))
+        p_db = float(pagos.get('debito', 0))
+        p_cc = float(pagos.get('cc', 0))
+
+        if not pagos and data.get('metodo_pago'):
+            m = data.get('metodo_pago')
+            if m == 'Efectivo': monto_entregado_ef = total_venta
+            elif m in ['Mercado Pago', 'Transferencia']: p_tr = total_venta
+            elif m == 'Débito': p_db = total_venta
+            elif m == 'Cuenta Corriente': p_cc = total_venta
+
+        otros_medios = p_tr + p_db + p_cc
+        p_ef = max(0.0, round(min(monto_entregado_ef, total_venta - otros_medios), 2))
+
+        if p_cc > 0 and cliente_id:
+            cliente = db.session.get(Cliente, cliente_id)
+            if cliente:
+                if cliente.limite_credito > 0 and (cliente.saldo + p_cc) > cliente.limite_credito:
+                    db.session.rollback()
+                    return jsonify({"ok": False, "success": False, "error": f"Límite de crédito excedido. Saldo: ${cliente.saldo:.2f}, Límite: ${cliente.limite_credito:.2f}"}), 403
+                cliente.saldo += p_cc
+
+        venta = Venta(
+            cliente_id=cliente_id,
+            total=total_venta,
+            detalle_json=_json.dumps(detalle, ensure_ascii=False),
+            lista_precios=lista_sel,
+            tipo=data.get('tipo', 'local'),
+            metodo_pago=data.get('metodo_pago', 'Varios'),
+            pago_efectivo=p_ef,
+            pago_transferencia=p_tr,
+            pago_debito=p_db,
+            pago_cc=p_cc,
+            entregado=monto_entregado_ef,
+            fecha=hora_argentina(),
+            sincronizado=not es_offline(),
+            ultima_actualizacion=hora_argentina()
+        )
+        db.session.add(venta)
+        db.session.flush()
+
+        for d in detalle:
+            prod_id = d.get('producto_id')
+            if not prod_id:
+                for it in items:
+                    pid_temp = it.get('producto_id') if it.get('producto_id') is not None else it.get('id')
+                    if pid_temp:
+                        p_temp = Producto.query.get(int(pid_temp))
+                        if p_temp and p_temp.nombre == d['nombre']:
+                            prod_id = p_temp.id
+                            break
+            
+            det_obj = DetalleVenta(
+                venta_id=venta.id,
+                producto_id=prod_id,
+                nombre_producto=d['nombre'],
+                cantidad=d.get('qty', 1),
+                precio_unitario=d.get('precio_unit', 0.0),
+                descuento_porcentaje=d.get('discount_perc', 0.0),
+                subtotal=d.get('subtotal', 0.0)
+            )
+            db.session.add(det_obj)
+
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "success": True,
+            "mensaje": f"Venta registrada con éxito{mensaje_afip}",
+            "venta_id": venta.id
+        })
+
+    except IntegrityError as ie:
+        db.session.rollback()
+        print(f"⚠️ IntegrityError en registrar_venta: {ie}")
+        traceback.print_exc()
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Error de integridad de datos. Uno de los productos ya no existe o está inactivo.",
+            "mensaje": "Error de integridad de datos."
+        }), 400
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error al registrar venta: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": str(e),
+            "mensaje": f"Error interno al guardar la venta: {str(e)}"
+        }), 500
 
 # ─── Rutas del Frontend (La Vidriera) ────────────────────────
 # ─── Utilidades ────────────────────────────────────────────────────────
@@ -2744,15 +2818,14 @@ def api_reportes():
     })
 
 @app.route('/manifest.json')
-@login_requerido
 def send_manifest():
     return send_from_directory('static', 'manifest.json')
 
 @app.route('/sw.js')
-@login_requerido
 def send_sw():
     response = make_response(send_from_directory('static', 'sw.js'))
     response.headers['Content-Type'] = 'application/javascript'
+    response.headers['Service-Worker-Allowed'] = '/'
     return response
 
 if __name__ == '__main__':
