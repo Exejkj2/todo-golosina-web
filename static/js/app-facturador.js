@@ -693,8 +693,13 @@ async function fetchWeather() {
 }
 
 async function cargarDashboard() {
+  if (!navigator.onLine) return;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
   try {
-    const r = await fetch("/api/ventas_hoy");
+    const r = await fetch("/api/ventas_hoy", { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!r.ok) return;
     const d = await r.json();
     if (d.ok) {
       const vH = document.getElementById("dashVentasHoy");
@@ -710,7 +715,9 @@ async function cargarDashboard() {
         sH.parentElement.classList.toggle("text-danger", d.alertas_stock > 0);
       }
     }
-  } catch (e) { console.log("Dash data error", e); }
+  } catch (e) {
+    clearTimeout(timeoutId);
+  }
 }
 
 function switchSection(section, btn) {
@@ -730,23 +737,33 @@ function switchSection(section, btn) {
   else if (section === "cobranzas") cargarDeudores();
 }
 
-// Sales & Cash Management
-// Sales & Cash Management
+// Sales & Cash Management (Protegido contra congelamientos Offline)
 async function cargarVentasDia() {
   const b = document.getElementById("ventasDiaBody");
   if (!b) return;
-  b.innerHTML = '<tr><td colspan="4" class="text-center p-4">Cargando ventas...</td></tr>';
+  
+  if (!navigator.onLine) {
+    b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-wifi-off me-2 text-warning fs-5"></i>El historial de ventas pasadas no está disponible en modo Offline</td></tr>';
+    return;
+  }
+
+  b.innerHTML = '<tr><td colspan="4" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando ventas...</td></tr>';
   
   let url = "/api/ventas_hoy";
   const fInicio = document.getElementById("fechaInicio")?.value;
   const fFin = document.getElementById("fechaFin")?.value;
   
   if (fInicio && fFin) {
-      url += `?inicio=${fInicio}&fin=${fFin}`;
+      url += `?inicio=${encodeURIComponent(fInicio)}&fin=${encodeURIComponent(fFin)}`;
   }
   
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     if (d.ventas && d.ventas.length > 0) {
       b.innerHTML = d.ventas
@@ -761,9 +778,13 @@ async function cargarVentasDia() {
     } else {
       b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No hay ventas registradas en el período seleccionado</td></tr>';
     }
-  } catch (e) { 
-    console.error(e);
-    b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-danger">Error al cargar</td></tr>'; 
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-warning"><i class="bi bi-clock-history me-2"></i>Tiempo de espera agotado al consultar el servidor (5s).</td></tr>';
+    } else {
+      b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor para obtener el historial.</td></tr>';
+    }
   }
 }
 
@@ -979,22 +1000,43 @@ async function saveGasto() {
   } catch (e) { console.error(e); }
 }
 
-// Debt Collection
+// Debt Collection (Protegido con Timeout)
 async function cargarDeudores() {
   const body = document.getElementById("deudoresBody");
   if (!body) return;
-  body.innerHTML = '<tr><td colspan="4" class="text-center p-4">Cargando...</td></tr>';
+
+  if (!navigator.onLine) {
+    body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-wifi-off me-2 text-warning fs-5"></i>El módulo de cobranzas no está disponible en modo Offline</td></tr>';
+    return;
+  }
+
+  body.innerHTML = '<tr><td colspan="4" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando deudores...</td></tr>';
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
-    const r = await fetch("/api/clientes/deudores");
+    const r = await fetch("/api/clientes/deudores", { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     if (d.ok) {
-      deudores = d.clientes;
+      deudores = d.clientes || d.deudores || [];
       renderDeudores(deudores);
       const total = deudores.reduce((acc, c) => acc + (c.saldo || 0), 0);
       const badge = document.getElementById("totalDeudaBadge");
       if (badge) badge.textContent = `Deuda Total Clientes: $${total.toLocaleString()}`;
+    } else {
+      body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No se encontraron cuentas deudoras</td></tr>';
     }
-  } catch (e) { body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-danger">Error</td></tr>'; }
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-warning"><i class="bi bi-clock-history me-2"></i>Tiempo de espera agotado al consultar deudores (5s).</td></tr>';
+    } else {
+      body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor.</td></tr>';
+    }
+  }
 }
 
 function filtrarDeudores() {
@@ -2885,43 +2927,93 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Inicializar Conexión SSE
-  try {
-    const eventSource = new EventSource('/api/stream-actualizaciones');
-    eventSource.onmessage = function(event) {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.tipo === "actualizacion_precios" && data.modificados && data.modificados.length > 0) {
-          
-          let listHtml = "<ul style='text-align: left; max-height: 200px; overflow-y: auto;'>";
-          data.modificados.forEach(item => {
-            listHtml += `<li>${item}</li>`;
-          });
-          listHtml += "</ul>";
+  // Inicializar Conexión SSE Controlada (Sin bucles agresivos de reconexión)
+  let sseSource = null;
+  let sseReconnectTimer = null;
 
-          Swal.fire({
-            title: '¡ATENCIÓN! Se actualizaron precios',
-            html: `Los siguientes artículos fueron modificados:<br><br>${listHtml}<br>Presiona OK para actualizar el catálogo local.`,
-            icon: 'warning',
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            confirmButtonText: 'OK, Actualizar',
-            confirmButtonColor: '#3085d6'
-          }).then((result) => {
-            if (result.isConfirmed) {
-              // Recargar la página o volver a llamar a la función que descarga el catálogo
-              window.location.reload(true);
-            }
-          });
+  function iniciarSSE() {
+    if (sseReconnectTimer) {
+      clearTimeout(sseReconnectTimer);
+      sseReconnectTimer = null;
+    }
+    
+    if (sseSource) {
+      try { sseSource.close(); } catch(e) {}
+      sseSource = null;
+    }
+
+    if (!navigator.onLine) return;
+
+    try {
+      sseSource = new EventSource('/api/stream-actualizaciones');
+      
+      sseSource.onmessage = function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.tipo === "actualizacion_precios" && data.modificados && data.modificados.length > 0) {
+            let listHtml = "<ul style='text-align: left; max-height: 200px; overflow-y: auto;'>";
+            data.modificados.forEach(item => {
+              listHtml += `<li>${item}</li>`;
+            });
+            listHtml += "</ul>";
+
+            Swal.fire({
+              title: '¡ATENCIÓN! Se actualizaron precios',
+              html: `Los siguientes artículos fueron modificados:<br><br>${listHtml}<br>Presiona OK para actualizar el catálogo local.`,
+              icon: 'warning',
+              allowOutsideClick: false,
+              allowEscapeKey: false,
+              confirmButtonText: 'OK, Actualizar',
+              confirmButtonColor: '#3085d6'
+            }).then((result) => {
+              if (result.isConfirmed) {
+                window.location.reload(true);
+              }
+            });
+          }
+        } catch (err) {}
+      };
+
+      sseSource.onerror = function() {
+        // Cerrar socket inmediatamente para detener reintentos agresivos del navegador
+        if (sseSource) {
+          try { sseSource.close(); } catch(e) {}
+          sseSource = null;
         }
-      } catch (err) {
-        console.error("Error al procesar mensaje SSE:", err);
+        // Calmar reconexión: esperar 45 segundos antes de reintentar
+        if (!sseReconnectTimer && navigator.onLine) {
+          sseReconnectTimer = setTimeout(() => {
+            sseReconnectTimer = null;
+            iniciarSSE();
+          }, 45000);
+        }
+      };
+    } catch (err) {
+      if (!sseReconnectTimer && navigator.onLine) {
+        sseReconnectTimer = setTimeout(() => {
+          sseReconnectTimer = null;
+          iniciarSSE();
+        }, 45000);
       }
-    };
-    eventSource.onerror = function(err) {
-      console.error("Error en conexión SSE (Reconectando automáticamente...)", err);
-    };
-  } catch (err) {
-    console.error("No se pudo inicializar EventSource", err);
+    }
   }
+
+  // Arrancar SSE
+  iniciarSSE();
+
+  // Escuchar eventos de red para controlar SSE
+  window.addEventListener('online', () => {
+    iniciarSSE();
+  });
+
+  window.addEventListener('offline', () => {
+    if (sseReconnectTimer) {
+      clearTimeout(sseReconnectTimer);
+      sseReconnectTimer = null;
+    }
+    if (sseSource) {
+      try { sseSource.close(); } catch(e) {}
+      sseSource = null;
+    }
+  });
 });
