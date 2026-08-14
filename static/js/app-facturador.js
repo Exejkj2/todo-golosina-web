@@ -30,6 +30,7 @@ window.catalogoProductos = [];
 window.cargandoCatalogo = false;
 let currentCatalogoVersion = null;
 
+// ─── SINCRONIZACIÓN EN SEGUNDO PLANO (BACKGROUND SYNC SILENCIOSO) ───────────
 async function verificarVersionCatalogo() {
   if (!navigator.onLine) return;
   try {
@@ -40,19 +41,24 @@ async function verificarVersionCatalogo() {
       currentCatalogoVersion = data.version;
     } else if (currentCatalogoVersion !== data.version) {
       currentCatalogoVersion = data.version;
-      window.catalogoProductos = []; // Limpiamos caché
+      // Sincronizar catálogo en segundo plano de manera invisible
       await cargarCatalogoEnMemoria();
       const Toast = Swal.mixin({
         toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true
       });
-      Toast.fire({ icon: 'info', title: 'Catálogo actualizado' });
+      Toast.fire({ icon: 'info', title: 'Catálogo sincronizado en segundo plano' });
     }
   } catch(e) {
-    console.error("Error verificando catálogo:", e);
+    // Silencioso ante fallos de red / microcortes
   }
 }
-// Polling cada 2 minutos
-setInterval(verificarVersionCatalogo, 120000);
+// Polling periódico silencioso cada 5 minutos
+setInterval(verificarVersionCatalogo, 300000);
+
+// Disparar sincronización silenciosa al recuperar internet
+window.addEventListener('online', () => {
+  setTimeout(verificarVersionCatalogo, 1000);
+});
 
 async function cargarCatalogoEnMemoria(forceFull = false) {
   if (window.cargandoCatalogo) return;
@@ -115,7 +121,7 @@ async function cargarCatalogoEnMemoria(forceFull = false) {
     // 4. Pre-instanciación asíncrona de modales en memoria (sin bloquear el hilo principal)
     setTimeout(precargarModalesEnMemoria, 50);
   } catch (err) {
-    console.error("Error en sincronización de catálogo (Delta):", err);
+    // Silencioso ante fallos de conexión (Failed to fetch)
   } finally {
     window.cargandoCatalogo = false;
   }
@@ -355,27 +361,38 @@ function getActiveTab() {
   return salesTabs.find((t) => t.id == activeTabId);
 }
 
-// Customers Management
+// Customers Management (Offline First con caché local)
 async function loadAllClientes() {
-  const body = document.getElementById("tabla-clientes-body");
-  if (body)
-    body.innerHTML =
-      '<tr><td colspan="6" class="text-center p-4 text-primary fw-bold"><i class="bi bi-hourglass-split me-2"></i> Cargando clientes...</td></tr>';
+  // 1. Restaurar de inmediato desde caché local si la memoria está vacía
+  if (!allClientes || allClientes.length === 0) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('clientes_local_cache') || '[]');
+      if (cached.length > 0) {
+        allClientes = cached;
+        renderCustManager();
+      }
+    } catch(e) {}
+  }
+
+  if (!navigator.onLine) return;
 
   try {
     const r = await fetch("/obtener_clientes");
+    if (!r.ok) return;
     const d = await r.json();
-    allClientes = d.clientes || [];
-    renderCustManager();
-    if (typeof renderCusts === "function") {
-      currentCustResults = allClientes;
-      renderCusts(currentCustResults);
+    if (d.clientes) {
+      allClientes = d.clientes;
+      renderCustManager();
+      try {
+        localStorage.setItem('clientes_local_cache', JSON.stringify(allClientes));
+      } catch (e) {}
+      if (typeof renderCusts === "function") {
+        currentCustResults = allClientes;
+        renderCusts(currentCustResults);
+      }
     }
   } catch (e) {
-    console.error("Error crítico cargando clientes:", e);
-    if (body)
-      body.innerHTML =
-        '<tr><td colspan="6" class="text-center p-4 text-danger">Error al cargar clientes</td></tr>';
+    // Silencioso ante microcortes de red
   }
 }
 
@@ -521,21 +538,24 @@ async function saveCustManager() {
   }
 }
 
-async function openCustModal() {
+// Apertura Instantánea de Selección de Cliente (0ms, 100% Memoria Local)
+function openCustModal() {
   currentCustResults = allClientes || [];
   custSelectedIndex = currentCustResults.length > 0 ? 0 : -1;
   renderCusts(currentCustResults);
+  
+  // Apertura inmediata
   getModal('custModal')?.show();
+  
   const cInput = document.getElementById("custSearchIn");
   if (cInput) {
     cInput.value = "";
     setTimeout(() => cInput.focus(), 20);
   }
-  if (navigator.onLine && allClientes.length === 0) {
-    loadAllClientes().then(() => {
-      currentCustResults = allClientes;
-      renderCusts(currentCustResults);
-    });
+  
+  // Sincronización silenciosa en segundo plano solo si está vacía
+  if (navigator.onLine && (!allClientes || allClientes.length === 0)) {
+    loadAllClientes();
   }
 }
 
@@ -1513,6 +1533,7 @@ if (originalBtnConfirmar) {
   });
 }
 
+// ─── APERTURA INSTANTÁNEA DE PRODUCTOS (0ms - OFFLINE FIRST) ───────────────
 function abrirModalProductos() {
   selectedProd = null;
   searchSelectedIndex = -1;
@@ -1531,25 +1552,24 @@ function abrirModalProductos() {
     mS.value = "";
   }
 
-  // Apertura instantánea 0ms
+  // 1. Apertura visual instantánea en 0ms
   getModal('searchModal')?.show();
   if (mS) {
     setTimeout(() => mS.focus(), 20);
   }
 
-  // Renderizado ultrarrápido inicial (máx 25 elementos para no saturar el DOM)
+  // 2. Renderizado inmediato desde memoria local (máx 30 items)
   if (window.catalogoProductos && window.catalogoProductos.length > 0) {
-    renderizarResultadosLocales(window.catalogoProductos.slice(0, 25));
+    renderizarResultadosLocales(window.catalogoProductos.slice(0, 30));
   } else {
-    const results = document.getElementById("modalResults");
-    if (results) {
-      results.innerHTML = '<tr><td colspan="2" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando catálogo...</td></tr>';
-    }
-    cargarCatalogoEnMemoria().then(() => {
-      if (window.catalogoProductos && window.catalogoProductos.length > 0) {
-        renderizarResultadosLocales(window.catalogoProductos.slice(0, 25));
+    // Si la memoria está vacía, intentar precargar desde localStorage de inmediato
+    try {
+      const localCached = JSON.parse(localStorage.getItem('catalogo_local_cache') || '[]');
+      if (localCached.length > 0) {
+        window.catalogoProductos = localCached;
+        renderizarResultadosLocales(window.catalogoProductos.slice(0, 30));
       }
-    });
+    } catch(e) {}
   }
 }
 
