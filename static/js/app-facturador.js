@@ -111,6 +111,9 @@ async function cargarCatalogoEnMemoria(forceFull = false) {
         console.warn("Aviso al guardar catálogo en LocalStorage:", e);
       }
     }
+
+    // 4. Pre-instanciación asíncrona de modales en memoria (sin bloquear el hilo principal)
+    setTimeout(precargarModalesEnMemoria, 50);
   } catch (err) {
     console.error("Error en sincronización de catálogo (Delta):", err);
   } finally {
@@ -118,14 +121,52 @@ async function cargarCatalogoEnMemoria(forceFull = false) {
   }
 }
 
+// ─── Instanciación y Caché en Memoria de Modales Bootstrap ───
+window.modalCache = window.modalCache || {};
 
-// Bootstrap Modal Instances: se instancian on-demand con getOrCreateInstance()
+function precargarModalesEnMemoria() {
+  const modalIds = [
+    'searchModal',
+    'cobroModal',
+    'custModal',
+    'editCustModal',
+    'modalOpcionesVenta',
+    'modal-nuevo-cliente-rapido',
+    'modal-registrar-pago',
+    'gastoModal',
+    'modalEliminarCliente',
+    'postSaleModal',
+    'modal-descuento-articulo',
+    'modal-abrir-caja',
+    'modalExitoVenta'
+  ];
 
-// Helper para obtener/crear instancia de modal on-demand
+  for (const id of modalIds) {
+    if (!window.modalCache[id]) {
+      const el = document.getElementById(id);
+      if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        window.modalCache[id] = new bootstrap.Modal(el);
+      }
+    }
+  }
+}
+
+// Helper optimizado: Recupera directamente la instancia pre-cargada en memoria O(1)
 function getModal(id) {
+  if (window.modalCache && window.modalCache[id]) {
+    return window.modalCache[id];
+  }
   const el = document.getElementById(id);
-  if (!el) { console.error(`Modal no encontrado: #${id}`); return null; }
-  return bootstrap.Modal.getOrCreateInstance(el);
+  if (!el) {
+    console.error(`Modal no encontrado: #${id}`);
+    return null;
+  }
+  if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+    const instance = new bootstrap.Modal(el);
+    window.modalCache[id] = instance;
+    return instance;
+  }
+  return null;
 }
 
 // --- Network Status Handler ---
