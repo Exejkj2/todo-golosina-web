@@ -1,13 +1,11 @@
 // facturador-core.js - Lógica principal del Facturador
 // Todo Golosina POS System
 
-// Service Worker Registration
+// Service Worker Unregistration
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/static/service-worker.js')
-      .then(reg => console.log('SW: Registrado'))
-      .catch(err => console.log('SW: Error', err));
-  });
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    for (const reg of regs) reg.unregister();
+  }).catch(() => {});
 }
 
 // Global Variables

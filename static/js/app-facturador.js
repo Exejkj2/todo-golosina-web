@@ -1,6 +1,24 @@
 // app-facturador.js - Lógica principal del Facturador (Versión CSP-Compliant)
 // Todo Golosina POS System
 
+// Desregistrar cualquier Service Worker existente y limpiar cachés
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister().then((success) => {
+        if (success) console.log('✅ Service Worker desregistrado correctamente.');
+      });
+    }
+  }).catch((err) => {
+    console.warn('Aviso al desregistrar Service Worker:', err);
+  });
+}
+if ('caches' in window) {
+  caches.keys().then((keys) => {
+    keys.forEach((key) => caches.delete(key));
+  }).catch(() => {});
+}
+
 
 
 // Global Variables
@@ -181,55 +199,7 @@ function getModal(id) {
   return null;
 }
 
-// --- Network Status Handler ---
-function updateNetworkStatus(isOnline) {
-  const statusDot = document.getElementById('status-dot');
-  const statusText = document.getElementById('status-text');
-  const offlineIndicator = document.getElementById('offline-indicator'); // Del offline-manager.js
 
-  if (statusDot) {
-    if (isOnline) {
-      statusDot.classList.remove('status-dot-offline');
-      statusDot.style.backgroundColor = '#198754'; // Verde
-      statusDot.title = 'Conectado';
-    } else {
-      statusDot.classList.add('status-dot-offline');
-      statusDot.style.removeProperty('background-color'); // Deja actuar al estilo .status-dot-offline (rojo parpadeante)
-      statusDot.title = 'Trabajando Offline';
-    }
-  }
-
-  if (statusText) {
-    if (isOnline) {
-      statusText.innerHTML = 'EN LÍNEA (NUBE)';
-    } else {
-      statusText.innerHTML = '<b>MODO OFFLINE (LOCAL)</b>';
-    }
-  }
-
-  if (offlineIndicator) {
-    if (isOnline) {
-      offlineIndicator.className = 'badge bg-success';
-      offlineIndicator.innerHTML = '<i class="bi bi-wifi"></i> Conectado';
-    } else {
-      offlineIndicator.className = 'badge bg-warning text-dark';
-      offlineIndicator.innerHTML = '<i class="bi bi-wifi-off"></i> Trabajando Offline';
-    }
-  }
-
-  // También actualizamos el switch de AFIP si existe
-  const switchAfip = document.getElementById('toggleFacturaAfip');
-  if (switchAfip) {
-    if (!isOnline) {
-      switchAfip.checked = false;
-      switchAfip.disabled = true;
-      switchAfip.closest('.form-check')?.querySelector('label')?.classList.add('text-muted');
-    } else {
-      switchAfip.disabled = false;
-      switchAfip.closest('.form-check')?.querySelector('label')?.classList.remove('text-muted');
-    }
-  }
-}
 
 /**
  * Formatea un string a Title Case (Primera letra de cada palabra en Mayúscula)
@@ -254,8 +224,6 @@ function initApp() {
   cargarDashboard();
   setupEventListeners();
   verificarCaja();
-  // Verificación inicial del estado de red al cargar la aplicación
-  updateNetworkStatus(navigator.onLine);
 }
 
 // Tabs Management
@@ -693,12 +661,8 @@ async function fetchWeather() {
 }
 
 async function cargarDashboard() {
-  if (!navigator.onLine) return;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
   try {
-    const r = await fetch("/api/ventas_hoy", { signal: controller.signal });
-    clearTimeout(timeoutId);
+    const r = await fetch("/api/ventas_hoy");
     if (!r.ok) return;
     const d = await r.json();
     if (d.ok) {
@@ -716,7 +680,7 @@ async function cargarDashboard() {
       }
     }
   } catch (e) {
-    clearTimeout(timeoutId);
+    console.error("Error al cargar dashboard:", e);
   }
 }
 
@@ -737,15 +701,10 @@ function switchSection(section, btn) {
   else if (section === "cobranzas") cargarDeudores();
 }
 
-// Sales & Cash Management (Protegido contra congelamientos Offline)
+// Sales & Cash Management
 async function cargarVentasDia() {
   const b = document.getElementById("ventasDiaBody");
   if (!b) return;
-  
-  if (!navigator.onLine) {
-    b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-wifi-off me-2 text-warning fs-5"></i>El historial de ventas pasadas no está disponible en modo Offline</td></tr>';
-    return;
-  }
 
   b.innerHTML = '<tr><td colspan="4" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando ventas...</td></tr>';
   
@@ -756,13 +715,9 @@ async function cargarVentasDia() {
   if (fInicio && fFin) {
       url += `?inicio=${encodeURIComponent(fInicio)}&fin=${encodeURIComponent(fFin)}`;
   }
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
 
   try {
-    const r = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
+    const r = await fetch(url);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     if (d.ventas && d.ventas.length > 0) {
@@ -779,12 +734,8 @@ async function cargarVentasDia() {
       b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No hay ventas registradas en el período seleccionado</td></tr>';
     }
   } catch (e) {
-    clearTimeout(timeoutId);
-    if (e.name === 'AbortError') {
-      b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-warning"><i class="bi bi-clock-history me-2"></i>Tiempo de espera agotado al consultar el servidor (5s).</td></tr>';
-    } else {
-      b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor para obtener el historial.</td></tr>';
-    }
+    console.error("Error al cargar historial de ventas:", e);
+    b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor para obtener el historial.</td></tr>';
   }
 }
 
@@ -1000,24 +951,15 @@ async function saveGasto() {
   } catch (e) { console.error(e); }
 }
 
-// Debt Collection (Protegido con Timeout)
+// Debt Collection
 async function cargarDeudores() {
   const body = document.getElementById("deudoresBody");
   if (!body) return;
 
-  if (!navigator.onLine) {
-    body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-wifi-off me-2 text-warning fs-5"></i>El módulo de cobranzas no está disponible en modo Offline</td></tr>';
-    return;
-  }
-
   body.innerHTML = '<tr><td colspan="4" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando deudores...</td></tr>';
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
 
   try {
-    const r = await fetch("/api/clientes/deudores", { signal: controller.signal });
-    clearTimeout(timeoutId);
+    const r = await fetch("/api/clientes/deudores");
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     if (d.ok) {
@@ -1030,12 +972,8 @@ async function cargarDeudores() {
       body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No se encontraron cuentas deudoras</td></tr>';
     }
   } catch (e) {
-    clearTimeout(timeoutId);
-    if (e.name === 'AbortError') {
-      body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-warning"><i class="bi bi-clock-history me-2"></i>Tiempo de espera agotado al consultar deudores (5s).</td></tr>';
-    } else {
-      body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor.</td></tr>';
-    }
+    console.error("Error al consultar deudores:", e);
+    body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor.</td></tr>';
   }
 }
 
@@ -1450,9 +1388,7 @@ if (originalBtnConfirmar) {
       }
 
       const switchAfip = document.getElementById('toggleFacturaAfip');
-      // Seguridad: Si el indicador está en rojo (clase offline), forzamos quiereFactura a false
-      const isActuallyOffline = document.getElementById('status-dot')?.classList.contains('status-dot-offline');
-      const quiereFactura = (switchAfip && !isActuallyOffline) ? switchAfip.checked : false;
+      const quiereFactura = switchAfip ? switchAfip.checked : false;
 
       const payload = {
         tipo: "Local",
@@ -1475,25 +1411,6 @@ if (originalBtnConfirmar) {
         general_savings: montoDescuentoGral,
         facturar_afip: quiereFactura
       };
-
-      // Si no hay conexión detectada de antemano
-      if (!navigator.onLine) {
-        payload.offline = true;
-        payload.fecha_local = new Date().toISOString();
-        if (typeof guardarVentaOffline === "function") {
-          await guardarVentaOffline(payload);
-        } else if (typeof queueSale === "function") {
-          await queueSale(payload);
-        }
-        Swal.fire({
-          icon: 'info',
-          title: 'Modo Offline',
-          text: 'Venta guardada localmente (Modo Offline). Se sincronizará automáticamente cuando regrese internet.'
-        });
-        getModal('cobroModal')?.hide();
-        resetFacturador();
-        return;
-      }
 
       try {
         const res = await fetch("/api/registrar_venta", {
@@ -1555,21 +1472,12 @@ if (originalBtnConfirmar) {
           Swal.fire({ icon: 'error', title: 'Error', text: d.mensaje || d.error || 'Error al procesar la venta' });
         }
       } catch (fetchErr) {
-        console.warn("Fallo de conexión en el envío de venta, guardando en cola offline...", fetchErr);
-        payload.offline = true;
-        payload.fecha_local = new Date().toISOString();
-        if (typeof guardarVentaOffline === "function") {
-          await guardarVentaOffline(payload);
-        } else if (typeof queueSale === "function") {
-          await queueSale(payload);
-        }
+        console.error("Error de conexión al registrar venta:", fetchErr);
         Swal.fire({
-          icon: 'info',
-          title: 'Modo Offline',
-          text: 'Venta guardada localmente (Modo Offline). Se sincronizará automáticamente cuando regrese internet.'
+          icon: 'error',
+          title: 'Error de Conexión',
+          text: 'No se pudo comunicar con el servidor. Verifique su conexión e intente nuevamente.'
         });
-        getModal('cobroModal')?.hide();
-        resetFacturador();
       }
     } catch (e) {
       console.error("Error general en el proceso de cobro:", e);
@@ -1880,32 +1788,7 @@ function setupEventListeners() {
   // Global Keydown
   window.addEventListener("keydown", handleGlobalShortcuts);
 
-  // Control de Estado de Red (Eventos y Heartbeat)
-  window.addEventListener('online', () => checkRealConnection());
-  window.addEventListener('offline', () => updateNetworkStatus(false));
-  
-  async function checkRealConnection() {
-    if (!navigator.onLine) {
-      updateNetworkStatus(false);
-      return;
-    }
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch('/api/estado_conexion', { signal: controller.signal, cache: 'no-store' });
-      clearTimeout(timeoutId);
-      const data = await res.json();
-      updateNetworkStatus(!!data.online);
-    } catch (e) {
-      updateNetworkStatus(false);
-    }
-  }
 
-  // Verificación inicial de red física y lógica al cargar
-  checkRealConnection();
-  
-  // Re-verificar cada 10 segundos
-  setInterval(checkRealConnection, 10000);
 
   // 🧲 IMÁN DE FOCO: Retornar al lector al cerrar cualquier modal
   document.addEventListener("hidden.bs.modal", () => {
