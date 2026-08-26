@@ -240,7 +240,7 @@ class Categoria(db.Model):
 class Producto(db.Model):
     __tablename__ = 'productos'
     id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(150), nullable=False)
+    nombre = db.Column(db.String(150), nullable=False, index=True)
     descripcion = db.Column(db.Text)
     precio_lista_1 = db.Column(db.Float, nullable=False) # Lista 1
     precio_lista_2 = db.Column(db.Float, nullable=True, default=0.0) # Lista 2
@@ -252,7 +252,7 @@ class Producto(db.Model):
     
     permitir_sin_stock = db.Column(db.Boolean, default=True)
     ventas_totales = db.Column(db.Integer, default=0)
-    codigo_barra = db.Column(db.String(100), nullable=True)
+    codigo_barra = db.Column(db.String(100), nullable=True, index=True)
 
 
     sincronizado = db.Column(db.Boolean, default=True, nullable=False)
@@ -647,12 +647,20 @@ def get_productos():
     else:
         query = query.order_by(Producto.id.desc())
 
-    productos = query.limit(50).all()
+    page = request.args.get('page', 1, type=int)
+    paginated = query.paginate(page=page, per_page=50, error_out=False)
+
     return jsonify({
         "ok": True,
         "es_delta": bool(ultima_fecha_str),
         "timestamp_servidor": hora_argentina().isoformat(),
-        "productos": [p.to_dict() for p in productos]
+        "productos": [p.to_dict() for p in paginated.items],
+        "pagination": {
+            "page": paginated.page,
+            "total_pages": paginated.pages,
+            "has_next": paginated.has_next,
+            "has_prev": paginated.has_prev
+        }
     })
 
 @app.route('/api/productos/catalogo_completo', methods=['GET'])
@@ -2982,6 +2990,13 @@ def send_sw():
 with app.app_context():
     try:
         db.session.execute(text('ALTER TABLE ventas ADD COLUMN anulada BOOLEAN DEFAULT 0'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        
+    try:
+        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_nombre ON productos(nombre)'))
+        db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_codigo_barra ON productos(codigo_barra)'))
         db.session.commit()
     except Exception:
         db.session.rollback()
