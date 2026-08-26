@@ -706,7 +706,7 @@ async function cargarVentasDia() {
   const b = document.getElementById("ventasDiaBody");
   if (!b) return;
 
-  b.innerHTML = '<tr><td colspan="4" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando ventas...</td></tr>';
+  b.innerHTML = '<tr><td colspan="4" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2 text-primary"></span>Cargando historial de ventas (conectando con el servidor)...</td></tr>';
   
   let url = "/api/ventas_hoy";
   const fInicio = document.getElementById("fechaInicio")?.value;
@@ -716,8 +716,12 @@ async function cargarVentasDia() {
       url += `?inicio=${encodeURIComponent(fInicio)}&fin=${encodeURIComponent(fFin)}`;
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos de tolerancia para Render
+
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     if (d.ventas && d.ventas.length > 0) {
@@ -734,8 +738,13 @@ async function cargarVentasDia() {
       b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No hay ventas registradas en el período seleccionado</td></tr>';
     }
   } catch (e) {
+    clearTimeout(timeoutId);
     console.error("Error al cargar historial de ventas:", e);
-    b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor para obtener el historial.</td></tr>';
+    if (e.name === 'AbortError') {
+      b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-warning"><i class="bi bi-clock-history me-2"></i>El servidor tardó más de 60 segundos en responder. Intente nuevamente.</td></tr>';
+    } else {
+      b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor para obtener el historial.</td></tr>';
+    }
   }
 }
 
@@ -956,10 +965,14 @@ async function cargarDeudores() {
   const body = document.getElementById("deudoresBody");
   if (!body) return;
 
-  body.innerHTML = '<tr><td colspan="4" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando deudores...</td></tr>';
+  body.innerHTML = '<tr><td colspan="4" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2 text-primary"></span>Cargando deudores...</td></tr>';
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos
 
   try {
-    const r = await fetch("/api/clientes/deudores");
+    const r = await fetch("/api/clientes/deudores", { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     if (d.ok) {
@@ -972,8 +985,13 @@ async function cargarDeudores() {
       body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No se encontraron cuentas deudoras</td></tr>';
     }
   } catch (e) {
+    clearTimeout(timeoutId);
     console.error("Error al consultar deudores:", e);
-    body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor.</td></tr>';
+    if (e.name === 'AbortError') {
+      body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-warning"><i class="bi bi-clock-history me-2"></i>El servidor tardó más de 60 segundos en responder.</td></tr>';
+    } else {
+      body.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor.</td></tr>';
+    }
   }
 }
 
