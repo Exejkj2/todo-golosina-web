@@ -2011,7 +2011,11 @@ def admin_dashboard():
 @app.route('/admin/producto/add', methods=['POST'])
 @login_requerido
 def admin_add_product():
-    if not session.get('admin_autenticado'): return redirect('/')
+    if not session.get('admin_autenticado'):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'ok': False, 'error': 'No autorizado'}), 401
+        return redirect('/')
+        
     nombre = request.form.get('nombre')
     
     precio_str = request.form.get('precio', '0').strip().replace(',', '.')
@@ -2057,18 +2061,20 @@ def admin_add_product():
     except ValueError:
         precio_lista_3 = precio_lista_1
 
-
+    # Validación optimizada de Códigos de Barras (consulta dirigida por SQL con ILIKE)
     codigo_barra = request.form.get('codigo_barra', '').strip()
     if codigo_barra:
         nuevos_codigos = [c.strip() for c in codigo_barra.split(',') if c.strip()]
-        otros_productos = Producto.query.filter(Producto.activo == 1).all()
-        for p in otros_productos:
-            if not p.codigo_barra:
-                continue
-            codigos_existentes = [c.strip() for c in p.codigo_barra.split(',') if c.strip()]
-            for nc in nuevos_codigos:
-                if nc in codigos_existentes:
-                     return jsonify({"error": f"El código '{nc}' ya está registrado en el producto '{p.nombre}' (ID: {p.id})."}), 400
+        if nuevos_codigos:
+            condiciones = [Producto.codigo_barra.ilike(f'%{nc}%') for nc in nuevos_codigos]
+            candidatos = Producto.query.filter(Producto.activo == 1, or_(*condiciones)).all()
+            for p in candidatos:
+                if not p.codigo_barra:
+                    continue
+                codigos_existentes = [c.strip() for c in p.codigo_barra.split(',') if c.strip()]
+                for nc in nuevos_codigos:
+                    if nc in codigos_existentes:
+                        return jsonify({"ok": False, "error": f"El código '{nc}' ya está registrado en el producto '{p.nombre}' (ID: {p.id})."}), 400
 
     nuevo = Producto(
         nombre=nombre, precio_lista_1=precio_lista_1, precio_lista_2=precio_lista_2, precio_lista_3=precio_lista_3,
@@ -2083,6 +2089,28 @@ def admin_add_product():
     db.session.add(nuevo)
     db.session.commit()
     actualizar_version_catalogo()
+
+    # Retorno directo de JSON para el frontend sin recargas
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+        cat_nombre = nuevo.categoria_rel.nombre if nuevo.categoria_rel else 'General'
+        return jsonify({
+            "ok": True,
+            "mensaje": "Producto agregado exitosamente.",
+            "producto": {
+                "id": nuevo.id,
+                "nombre": nuevo.nombre,
+                "codigo_barra": nuevo.codigo_barra or '',
+                "precio_lista_1": nuevo.precio_lista_1,
+                "precio_lista_2": nuevo.precio_lista_2,
+                "precio_lista_3": nuevo.precio_lista_3,
+                "stock": nuevo.stock,
+                "categoria_nombre": cat_nombre,
+                "permitir_sin_stock": nuevo.permitir_sin_stock,
+                "descripcion": nuevo.descripcion or '',
+                "imagen_url": nuevo.imagen_url or nuevo.imagen or ''
+            }
+        }), 201
+
     flash('Producto agregado exitosamente.', 'success')
     return redirect(url_for('admin_dashboard'))
 

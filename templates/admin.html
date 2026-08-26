@@ -857,12 +857,20 @@
       }
 
       // --- Manejo de Envío de Formulario con AJAX (Senior UX) ---
+      // --- Manejo de Envío de Formulario con AJAX (Inserción Directa en DOM) ---
       const addForm = document.querySelector('#addModal form');
       if (addForm) {
         addForm.addEventListener('submit', async function(e) {
           e.preventDefault();
           
-          // Primero aplicamos el Capitalize que ya estaba
+          const btnSubmit = this.querySelector('button[type="submit"]');
+          const originalBtnText = btnSubmit ? btnSubmit.innerHTML : 'Agregar Producto';
+          if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+          }
+          
+          // Aplicar Capitalize al nombre
           const nombreInput = this.querySelector('input[name="nombre"]');
           if (nombreInput) {
             nombreInput.value = toTitleCase(nombreInput.value.trim());
@@ -870,7 +878,8 @@
 
           const formData = new FormData(this);
           const errorContainer = document.getElementById('error-container-add');
-          const errorAlert = errorContainer.querySelector('.alert');
+          const errorAlert = errorContainer ? errorContainer.querySelector('.alert') : null;
+          if (errorContainer) errorContainer.style.display = 'none';
 
           try {
             const response = await fetch(this.action, {
@@ -881,22 +890,98 @@
               }
             });
 
-            if (response.ok) {
-              // Si todo bien, recargamos para ver el nuevo producto
-              window.location.reload();
+            const data = await response.json();
+
+            if (response.ok && data.ok && data.producto) {
+              const p = data.producto;
+              
+              // 1. Cerrar Modal
+              const addModalInst = bootstrap.Modal.getInstance(document.getElementById('addModal'));
+              if (addModalInst) addModalInst.hide();
+
+              // 2. Limpiar Formulario y etiquetas
+              addForm.reset();
+              const contTags = document.getElementById('add_contenedor_codigos');
+              if (contTags) contTags.innerHTML = '';
+              const hidInput = document.getElementById('add_codigo_barra_hidden');
+              if (hidInput) hidInput.value = '';
+
+              // 3. Formatear Códigos de Barra y Stock
+              const codigos = p.codigo_barra ? p.codigo_barra.split(',') : [];
+              const primerCodigo = codigos.length > 0 ? codigos[0].trim() : '-';
+              const codigoHtml = codigos.length > 1 
+                ? `${primerCodigo} <span class="text-muted" style="font-size: 0.8em;" title="${p.codigo_barra}">...</span>` 
+                : primerCodigo;
+
+              let stockBadge = '';
+              if (p.stock > 10) {
+                stockBadge = `<span class="badge bg-success bg-opacity-10 text-success px-2">${p.stock}</span>`;
+              } else if (p.stock > 0) {
+                stockBadge = `<span class="badge bg-warning bg-opacity-10 text-warning px-2">${p.stock}</span>`;
+              } else {
+                stockBadge = `<span class="badge bg-danger bg-opacity-10 text-danger px-2">Sin stock</span>`;
+              }
+
+              // 4. Construir fila e insertar al inicio de la tabla (unshift / prepend)
+              const newRowHtml = `
+                <tr id="fila_prod_${p.id}" class="table-success" style="transition: background-color 1.8s ease;">
+                  <td class="ps-4">
+                    <div class="form-check">
+                      <input class="form-check-input checkbox-product" type="checkbox" value="${p.id}">
+                    </div>
+                  </td>
+                  <td class="text-muted">#${p.id}</td>
+                  <td><small class="text-muted fw-bold">${codigoHtml}</small></td>
+                  <td>
+                    ${p.imagen_url ? `<img src="${p.imagen_url}" class="img-preview shadow-sm" alt="img" />` : `
+                    <div class="img-preview d-flex align-items-center justify-content-center text-muted fs-4">
+                      <i class="bi bi-box-seam"></i>
+                    </div>`}
+                  </td>
+                  <td><strong style="color: #1e293b">${toTitleCase(p.nombre)}</strong></td>
+                  <td><span class="badge bg-light text-dark border">${p.categoria_nombre || 'General'}</span></td>
+                  <td>${stockBadge}</td>
+                  <td class="fw-bold">$${p.precio_lista_1}</td>
+                  <td class="text-end pe-4">
+                    <button class="btn btn-sm btn-light text-primary me-1" onclick="window.location.reload();" title="Recargar para edición completa">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light text-danger" onclick="window.location.reload();" title="Recargar para opciones">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              `;
+
+              const tbody = document.querySelector('#tabla_productos tbody');
+              if (tbody) {
+                tbody.insertAdjacentHTML('afterbegin', newRowHtml);
+              }
+
+              // Remover el sombreado verde suavemente
+              setTimeout(() => {
+                const fila = document.getElementById(`fila_prod_${p.id}`);
+                if (fila) fila.classList.remove('table-success');
+              }, 2000);
+
             } else {
-              const data = await response.json();
-              if (data.error) {
-                errorAlert.textContent = data.error;
+              if (errorAlert && errorContainer) {
+                errorAlert.textContent = data.error || data.mensaje || 'Error al guardar el producto.';
                 errorContainer.style.display = 'block';
-                // Scroll al error si es necesario
                 errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }
             }
           } catch (err) {
             console.error('Error al guardar producto:', err);
-            errorAlert.textContent = 'Ocurrió un error inesperado al guardar el producto.';
-            errorContainer.style.display = 'block';
+            if (errorAlert && errorContainer) {
+              errorAlert.textContent = 'Ocurrió un error inesperado al guardar el producto.';
+              errorContainer.style.display = 'block';
+            }
+          } finally {
+            if (btnSubmit) {
+              btnSubmit.disabled = false;
+              btnSubmit.innerHTML = originalBtnText;
+            }
           }
         });
       }
