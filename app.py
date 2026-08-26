@@ -2560,47 +2560,67 @@ def catalogo_version_update():
     actualizar_version_catalogo()
     return jsonify({"ok": True, "version": ultima_actualizacion_catalogo})
 
-# ─── Exportación a Excel ───────────────────────────────────────
+# ─── Exportación de Inventario (Streaming Optimizado O(1) RAM) ───
 @app.route('/admin/exportar')
 @login_requerido # Protegido (A-05)
 def admin_exportar():
-    if not session.get('admin_autenticado'): return redirect('/')
-    productos = Producto.query.all()
-    data = []
-    for p in productos:
-        data.append({
-            'ID': p.id,
-            'Nombre': p.nombre,
-            'Precio Lista 1': p.precio_lista_1,
-            'Precio Lista 2': p.precio_lista_2,
-            'Precio Lista 3': p.precio_lista_3,
-            'Código de Barras': p.codigo_barra,
-            'Stock': p.stock,
-            'Categoria': p.categoria_rel.nombre if p.categoria_rel else 'General',
-            'Favorito': 'SI' if p.favorito else 'NO',
-            'Venta sin Stock': 'SI' if p.permitir_sin_stock else 'NO',
-            'Link Imagen': p.imagen_url or p.imagen,
-            'Activo': 'SI' if p.activo == 1 else 'NO'
-        })
-    import openpyxl
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = 'Inventario'
-    if data:
-        headers = list(data[0].keys())
-        ws.append(headers)
-        for row in data:
-            ws.append([row[h] for h in headers])
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
+    if not session.get('admin_autenticado'):
+        return redirect('/')
     
-    return send_file(
-        output,
-        download_name='Inventario_Todo_Golosina.xlsx',
-        as_attachment=True,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    try:
+        def generate_csv_stream():
+            buffer = io.StringIO()
+            writer = csv.writer(buffer, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+            
+            # 1. UTF-8 BOM para apertura nativa y correcta en Excel con acentos y caracteres especiales
+            yield '\ufeff'
+            
+            # 2. Encabezados
+            headers = [
+                'ID', 'Nombre', 'Precio Lista 1', 'Precio Lista 2', 'Precio Lista 3',
+                'Código de Barras', 'Stock', 'Categoría', 'Venta sin Stock', 'Activo'
+            ]
+            writer.writerow(headers)
+            yield buffer.getvalue()
+            buffer.seek(0)
+            buffer.truncate(0)
+            
+            # 3. Consulta paginada por chunks (yield_per) para evitar OOM Crash en Render
+            query = Producto.query.options(db.joinedload(Producto.categoria_rel)).order_by(Producto.id.asc()).yield_per(200)
+            
+            for p in query:
+                cat_nombre = p.categoria_rel.nombre if p.categoria_rel else 'General'
+                row = [
+                    p.id,
+                    p.nombre or '',
+                    p.precio_lista_1 or 0,
+                    p.precio_lista_2 if p.precio_lista_2 is not None else (p.precio_lista_1 or 0),
+                    p.precio_lista_3 if p.precio_lista_3 is not None else (p.precio_lista_1 or 0),
+                    p.codigo_barra or '',
+                    p.stock or 0,
+                    cat_nombre,
+                    'SI' if p.permitir_sin_stock else 'NO',
+                    'SI' if getattr(p, 'activo', 1) == 1 else 'NO'
+                ]
+                writer.writerow(row)
+                yield buffer.getvalue()
+                buffer.seek(0)
+                buffer.truncate(0)
+
+        response = Response(
+            stream_with_context(generate_csv_stream()),
+            mimetype='text/csv; charset=utf-8'
+        )
+        response.headers['Content-Disposition'] = 'attachment; filename="Inventario_Todo_Golosina.csv"'
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({
+            "ok": False,
+            "error": f"Error interno al exportar inventario: {str(e)}"
+        }), 500
 
 # ─── Estadísticas de Ventas ──────────────────────────────────
 @app.route('/admin/estadisticas')
