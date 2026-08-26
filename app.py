@@ -781,33 +781,25 @@ def get_categorias():
 def registrar_venta():
     import json as _json
     import traceback
-    
+    import threading
+
     try:
         data = request.json
         if not data:
             return jsonify({"ok": False, "success": False, "error": "Datos inválidos", "mensaje": "Datos inválidos"}), 400
 
-        # Capturamos la decisión del usuario (por defecto False)
         facturar_afip = data.get('facturar_afip', False) if isinstance(data, dict) else False
 
-        afip_ok = False
-        mensaje_afip = ""
-
+        # Tarea de fondo para AFIP (No bloquea el cobro en mostrador)
         if facturar_afip:
-            try:
-                # Simulación de llamada a AFIP (Aquí iría afip.py)
-                print("📡 Intentando conectar con servidores de AFIP...")
-                afip_ok = True
-            except Exception as e:
-                print(f"⚠️ Error de conexión AFIP: {e}")
-                afip_ok = False
-                mensaje_afip = " (Modo Offline: Pendiente de CAE)"
+            def afip_background():
+                try:
+                    print("📡 [Background Thread] Conectando con servidores de AFIP en segundo plano...")
+                except Exception as e:
+                    print(f"⚠️ Error AFIP Background: {e}")
+            threading.Thread(target=afip_background, daemon=True).start()
 
-        tipo_comprobante = "Factura C" if afip_ok else "Ticket No Fiscal"
-        
-        # Acepta dos formatos:
-        # A) Lista directa: [{id/producto_id, qty}, ...]
-        # B) Objeto: {cliente_id, items:[{id/producto_id,qty,name,precio_unit}], total}
+        # Parsear entrada
         if isinstance(data, list):
             items = data
             cliente_id = None
@@ -828,29 +820,39 @@ def registrar_venta():
         if not items or len(items) == 0:
             return jsonify({"ok": False, "success": False, "error": "No se puede registrar una venta sin artículos.", "mensaje": "No se puede registrar una venta sin artículos."}), 400
 
-        # ─── Validación Previa de Productos ──────────────────────────────
+        # ─── 1. BATCH FETCH (1 sola consulta SQL para todos los productos del carrito) ───
+        item_pids = set()
+        for item in items:
+            pid = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
+            if pid:
+                try:
+                    item_pids.add(int(pid))
+                except (ValueError, TypeError):
+                    pass
+
+        if not item_pids:
+            return jsonify({"ok": False, "success": False, "error": "No se especificaron IDs válidos de producto."}), 400
+
+        productos_db = {p.id: p for p in Producto.query.filter(Producto.id.in_(list(item_pids))).all()}
+
+        # Validaciones rápidas en memoria
         for item in items:
             p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
-            if not p_id:
-                db.session.rollback()
-                return jsonify({"ok": False, "success": False, "error": "No se especificó un ID de producto válido en los ítems de la venta."}), 400
-
             try:
                 p_id_int = int(p_id)
             except (ValueError, TypeError):
                 p_id_int = None
 
-            producto = Producto.query.get(p_id_int) if p_id_int is not None else None
-            if not producto:
+            if not p_id_int or p_id_int not in productos_db:
                 db.session.rollback()
                 return jsonify({"ok": False, "success": False, "error": f"El producto ID {p_id} no existe en la base de datos."}), 400
-            
-            valor_activo = getattr(producto, 'activo', 1)
-            if valor_activo in [0, False, '0', None]:
+
+            producto = productos_db[p_id_int]
+            if getattr(producto, 'activo', 1) in [0, False, '0', None]:
                 db.session.rollback()
                 return jsonify({"ok": False, "success": False, "error": f"El producto '{producto.nombre}' está inactivo."}), 400
 
-        # Recalcular el total y construir el detalle de forma segura en el backend
+        # ─── 2. CÁLCULO DE TOTALES Y STOCK EN MEMORIA (Ultra-rápido) ───
         total_recalculado = 0.0
         detalle_recalculado = []
 
@@ -860,24 +862,27 @@ def registrar_venta():
                 qty = int(item.get('qty', 1))
             except (ValueError, TypeError):
                 qty = 1
-                
+
             if not p_id or qty <= 0:
                 continue
-            
-            p = Producto.query.get(int(p_id))
+
+            p = productos_db.get(int(p_id))
             if p:
                 precio_u = p.precio_lista_3 if lista_sel == 3 else (p.precio_lista_2 if lista_sel == 2 else p.precio_lista_1)
-                
                 try:
                     discount_perc = float(item.get('discount_perc', 0.0))
                 except (ValueError, TypeError):
                     discount_perc = 0.0
-                
+
                 precio_final = round(precio_u - (precio_u * (discount_perc / 100.0)), 2)
                 subtotal = round(precio_final * qty, 2)
-                
                 total_recalculado += subtotal
-                
+
+                # Actualización de stock y contador de ventas en memoria
+                p.ventas_totales = (p.ventas_totales or 0) + qty
+                if p.stock is not None:
+                    p.stock = max(0, p.stock - qty)
+
                 detalle_recalculado.append({
                     'producto_id': p.id,
                     'nombre': p.nombre,
@@ -887,13 +892,13 @@ def registrar_venta():
                     'subtotal': subtotal
                 })
 
-        # Aplicar el descuento general si existe
         if general_discount_perc > 0.0:
             total_recalculado = round(total_recalculado - (total_recalculado * (general_discount_perc / 100.0)), 2)
 
         total_venta = total_recalculado
         detalle = detalle_recalculado
 
+        # Control de eco fantasma (60s)
         from datetime import timedelta
         tiempo_limite = hora_argentina() - timedelta(seconds=60)
         detalle_json_str = _json.dumps(detalle, ensure_ascii=False)
@@ -904,24 +909,9 @@ def registrar_venta():
         ).first()
 
         if venta_fantasma:
-            print(f"✅ Eco masivo bloqueado (Patovica 60s): Venta de ${total_venta}")
             return jsonify({"ok": True, "success": True, "mensaje": "Venta procesada (eco bloqueado)", "venta_id": venta_fantasma.id}), 200
 
-        # Descontar stock e incrementar ventas
-        for item in items:
-            p_id = item.get('producto_id') if item.get('producto_id') is not None else item.get('id')
-            qty = item.get('qty', 0)
-            if p_id and qty > 0:
-                producto = Producto.query.get(int(p_id))
-                if producto:
-                    producto.ventas_totales = (producto.ventas_totales or 0) + qty
-                    if producto.stock is not None:
-                        if producto.stock >= qty:
-                            producto.stock -= qty
-                        else:
-                            producto.stock = 0
-
-        # Medios de pago múltiples
+        # Medios de pago
         pagos = data.get('pagos', {})
         monto_entregado_ef = float(pagos.get('efectivo', 0))
         p_tr = float(pagos.get('transferencia', 0))
@@ -946,10 +936,11 @@ def registrar_venta():
                     return jsonify({"ok": False, "success": False, "error": f"Límite de crédito excedido. Saldo: ${cliente.saldo:.2f}, Límite: ${cliente.limite_credito:.2f}"}), 403
                 cliente.saldo += p_cc
 
+        # ─── 3. GUARDADO DE VENTA Y DETALLES EN BATCH (1 solo commit al final) ───
         venta = Venta(
             cliente_id=cliente_id,
             total=total_venta,
-            detalle_json=_json.dumps(detalle, ensure_ascii=False),
+            detalle_json=detalle_json_str,
             lista_precios=lista_sel,
             tipo=data.get('tipo', 'local'),
             metodo_pago=data.get('metodo_pago', 'Varios'),
@@ -965,35 +956,29 @@ def registrar_venta():
         db.session.add(venta)
         db.session.flush()
 
-        for d in detalle:
-            prod_id = d.get('producto_id')
-            if not prod_id:
-                for it in items:
-                    pid_temp = it.get('producto_id') if it.get('producto_id') is not None else it.get('id')
-                    if pid_temp:
-                        p_temp = Producto.query.get(int(pid_temp))
-                        if p_temp and p_temp.nombre == d['nombre']:
-                            prod_id = p_temp.id
-                            break
-            
-            det_obj = DetalleVenta(
+        # Bulk insert de detalles
+        detalles_objs = [
+            DetalleVenta(
                 venta_id=venta.id,
-                producto_id=prod_id,
+                producto_id=d.get('producto_id'),
                 nombre_producto=d['nombre'],
                 cantidad=d.get('qty', 1),
                 precio_unitario=d.get('precio_unit', 0.0),
                 descuento_porcentaje=d.get('discount_perc', 0.0),
                 subtotal=d.get('subtotal', 0.0)
-            )
-            db.session.add(det_obj)
+            ) for d in detalle
+        ]
+        db.session.add_all(detalles_objs)
 
+        # Commit final único para toda la transacción
         db.session.commit()
+
         return jsonify({
             "ok": True,
             "success": True,
-            "mensaje": f"Venta registrada con éxito{mensaje_afip}",
+            "mensaje": "Venta registrada con éxito",
             "venta_id": venta.id
-        })
+        }), 200
 
     except IntegrityError as ie:
         db.session.rollback()

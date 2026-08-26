@@ -1430,6 +1430,14 @@ if (originalBtnConfirmar) {
         facturar_afip: quiereFactura
       };
 
+      // ─── OPTIMISTIC UI: Cierre y transición inmediata (0ms) ─────────
+      getModal('cobroModal')?.hide();
+      document.body.style.backgroundColor = "#dcfce7";
+      setTimeout(() => (document.body.style.backgroundColor = ""), 300);
+      
+      // Abrir modal de opciones post-venta de inmediato
+      getModal('modalOpcionesVenta')?.show();
+
       try {
         const res = await fetch("/api/registrar_venta", {
           method: "POST",
@@ -1448,49 +1456,46 @@ if (originalBtnConfirmar) {
             errDetail = `Error del servidor: ${errText.substring(0, 80)}...`;
           }
           
+          getModal('modalOpcionesVenta')?.hide();
+          getModal('cobroModal')?.show();
+
           if (res.status === 400) {
             Swal.fire({ icon: 'error', title: 'Producto no disponible', text: errDetail });
             if (typeof cargarCatalogoEnMemoria === 'function') {
               cargarCatalogoEnMemoria(true);
             }
           } else {
-            Swal.fire({ icon: 'error', title: 'Error del Servidor', text: errDetail });
+            Swal.fire({ icon: 'error', title: 'Error al Registrar Venta', text: errDetail });
           }
           return;
         }
 
         const d = await res.json();
         if (d.ok || d.success) {
-          getModal('cobroModal')?.hide();
           lastVentaId = d.venta_id; 
           lastVentaTotal = tot;
           
-          // Notificación de éxito con detalle de CC si corresponde
-          let successMsg = `Venta por $${tot.toLocaleString()} finalizada.`;
           if (deudaCC > 0) {
-            successMsg = `✅ Venta completada. $${deudaCC.toLocaleString()} cargados a la cuenta corriente de ${tab.selectedCliente.nombre}.`;
+            Swal.fire({
+              icon: 'info',
+              title: 'Cuenta Corriente',
+              text: `✅ $${deudaCC.toLocaleString()} cargados a la cuenta de ${tab.selectedCliente.nombre}.`,
+              timer: 3000,
+              showConfirmButton: false
+            });
           }
 
-          Swal.fire({
-            icon: 'success',
-            title: '¡Venta Exitosa!',
-            text: successMsg,
-            timer: 4000,
-            showConfirmButton: false
-          });
-
-          document.body.style.backgroundColor = "#dcfce7";
-          setTimeout(() => (document.body.style.backgroundColor = ""), 300);
-          
-          // Abrir Modal de Opciones (Restaurado)
-          getModal('modalOpcionesVenta')?.show();
-          
+          // Actualizaciones en segundo plano
           cargarDashboard(); 
         } else { 
+          getModal('modalOpcionesVenta')?.hide();
+          getModal('cobroModal')?.show();
           Swal.fire({ icon: 'error', title: 'Error', text: d.mensaje || d.error || 'Error al procesar la venta' });
         }
       } catch (fetchErr) {
         console.error("Error de conexión al registrar venta:", fetchErr);
+        getModal('modalOpcionesVenta')?.hide();
+        getModal('cobroModal')?.show();
         Swal.fire({
           icon: 'error',
           title: 'Error de Conexión',
