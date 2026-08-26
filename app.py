@@ -2853,9 +2853,12 @@ def send_manifest():
 
 @app.route('/sw.js')
 def send_sw():
-    response = make_response(send_from_directory('static', 'sw.js'))
+    response = make_response(
+        "self.addEventListener('install', () => self.skipWaiting());\n"
+        "self.addEventListener('activate', () => self.registration.unregister());\n"
+    )
     response.headers['Content-Type'] = 'application/javascript'
-    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
 
 if __name__ == '__main__':
