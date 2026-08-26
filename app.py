@@ -343,6 +343,7 @@ class Venta(db.Model):
     entregado = db.Column(db.Float, default=0.0)
     sincronizado = db.Column(db.Boolean, default=True, nullable=False)
     ultima_actualizacion = db.Column(db.DateTime, default=hora_argentina, onupdate=hora_argentina)
+    anulada = db.Column(db.Boolean, default=False)
     detalles = db.relationship('DetalleVenta', backref='venta', lazy=True, cascade="all, delete-orphan")
 
     def __init__(self, **kwargs):
@@ -1656,15 +1657,15 @@ def get_ventas_hoy():
             else:
                 inicio_rango = datetime.combine(date.today(), time.min)
 
-            ventas = Venta.query.filter(Venta.fecha >= inicio_rango).order_by(Venta.fecha.desc()).all()
+            ventas = Venta.query.filter(Venta.fecha >= inicio_rango).order_by(Venta.fecha.desc()).limit(100).all()
             gastos = Gasto.query.filter(Gasto.fecha >= inicio_rango).all()
         
-        m_ef = sum((v.pago_efectivo or 0.0) for v in ventas)
-        m_tr = sum((v.pago_transferencia or 0.0) for v in ventas)
-        m_db = sum((v.pago_debito or 0.0) for v in ventas)
-        m_cc = sum((v.pago_cc or 0.0) for v in ventas)
+        m_ef = sum((v.pago_efectivo or 0.0) for v in ventas if not v.anulada)
+        m_tr = sum((v.pago_transferencia or 0.0) for v in ventas if not v.anulada)
+        m_db = sum((v.pago_debito or 0.0) for v in ventas if not v.anulada)
+        m_cc = sum((v.pago_cc or 0.0) for v in ventas if not v.anulada)
         
-        total_ventas = sum((v.total or 0.0) for v in ventas)
+        total_ventas = sum((v.total or 0.0) for v in ventas if not v.anulada)
         
         ingresos_extra = sum((g.monto or 0.0) for g in gastos if g.tipo == 'Ingreso' and g.categoria != 'Cobranza')
         cobranzas = sum((g.monto or 0.0) for g in gastos if g.tipo == 'Ingreso' and g.categoria == 'Cobranza')
@@ -1674,9 +1675,10 @@ def get_ventas_hoy():
         # Efectivo Real = Inicio + Ventas Efectivo + Cobranzas + Ingresos Extra - Egresos
         efectivo_real = monto_inicial + m_ef + cobranzas + ingresos_extra - egresos
 
-        # Métricas extra para el Dashboard
-        tickets_hoy = len(ventas)
-        clientes_hoy = len(set(v.cliente_id for v in ventas if v.cliente_id))
+        # Métricas extra para el Dashboard (solo ventas válidas)
+        ventas_validas = [v for v in ventas if not v.anulada]
+        tickets_hoy = len(ventas_validas)
+        clientes_hoy = len(set(v.cliente_id for v in ventas_validas if v.cliente_id))
         alertas_stock = Producto.query.filter(Producto.activo == 1, Producto.stock <= 5).count()
 
         return jsonify({
@@ -1701,7 +1703,8 @@ def get_ventas_hoy():
                 "id": v.id,
                 "hora": v.fecha.strftime('%H:%M') if hasattr(v.fecha, 'strftime') else (str(v.fecha)[:16] if v.fecha else '--:--'),
                 "metodo_pago": getattr(v, 'metodo_pago', 'No especificado') or 'No especificado',
-                "total": v.total or 0.0
+                "total": v.total or 0.0,
+                "anulada": getattr(v, 'anulada', False)
             } for v in ventas],
             "gastos": [g.to_dict() for g in gastos]
         })
@@ -1745,8 +1748,38 @@ def obtener_detalle_venta(id_venta):
     venta = db.session.get(Venta, id_venta)
     if not venta:
         return jsonify({"ok": False, "mensaje": "El comprobante no existe o fue anulado."}), 404
-    
     items_vendidos = []
+
+@app.route('/api/ventas/<int:id_venta>/anular', methods=['POST'])
+@login_requerido
+def anular_venta(id_venta):
+    try:
+        venta = db.session.get(Venta, id_venta)
+        if not venta:
+            return jsonify({"ok": False, "mensaje": "Venta no encontrada"}), 404
+        if getattr(venta, 'anulada', False):
+            return jsonify({"ok": False, "mensaje": "La venta ya se encuentra anulada"}), 400
+            
+        # 1. Marcar como anulada
+        venta.anulada = True
+        
+        # 2. Devolver stock
+        import json
+        detalles = json.loads(venta.detalle_json or '[]')
+        for item in detalles:
+            if 'id' in item:
+                producto = db.session.get(Producto, item['id'])
+                if producto:
+                    producto.stock += int(item.get('cantidad', 1))
+        
+        # 3. Guardar cambios
+        db.session.commit()
+        
+        return jsonify({"ok": True, "mensaje": "Venta anulada y stock restaurado exitosamente."})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error al anular venta {id_venta}: {e}")
+        return jsonify({"ok": False, "mensaje": str(e)}), 500
     
     # 1. Intentar obtener de la relación de base de datos si existe
     if hasattr(venta, 'detalles') and venta.detalles: 
@@ -2946,6 +2979,12 @@ def send_sw():
     response.headers['Content-Type'] = 'application/javascript'
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
+with app.app_context():
+    try:
+        db.session.execute(text('ALTER TABLE ventas ADD COLUMN anulada BOOLEAN DEFAULT 0'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

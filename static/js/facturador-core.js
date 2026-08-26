@@ -475,7 +475,7 @@ function switchSection(section, btn) {
 async function cargarVentasDia() {
   const b = document.getElementById("ventasDiaBody");
   if (!b) return;
-  b.innerHTML = '<tr><td colspan="4" class="text-center p-4">Cargando ventas...</td></tr>';
+  b.innerHTML = '<tr><td colspan="4" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2 text-primary"></span><span id="ventasLoadingText">Cargando historial de ventas...</span></td></tr>';
   
   let url = "/api/ventas_hoy";
   const fInicio = document.getElementById("fechaInicio")?.value;
@@ -485,8 +485,16 @@ async function cargarVentasDia() {
       url += `?inicio=${fInicio}&fin=${fFin}`;
   }
   
+  const coldStartTimer = setTimeout(() => {
+    const loadingText = document.getElementById("ventasLoadingText");
+    if (loadingText) {
+      loadingText.textContent = "El servidor se estaba reiniciando por inactividad. Esto puede demorar un minuto, por favor no cierres la ventana...";
+    }
+  }, 8000);
+
   try {
     const r = await fetch(url);
+    clearTimeout(coldStartTimer);
     const d = await r.json();
     if (d.ventas && d.ventas.length > 0) {
       b.innerHTML = d.ventas
@@ -502,6 +510,7 @@ async function cargarVentasDia() {
       b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No hay ventas registradas en el período seleccionado</td></tr>';
     }
   } catch (e) { 
+    clearTimeout(coldStartTimer);
     console.error(e);
     b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-danger">Error al cargar</td></tr>'; 
   }

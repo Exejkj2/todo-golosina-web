@@ -706,7 +706,7 @@ async function cargarVentasDia() {
   const b = document.getElementById("ventasDiaBody");
   if (!b) return;
 
-  b.innerHTML = '<tr><td colspan="4" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2 text-primary"></span>Cargando historial de ventas (conectando con el servidor)...</td></tr>';
+  b.innerHTML = '<tr><td colspan="5" class="text-center p-4"><span class="spinner-border spinner-border-sm me-2 text-primary"></span><span id="ventasLoadingText">Cargando historial de ventas...</span></td></tr>';
   
   let url = "/api/ventas_hoy";
   const fInicio = document.getElementById("fechaInicio")?.value;
@@ -718,32 +718,94 @@ async function cargarVentasDia() {
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos de tolerancia para Render
+  const coldStartTimer = setTimeout(() => {
+    const loadingText = document.getElementById("ventasLoadingText");
+    if (loadingText) {
+      loadingText.textContent = "El servidor se estaba reiniciando por inactividad. Esto puede demorar un minuto, por favor no cierres la ventana...";
+    }
+  }, 8000);
 
   try {
     const r = await fetch(url, { signal: controller.signal });
+    clearTimeout(coldStartTimer);
     clearTimeout(timeoutId);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     if (d.ventas && d.ventas.length > 0) {
       b.innerHTML = d.ventas
-        .map((v) => `
-        <tr style="cursor: pointer;" onclick="seleccionarVenta(${v.id}, this)">
-          <td class="ps-3 fw-bold">#${v.id}</td>
-          <td>${v.hora} hs</td>
-          <td><span class="badge bg-light text-dark border">${v.metodo_pago}</span></td>
-          <td class="text-end pe-3 fw-bold">$${Number(v.total).toLocaleString()}</td>
-        </tr>
-      `).join("");
+        .map((v) => {
+          const isAnulada = v.anulada ? 'text-decoration-line-through text-muted bg-light' : '';
+          const btnHtml = v.anulada 
+            ? `<span class="badge bg-danger">Anulada</span>`
+            : `<button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="anularVenta(${v.id}, event)" title="Anular Venta"><i class="bi bi-x-circle"></i> Anular</button>`;
+          return `
+          <tr id="fila-venta-${v.id}" class="${isAnulada}" style="cursor: pointer;" onclick="seleccionarVenta(${v.id}, this)">
+            <td class="ps-3 fw-bold">#${v.id}</td>
+            <td>${v.hora} hs</td>
+            <td><span class="badge bg-light text-dark border">${v.metodo_pago}</span></td>
+            <td class="text-end fw-bold">$${Number(v.total).toLocaleString()}</td>
+            <td class="pe-3 text-end">${btnHtml}</td>
+          </tr>
+          `;
+        }).join("");
     } else {
-      b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No hay ventas registradas en el período seleccionado</td></tr>';
+      b.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted">No hay ventas registradas en el período seleccionado</td></tr>';
     }
   } catch (e) {
+    clearTimeout(coldStartTimer);
     clearTimeout(timeoutId);
     console.error("Error al cargar historial de ventas:", e);
     if (e.name === 'AbortError') {
-      b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-warning"><i class="bi bi-clock-history me-2"></i>El servidor tardó más de 60 segundos en responder. Intente nuevamente.</td></tr>';
+      b.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-warning"><i class="bi bi-clock-history me-2"></i>El servidor tardó más de 60 segundos en responder. Intente nuevamente.</td></tr>';
     } else {
-      b.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor para obtener el historial.</td></tr>';
+      b.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted"><i class="bi bi-cloud-slash me-2"></i>No se pudo conectar con el servidor para obtener el historial.</td></tr>';
+    }
+  }
+}
+
+async function anularVenta(id, event) {
+  event.stopPropagation();
+  
+  const result = await Swal.fire({
+    title: '¿Anular Venta?',
+    text: "Esta acción devolverá el stock y descontará el monto de los ingresos.",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'Sí, anular',
+    cancelButtonText: 'Cancelar'
+  });
+
+  if (result.isConfirmed) {
+    try {
+      const res = await fetch(`/api/ventas/${id}/anular`, { method: 'POST' });
+      const data = await res.json();
+      
+      if (data.ok) {
+        Swal.fire('Anulada', data.mensaje, 'success');
+        
+        // Modificar fila visualmente
+        const fila = document.getElementById(`fila-venta-${id}`);
+        if (fila) {
+          fila.classList.add('text-decoration-line-through', 'text-muted', 'bg-light');
+          const tdAccion = fila.querySelector('td:last-child');
+          if (tdAccion) {
+            tdAccion.innerHTML = '<span class="badge bg-danger">Anulada</span>';
+          }
+        }
+        
+        // Actualizar métricas del dashboard si estamos en la misma fecha
+        const totalVentasEl = document.getElementById("metric-ventas");
+        if (totalVentasEl) {
+          cargarDashboard(); // Recargar top métricas si existe la función o actualizar globalmente
+        }
+      } else {
+        Swal.fire('Error', data.mensaje || 'Error al anular', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Error', 'Fallo de conexión', 'error');
     }
   }
 }
