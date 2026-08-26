@@ -2184,16 +2184,34 @@ def admin_edit_product(id):
 @app.route('/admin/producto/delete/<int:id>', methods=['POST'])
 @login_requerido
 def admin_delete_product(id):
-    if not session.get('admin_autenticado'): return redirect('/')
+    if not session.get('admin_autenticado'):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'ok': False, 'error': 'No autorizado'}), 401
+        return redirect('/')
     try:
         producto = Producto.query.get_or_404(id)
         db.session.delete(producto)
         db.session.commit()
         actualizar_version_catalogo()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'ok': True, 'mensaje': 'Producto eliminado correctamente.'})
         flash('Producto eliminado definitivamente de la base de datos.', 'success')
-    except Exception as e:
+    except (IntegrityError, Exception) as e:
         db.session.rollback()
-        flash(f'Error al intentar eliminar el producto (puede tener ventas asociadas): {str(e)}', 'danger')
+        # Verificar si es error de integridad referencial / foreign key / not-null constraint por ventas históricas
+        err_str = str(e).lower()
+        is_integrity = isinstance(e, IntegrityError) or "not-null constraint" in err_str or "violates not-null" in err_str or "foreign key" in err_str or "detalle_ventas" in err_str
+        
+        if is_integrity:
+            mensaje = "No se puede eliminar este producto porque tiene ventas asociadas en el historial. Recomendación: Pon su stock en 0 o desactívalo."
+        else:
+            mensaje = f"Error al intentar eliminar el producto: {str(e)}"
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'ok': False, 'error': mensaje, 'mensaje': mensaje}), 400
+
+        flash(mensaje, 'warning' if is_integrity else 'danger')
+
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/api/productos/eliminar_masivo', methods=['POST'])
