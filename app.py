@@ -2061,27 +2061,36 @@ def admin_add_product():
                     if nc in codigos_existentes:
                         return jsonify({"ok": False, "error": f"El código '{nc}' ya está registrado en el producto '{p.nombre}' (ID: {p.id})."}), 400
 
-    nuevo = Producto(
-        nombre=nombre, precio_lista_1=precio_lista_1, precio_lista_2=precio_lista_2, precio_lista_3=precio_lista_3,
-        descripcion=descripcion,
-        categoria_id=categoria_id, stock=stock,
-        permitir_sin_stock=permitir_sin_stock,
-        codigo_barra=codigo_barra,
-        
-        sincronizado=not es_offline(),
-        ultima_actualizacion=hora_argentina()
-    )
-    db.session.add(nuevo)
-    db.session.commit()
-    actualizar_version_catalogo()
+    try:
+        nuevo = Producto(
+            nombre=nombre, precio_lista_1=precio_lista_1, precio_lista_2=precio_lista_2, precio_lista_3=precio_lista_3,
+            descripcion=descripcion,
+            categoria_id=categoria_id, stock=stock,
+            permitir_sin_stock=permitir_sin_stock,
+            codigo_barra=codigo_barra,
+            sincronizado=not es_offline(),
+            ultima_actualizacion=hora_argentina()
+        )
+        db.session.add(nuevo)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({"ok": False, "status": "error", "error": f"Error al guardar en la base de datos: {str(e)}"}), 500
+        flash(f"Error al guardar en la base de datos: {str(e)}", "danger")
+        return redirect(url_for('admin_dashboard'))
+
+    # Tareas posteriores al commit protegidas para evitar romper la respuesta exitosa
+    try:
+        actualizar_version_catalogo()
+    except Exception as e:
+        print(f"[WARN] Error al actualizar versión del catálogo: {e}")
 
     # Retorno directo de JSON para el frontend sin recargas
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
-        cat_nombre = nuevo.categoria_rel.nombre if nuevo.categoria_rel else 'General'
-        return jsonify({
-            "ok": True,
-            "mensaje": "Producto agregado exitosamente.",
-            "producto": {
+        try:
+            cat_nombre = nuevo.categoria_rel.nombre if (getattr(nuevo, 'categoria_rel', None) and nuevo.categoria_rel) else 'General'
+            producto_data = {
                 "id": nuevo.id,
                 "nombre": nuevo.nombre,
                 "codigo_barra": nuevo.codigo_barra or '',
@@ -2092,9 +2101,30 @@ def admin_add_product():
                 "categoria_nombre": cat_nombre,
                 "permitir_sin_stock": nuevo.permitir_sin_stock,
                 "descripcion": nuevo.descripcion or '',
-                "imagen_url": nuevo.imagen_url or nuevo.imagen or ''
+                "imagen_url": getattr(nuevo, 'imagen_url', '') or getattr(nuevo, 'imagen', '') or ''
             }
-        }), 201
+        except Exception as e:
+            print(f"[WARN] Error serializando producto creado: {e}")
+            producto_data = {
+                "id": nuevo.id,
+                "nombre": nuevo.nombre,
+                "codigo_barra": nuevo.codigo_barra or '',
+                "precio_lista_1": nuevo.precio_lista_1,
+                "precio_lista_2": nuevo.precio_lista_2,
+                "precio_lista_3": nuevo.precio_lista_3,
+                "stock": nuevo.stock,
+                "categoria_nombre": 'General',
+                "permitir_sin_stock": nuevo.permitir_sin_stock,
+                "descripcion": nuevo.descripcion or '',
+                "imagen_url": ''
+            }
+
+        return jsonify({
+            "ok": True,
+            "status": "success",
+            "mensaje": "Producto agregado exitosamente.",
+            "producto": producto_data
+        }), 200
 
     flash('Producto agregado exitosamente.', 'success')
     return redirect(url_for('admin_dashboard'))

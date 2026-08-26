@@ -890,9 +890,17 @@
               }
             });
 
-            const data = await response.json();
+            let data = null;
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+              try {
+                data = await response.json();
+              } catch (parseErr) {
+                console.error('Error al parsear JSON:', parseErr);
+              }
+            }
 
-            if (response.ok && data.ok && data.producto) {
+            if (response.ok && data && (data.ok || data.status === 'success') && data.producto) {
               const p = data.producto;
               
               // 1. Cerrar Modal
@@ -966,7 +974,10 @@
 
             } else {
               if (errorAlert && errorContainer) {
-                errorAlert.textContent = data.error || data.mensaje || 'Error al guardar el producto.';
+                const errorMsg = (data && (data.error || data.mensaje)) 
+                  ? (data.error || data.mensaje) 
+                  : `Error del servidor (${response.status}). No se pudo procesar la solicitud.`;
+                errorAlert.textContent = errorMsg;
                 errorContainer.style.display = 'block';
                 errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }
