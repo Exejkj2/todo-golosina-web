@@ -1071,64 +1071,48 @@
         });
       });
 
-      // --- Live Search + Navegación por Teclado + Búsqueda Backend ---
-      let filasVisibles = [];
-      let indiceSeleccionado = -1;
-
-      function resaltarFilaSeleccionada() {
-        document.querySelectorAll('#tabla_productos tbody tr').forEach(f => f.classList.remove('table-active'));
-        if (indiceSeleccionado >= 0 && filasVisibles[indiceSeleccionado]) {
-          const fila = filasVisibles[indiceSeleccionado];
-          fila.classList.add('table-active');
-          fila.scrollIntoView({ block: 'nearest' });
-        }
-      }
-
+      // --- Buscador con Debounce (400ms) + Límite de Renderizado ---
+      const searchForm = document.getElementById('ajaxSearchFormAdmin');
       const inputBuscador = document.getElementById('buscador_admin');
-      if (inputBuscador) {
-        // Filtrado visual instantáneo sobre las filas ya cargadas
+      let debounceTimer = null;
+      let initialSearchValue = inputBuscador ? inputBuscador.value.trim() : '';
+
+      if (inputBuscador && searchForm) {
+        // Restaurar foco y colocar cursor al final del input tras recarga
+        if (inputBuscador.value) {
+          inputBuscador.focus();
+          const val = inputBuscador.value;
+          inputBuscador.value = '';
+          inputBuscador.value = val;
+        }
+
+        // Debounce de 400ms: espera a que el usuario termine de escribir para consultar
         inputBuscador.addEventListener('input', function(e) {
-          const termino = e.target.value.toLowerCase();
-          const filas = document.querySelectorAll('#tabla_productos tbody tr');
-          filas.forEach(fila => {
-            fila.classList.remove('table-active');
-            fila.style.display = fila.textContent.toLowerCase().includes(termino) ? '' : 'none';
-          });
-          indiceSeleccionado = -1;
-          filasVisibles = Array.from(filas).filter(f => f.style.display === '');
+          const currentVal = e.target.value.trim();
+          
+          if (debounceTimer) {
+            clearTimeout(debounceTimer);
+          }
+
+          // Feedback visual: mostrar spinner en el botón de búsqueda
+          const btnSubmit = searchForm.querySelector('button[type="submit"]');
+          if (btnSubmit && currentVal !== initialSearchValue) {
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Buscando...';
+          }
+
+          debounceTimer = setTimeout(() => {
+            if (currentVal !== initialSearchValue) {
+              searchForm.submit();
+            }
+          }, 400);
         });
 
-        // Navegación con flechas + Enter inteligente
+        // Enviar inmediatamente al presionar Enter cancelando el temporizador
         inputBuscador.addEventListener('keydown', function(e) {
-          if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (indiceSeleccionado < filasVisibles.length - 1) {
-              indiceSeleccionado++;
-              resaltarFilaSeleccionada();
-            }
-          } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (indiceSeleccionado > 0) {
-              indiceSeleccionado--;
-              resaltarFilaSeleccionada();
-            }
-          } else if (e.key === 'Enter') {
-            // Prioridad 1: fila seleccionada con flechas → abrir modal
-            if (indiceSeleccionado >= 0 && filasVisibles[indiceSeleccionado]) {
-              e.preventDefault();
-              const btn = filasVisibles[indiceSeleccionado].querySelector('button[data-bs-target^="#editModal"]');
-              if (btn) btn.click();
-            // Prioridad 2: exactamente 1 fila visible sin navegación → abrir modal
-            } else if (filasVisibles.length === 1 && indiceSeleccionado < 0) {
-              e.preventDefault();
-              const btn = filasVisibles[0].querySelector('button[data-bs-target^="#editModal"]');
-              if (btn) btn.click();
-            }
-            // Prioridad 3: sin coincidencia única → dejar que el form envíe GET /admin?q=...
+          if (e.key === 'Enter') {
+            if (debounceTimer) clearTimeout(debounceTimer);
           }
         });
-        // No se bloquea el submit: botón "Buscar" y Enter (sin fila única seleccionada)
-        // envían la petición GET al backend correctamente.
       }
 
       // --- Manejo de Importación Masiva con Reporte AJAX ---

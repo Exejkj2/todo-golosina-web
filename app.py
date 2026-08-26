@@ -1997,8 +1997,13 @@ def admin_dashboard():
                     Producto.codigo_barra.ilike(f'%{q}%')
                 )
             )
-        productos  = base.order_by(Producto.id.desc()).paginate(page=page, per_page=50, error_out=False)
-        categorias = Categoria.query.all()
+        # Eager loading para evitar N+1 queries sobre categorías y paginación rápida de 50 registros
+        productos = (
+            base.options(db.joinedload(Producto.categoria_rel))
+            .order_by(Producto.id.desc())
+            .paginate(page=page, per_page=50, error_out=False)
+        )
+        categorias = Categoria.query.order_by(Categoria.nombre.asc()).all()
         return render_template('admin.html', productos=productos, categorias=categorias, search=q, q=q)
     except Exception as e:
         return f"<h1>Error Oculto: {str(e)}</h1><pre>{traceback.format_exc()}</pre>", 500
