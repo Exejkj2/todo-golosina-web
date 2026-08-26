@@ -2989,12 +2989,6 @@ def send_sw():
     return response
 with app.app_context():
     try:
-        db.session.execute(text('ALTER TABLE ventas ADD COLUMN anulada BOOLEAN DEFAULT 0'))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        
-    try:
         db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_nombre ON productos(nombre)'))
         db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_producto_codigo_barra ON productos(codigo_barra)'))
         db.session.commit()
